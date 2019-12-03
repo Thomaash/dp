@@ -12,10 +12,19 @@ const otapi = new OTAPI();
   );
 
   console.info("Waiting for OpenTrack...");
-  await otapi.once("simReadyForSimulation");
+  await Promise.all(
+    [
+      async (): Promise<void> => {
+        await otapi.once("simReadyForSimulation");
+        console.info("OpenTrack is ready for simulation.");
+      },
+      async (): Promise<void> => {
+        await otapi.once("simServerStarted");
+        console.info("OpenTrack has started simulation server.");
+      }
+    ].map((func): Promise<void> => func())
+  );
   console.info("OpenTrack is ready.");
-  await otapi.once("simServerStarted");
-  console.info("OpenTrack has started simulation server.");
 
   try {
     await otapi.startSimulation();
