@@ -1,7 +1,7 @@
 import bodyParser from "body-parser";
 import express, { Express } from "express";
 import xml2js from "xml2js";
-import { Config } from "../../config";
+import { Config } from "../config";
 import { Server } from "http";
 
 export interface Content {
