@@ -19,7 +19,7 @@ async function processSOAP(soapText: string): Promise<Content> {
   // SOAP message. If the input is not valid let's just crash for now.
   const xml = soapXML["SOAP-ENV:Envelope"]["SOAP-ENV:Body"][0];
   const name = Object.keys(xml)[0];
-  const attributes = xml.$;
+  const attributes = xml[name][0].$;
 
   return {
     attributes,
