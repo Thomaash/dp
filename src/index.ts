@@ -1,6 +1,10 @@
 import { AnyEventCallback, OTAPI } from "./otapi";
+import { spawn } from "child_process";
 
 const otapi = new OTAPI();
+
+const otBinaryPath =
+  "/mnt/c/Program Files (x86)/OpenTrack V1.9/OpenTrack.app/OpenTrack.exe";
 
 (async (): Promise<void> => {
   const anyCallback: AnyEventCallback = async function(
@@ -8,12 +12,14 @@ const otapi = new OTAPI();
     payload
   ): Promise<void> {
     process.stdout.write(
-      `\n\n===> OT: ${name}\n${JSON.stringify(payload, null, 4)}\n`
+      `\n\n===> OT: ${name}\n${JSON.stringify(payload, null, 4)}\n\n`
     );
   };
 
   try {
     await otapi.onAny(anyCallback);
+
+    spawn(otBinaryPath, ["-otd"]);
 
     console.info("Waiting for OpenTrack...");
     await Promise.all(
@@ -37,7 +43,7 @@ const otapi = new OTAPI();
   } catch (error) {
     console.error(error);
   } finally {
-    await otapi.onAny(anyCallback);
+    await otapi.offAny(anyCallback);
   }
 })().catch((error): void => {
   console.error(error);
