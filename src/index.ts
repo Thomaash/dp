@@ -1,10 +1,36 @@
+import globby from "globby";
 import { AnyEventCallback, OTAPI } from "./otapi";
+import { release } from "os";
 import { spawn } from "child_process";
 
 const otapi = new OTAPI();
 
 const otBinaryPath =
   "/mnt/c/Program Files (x86)/OpenTrack V1.9/OpenTrack.app/OpenTrack.exe";
+const otWorksheetGlob =
+  "/mnt/c/Users/st46664/Documents/Model/Worksheets/*.opentrack";
+
+const isWSL =
+  process.platform === "linux" &&
+  release()
+    .toUpperCase()
+    .includes("MICROSOFT");
+
+async function globWorksheetPaths(glob: string): Promise<string[]> {
+  const worksheets = await globby(glob);
+  return isWSL
+    ? worksheets.map((path): string =>
+        /^\/mnt\//.test(path)
+          ? path
+              .replace(
+                /^\/mnt\/([^\/]+)\//,
+                (_, letter: string): string => `${letter.toUpperCase()}:/`
+              )
+              .replace(/\//g, "\\")
+          : path
+      )
+    : worksheets;
+}
 
 (async (): Promise<void> => {
   const anyCallback: AnyEventCallback = async function(
@@ -19,7 +45,9 @@ const otBinaryPath =
   try {
     await otapi.onAny(anyCallback);
 
-    spawn(otBinaryPath, ["-otd"]);
+    const worksheetPaths = await globWorksheetPaths(otWorksheetGlob);
+
+    spawn(otBinaryPath, ["-otd", ...worksheetPaths]);
 
     console.info("Waiting for OpenTrack...");
     await Promise.all(
