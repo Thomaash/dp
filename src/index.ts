@@ -30,7 +30,9 @@ const otapi = new OTAPI();
     );
     console.info("OpenTrack is ready.");
 
+    const simulationEnd = otapi.once("simStopped");
     await otapi.startSimulation();
+    await simulationEnd;
     await otapi.terminateApplication();
   } catch (error) {
     console.error(error);
