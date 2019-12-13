@@ -45,12 +45,7 @@ async function globWorksheetPaths(glob: string): Promise<string[]> {
   try {
     await otapi.onAny(anyCallback);
 
-    const worksheetPaths = await globWorksheetPaths(otWorksheetGlob);
-
-    spawn(otBinaryPath, ["-otd", ...worksheetPaths]);
-
-    console.info("Waiting for OpenTrack...");
-    await Promise.all(
+    const ready = Promise.all(
       [
         async (): Promise<void> => {
           await otapi.once("simReadyForSimulation");
@@ -62,6 +57,13 @@ async function globWorksheetPaths(glob: string): Promise<string[]> {
         }
       ].map((func): Promise<void> => func())
     );
+
+    console.info("Starting OpenTrack...");
+    const worksheetPaths = await globWorksheetPaths(otWorksheetGlob);
+    spawn(otBinaryPath, ["-otd", ...worksheetPaths]);
+
+    console.info("Waiting for OpenTrack...");
+    await ready;
     console.info("OpenTrack is ready.");
 
     const simulationEnd = otapi.once("simStopped");
