@@ -42,6 +42,8 @@ export function createPayload(
         trainID: attrs["trainID"]
       };
 
+    case "routeEntry":
+    case "routeExit":
     case "routeReleased":
     case "routeReserved":
       return {

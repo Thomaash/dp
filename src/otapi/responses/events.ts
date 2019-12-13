@@ -4,6 +4,8 @@ export interface EventPayloads {
   infraPartReleased: { trainID: string; infraPartID: string; time: number };
   infraPartReserved: { trainID: string; infraPartID: string; time: number };
   ping: { time: number };
+  routeEntry: { trainID: string; routeID: string; time: number };
+  routeExit: { trainID: string; routeID: string; time: number };
   routePartReleased: {
     trainID: string;
     routeID: string;
