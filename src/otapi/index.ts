@@ -44,9 +44,10 @@ import {
   stepSimulation,
   terminateApplication
 } from "./requests";
-import { off, offAny, on, onAny, once, onceAny } from "./responses";
+import { ResponseManager, EventCallback, EventPayloads } from "./responses";
 
 import { Config } from "./config";
+import { EventNamePayloadPair } from "./responses/manager";
 
 export {
   AnyEventCallback,
@@ -72,6 +73,8 @@ const defaultConstructorParams: Required<OTAPIConstructorParams> = {
 };
 
 export class OTAPI {
+  private readonly _responseManager: ResponseManager;
+
   public readonly config: Config;
 
   public constructor({
@@ -81,6 +84,17 @@ export class OTAPI {
     protocol = defaultConstructorParams.protocol
   }: OTAPIConstructorParams = defaultConstructorParams) {
     this.config = Object.freeze({ host, portApp, portOT, protocol });
+    this._responseManager = new ResponseManager(this.config);
+  }
+
+  /*
+   * Lifecycle
+   */
+  public start(): Promise<void> {
+    return this._responseManager.start();
+  }
+  public stop(): Promise<void> {
+    return this._responseManager.stop();
   }
 
   /*
@@ -312,24 +326,31 @@ export class OTAPI {
    * Responses
    */
 
-  public off(...rest: Parameters<typeof off>): ReturnType<typeof off> {
-    return off.apply(this.config, rest);
+  public off(callback: EventCallback<keyof EventPayloads>): void;
+  public off<EventName extends keyof EventPayloads>(
+    eventName: EventName,
+    callback: EventCallback<EventName>
+  ): void;
+  public off(...rest: [any] | [any | any]): void {
+    return this._responseManager.off(...rest);
   }
-  public offAny(...rest: Parameters<typeof offAny>): ReturnType<typeof offAny> {
-    return offAny.apply(this.config, rest);
+
+  public on(callback: EventCallback<keyof EventPayloads>): void;
+  public on<EventName extends keyof EventPayloads>(
+    eventName: EventName,
+    callback: EventCallback<EventName>
+  ): void;
+  public on(...rest: [any] | [any | any]): void {
+    return this._responseManager.on(...rest);
   }
-  public on(...rest: Parameters<typeof on>): ReturnType<typeof on> {
-    return on.apply(this.config, rest);
-  }
-  public onAny(...rest: Parameters<typeof onAny>): ReturnType<typeof onAny> {
-    return onAny.apply(this.config, rest);
-  }
-  public once(...rest: Parameters<typeof once>): ReturnType<typeof once> {
-    return once.apply(this.config, rest);
-  }
-  public onceAny(
-    ...rest: Parameters<typeof onceAny>
-  ): ReturnType<typeof onceAny> {
-    return onceAny.apply(this.config, rest);
+
+  public once<EventName extends keyof EventPayloads>(
+    eventName?: EventName
+  ): Promise<EventNamePayloadPair> {
+    if (eventName != null) {
+      return this._responseManager.once(eventName);
+    } else {
+      return this._responseManager.once();
+    }
   }
 }

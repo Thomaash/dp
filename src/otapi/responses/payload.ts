@@ -1,5 +1,10 @@
-import { Content } from "./core";
 import { EventNames, EventPayloads } from "./events";
+
+export interface Content {
+  attributes: Record<string, string>;
+  name: string;
+  xml: any;
+}
 
 function number(input: string): number | undefined {
   return input != null ? +input : void 0;
