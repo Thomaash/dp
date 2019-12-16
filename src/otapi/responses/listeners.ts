@@ -21,7 +21,7 @@ export function on<EventName extends keyof EventPayloads>(
   return new Promise<void>((resolve, reject): void => {
     const filteredCallback = (content: Content): void => {
       if (content.name !== eventName) {
-        return; // we're waiting for different event.
+        return; // We're waiting for different event.
       }
 
       callback(createPayload(eventName, content));
@@ -62,7 +62,7 @@ export function once<EventName extends keyof EventPayloads>(
   return new Promise<EventPayloads[EventName]>((resolve, reject): void => {
     const callback = (content: Content): void => {
       if (content.name !== eventName) {
-        return; // we're waiting for different event.
+        return; // We're waiting for different event.
       }
 
       removeListener

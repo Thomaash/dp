@@ -37,23 +37,7 @@ export async function sendSimpleRequest(
 </SOAP-ENV:Envelope>`,
 
     method: "POST",
-    headers: {
-      "Content-Type": "application/xml; charset=utf-8",
-      connection: "close"
-    }
-  });
-}
-
-export async function send(this: Config, body: string): Promise<void> {
-  await fetch(getURL.call(this), {
-    body: `<?xml version="1.0" encoding="UTF-8"?>
-<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">
-  <SOAP-ENV:Body>
-    ${body}
-  </SOAP-ENV:Body>
-</SOAP-ENV:Envelope>`,
-
-    method: "POST",
+    timeout: 5000,
     headers: {
       "Content-Type": "application/xml; charset=utf-8",
       connection: "close"

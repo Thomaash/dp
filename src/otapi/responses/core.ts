@@ -51,17 +51,19 @@ export function addListener(
       app.use(
         bodyParser.text({
           type: (): boolean => true,
-          limit: "5mb"
+          limit: "50mb"
         })
       );
 
-      app.post("/otd", (req, _res): void => {
-        listeners.forEach(
-          async (callback): Promise<void> => {
-            callback(await processSOAP(req.body));
-          }
-        );
-      });
+      app.all(
+        "*",
+        async (req): Promise<void> => {
+          const soap = await processSOAP(req.body);
+          listeners.forEach((callback): void => {
+            callback(soap);
+          });
+        }
+      );
 
       alses.set(port, {
         app,
