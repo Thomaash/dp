@@ -1,14 +1,52 @@
 import { promisify } from "util";
-import { readFile as readFileCallback } from "fs";
+import {
+  readFile as readFileCallback,
+  writeFile as writeFileCallback
+} from "fs";
 import { spawn } from "child_process";
 
 import { AnyEventCallback, OTAPI, parseRunfile } from "./otapi";
 
 const readFile = promisify(readFileCallback);
+const writeFile = promisify(writeFileCallback);
 
 const otBinaryPath =
   "/mnt/c/Program Files (x86)/OpenTrack V1.9/OpenTrack.app/OpenTrack.exe";
 const otRunfile = "/mnt/c/Users/st46664/Documents/Model/runfile.txt";
+const otLog = "/mnt/c/Users/st46664/Documents/Model/OpenTrack.log";
+
+function spawnAndLog(
+  binaryPath: string,
+  args: string[],
+  logPath: string
+): Promise<{ code: number }> {
+  return new Promise((resolve, reject): void => {
+    let stdout = "";
+    let stderr = "";
+
+    const command = spawn(binaryPath, args);
+
+    command.stdout.on("data", (data): void => {
+      stdout += data.toString();
+    });
+    command.stderr.on("data", (data): void => {
+      stderr += data.toString();
+    });
+
+    command.on("close", (code): void => {
+      writeFile(
+        logPath,
+        [
+          `OpenTrack exited with exit code ${code}.`,
+          `STDOUT:\n${stdout}`,
+          `STDERR:\n${stderr}`
+        ].join("\n\n")
+      )
+        .then(resolve.bind(null, { code }))
+        .catch(reject);
+    });
+  });
+}
 
 (async (): Promise<void> => {
   const runfile = parseRunfile((await readFile(otRunfile)).toString());
@@ -52,7 +90,7 @@ const otRunfile = "/mnt/c/Users/st46664/Documents/Model/runfile.txt";
 
     console.info("Starting OpenTrack...");
     console.info([otBinaryPath, ...otArgs]);
-    spawn(otBinaryPath, otArgs);
+    const command = spawnAndLog(otBinaryPath, otArgs, otLog);
 
     console.info("Waiting for OpenTrack...");
     await sumlationStart;
@@ -60,6 +98,9 @@ const otRunfile = "/mnt/c/Users/st46664/Documents/Model/runfile.txt";
 
     await simulationEnd;
     console.info("Simulation ended.");
+
+    const { code } = await command;
+    console.info(`OpenTrack exited with exit code ${code}.`);
   } finally {
     otapi.off(debugCallback);
     await otapi.stop();
