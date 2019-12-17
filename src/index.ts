@@ -15,9 +15,25 @@ const otRunfile = "/mnt/c/Users/st46664/Documents/Model/runfile.txt";
   const portOT = +runfile["OpenTrack Server Port"][0];
   const portApp = +runfile["OTD Server Port"][0];
 
+  const otArgs = [
+    "-otd",
+    "-scriptinit",
+    `-runfile=${
+      otRunfile.startsWith("/mnt/")
+        ? `${
+            // Uppercase drive letter.
+            otRunfile.slice(5, 6).toUpperCase()
+          }:${
+            // The relative path on given drive with backslashes instead of shlashes.
+            otRunfile.slice(6).replace(/\//g, "\\")
+          }`
+        : otRunfile
+    }`
+  ];
+
   const otapi = new OTAPI({ portApp, portOT });
 
-  const anyCallback: AnyEventCallback = async function(
+  const debugCallback: AnyEventCallback = async function(
     name,
     payload
   ): Promise<void> {
@@ -29,14 +45,14 @@ const otRunfile = "/mnt/c/Users/st46664/Documents/Model/runfile.txt";
   try {
     await otapi.start();
 
-    otapi.on(anyCallback);
+    otapi.on(debugCallback);
 
     const sumlationStart = otapi.once("simStarted");
     const simulationEnd = otapi.once("simStopped");
 
     console.info("Starting OpenTrack...");
-    console.info([otBinaryPath, "-otd", "-scriptinit", "-runfile", otRunfile]);
-    spawn(otBinaryPath, ["-otd", "-scriptinit", "-runfile", otRunfile]);
+    console.info([otBinaryPath, ...otArgs]);
+    spawn(otBinaryPath, otArgs);
 
     console.info("Waiting for OpenTrack...");
     await sumlationStart;
@@ -44,10 +60,8 @@ const otRunfile = "/mnt/c/Users/st46664/Documents/Model/runfile.txt";
 
     await simulationEnd;
     console.info("Simulation ended.");
-  } catch (error) {
-    console.error(error);
   } finally {
-    otapi.off(anyCallback);
+    otapi.off(debugCallback);
     await otapi.stop();
     console.info("Finished.");
   }
