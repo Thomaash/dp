@@ -1,5 +1,3 @@
-// vim:fdm=marker
-
 import { Config, sendSimpleRequest as send } from "./common";
 
 /// activateTrain {{{
@@ -842,3 +840,5 @@ export function terminateApplication(
 }
 
 /// }}}
+
+// vim:fdm=marker

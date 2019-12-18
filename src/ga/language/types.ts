@@ -20,15 +20,16 @@ export interface Tuple<T extends any, L extends number> extends Array<T> {
 }
 
 export interface Expression {
-  root: Node;
+  root: Statement;
 }
 
 export interface Operator<Args extends PositiveInteger> {
   args: Args;
-  children: (Operator<PositiveInteger> | Terminal)[] & { length: Args };
   clone: () => Operator<Args>;
   code: string;
   name: string;
+  operands: (Operator<PositiveInteger> | Terminal)[] & { length: Args };
+  run: Function;
 }
 export interface Terminal {
   args: 0;
@@ -36,4 +37,4 @@ export interface Terminal {
   code: string;
   name: string;
 }
-export type Node = Operator<PositiveInteger> | Terminal;
+export type Statement = Operator<PositiveInteger> | Terminal;

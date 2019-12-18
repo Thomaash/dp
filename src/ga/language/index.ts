@@ -4,11 +4,13 @@ import { format } from "prettier";
 import {
   Operator,
   Terminal,
-  Node,
+  Statement,
   PositiveInteger,
   NextInteger,
   Tuple
 } from "./types";
+
+// Generic {{{
 
 function formatStatement(code: string): string {
   return (
@@ -25,27 +27,34 @@ export class UniversalOperator<Args extends PositiveInteger>
   public constructor(
     public readonly name: string,
     private readonly _code: Tuple<string, NextInteger[Args]>,
-    public readonly children: Tuple<Node, Args>
+    public readonly operands: Tuple<Statement, Args>
   ) {
-    this.args = children.length;
+    this.args = operands.length;
     Object.freeze(this);
   }
 
   public get code(): string {
     return formatStatement(
       this._code.reduce((acc, codeFragment, i): string => {
-        return i < this.children.length
-          ? `${acc} ${codeFragment} (${this.children[i].code})`
+        return i < this.operands.length
+          ? `${acc} ${codeFragment} (${this.operands[i].code})`
           : acc + codeFragment;
       }, "")
     );
+  }
+
+  public get run(): Function {
+    return new Function(`"use strict"; return (${this.code});`);
   }
 
   public clone(): UniversalOperator<Args> {
     return new UniversalOperator(
       this.name,
       this._code,
-      this.children.map((child): Node => child.clone()) as Tuple<Node, Args>
+      this.operands.map((operand): Statement => operand.clone()) as Tuple<
+        Statement,
+        Args
+      >
     );
   }
 }
@@ -65,11 +74,28 @@ export class UniversalTerminal implements Terminal {
   }
 }
 
+// }}}
+// Terminals {{{
+
+// Bool {{{
+
+export class Bool extends UniversalTerminal implements Terminal {
+  public constructor(value: boolean) {
+    super("Bool", "" + value);
+  }
+}
+
+// }}}
+// Constant {{{
+
 export class Constant extends UniversalTerminal implements Terminal {
   public constructor(value: number) {
     super("constant", "" + value);
   }
 }
+
+// }}}
+// RandomBipolarConstant {{{
 
 export class RandomBipolarConstant extends UniversalTerminal
   implements Terminal {
@@ -81,14 +107,93 @@ export class RandomBipolarConstant extends UniversalTerminal
   }
 }
 
-export class Plus extends UniversalOperator<2> implements Operator<2> {
-  public constructor(...children: Tuple<Node, 2>) {
-    super("Plus", ["", "+", ""], children);
+// }}}
+
+// }}}
+// Operators {{{
+
+// And {{{
+
+export class And extends UniversalOperator<2> implements Operator<2> {
+  public constructor(...operands: Tuple<Statement, 2>) {
+    super("Minus", ["", "&&", ""], operands);
   }
 }
 
-export class Minus extends UniversalOperator<2> implements Operator<2> {
-  public constructor(...children: Tuple<Node, 2>) {
-    super("Minus", ["", "-", ""], children);
+// }}}
+// Divide {{{
+
+export class Divide extends UniversalOperator<2> implements Operator<2> {
+  public constructor(...operands: Tuple<Statement, 2>) {
+    super("Minus", ["", "/", ""], operands);
   }
 }
+
+// }}}
+// Floor {{{
+
+export class Floor extends UniversalOperator<1> implements Operator<1> {
+  public constructor(...operands: Tuple<Statement, 1>) {
+    super("Floor", ["Math.floor(", ")"], operands);
+  }
+}
+
+// }}}
+// Minus {{{
+
+export class Minus extends UniversalOperator<2> implements Operator<2> {
+  public constructor(...operands: Tuple<Statement, 2>) {
+    super("Minus", ["", "-", ""], operands);
+  }
+}
+
+// }}}
+// Not {{{
+
+export class Not extends UniversalOperator<1> implements Operator<1> {
+  public constructor(...operands: Tuple<Statement, 1>) {
+    super("Minus", ["!", ""], operands);
+  }
+}
+
+// }}}
+// Or {{{
+
+export class Or extends UniversalOperator<2> implements Operator<2> {
+  public constructor(...operands: Tuple<Statement, 2>) {
+    super("Minus", ["", "||", ""], operands);
+  }
+}
+
+// }}}
+// Plus {{{
+
+export class Plus extends UniversalOperator<2> implements Operator<2> {
+  public constructor(...operands: Tuple<Statement, 2>) {
+    super("Plus", ["", "+", ""], operands);
+  }
+}
+
+// }}}
+// Power {{{
+
+export class Power extends UniversalOperator<2> implements Operator<2> {
+  public constructor(...operands: Tuple<Statement, 2>) {
+    super("Power", ["", "**", ""], operands);
+  }
+}
+
+// }}}
+// Times {{{
+
+export class Times extends UniversalOperator<2> implements Operator<2> {
+  public constructor(...operands: Tuple<Statement, 2>) {
+    super("Minus", ["", "*", ""], operands);
+  }
+}
+
+// }}}
+
+// }}}
+
+// vim:fdm=marker
