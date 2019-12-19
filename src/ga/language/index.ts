@@ -2,13 +2,17 @@ export * from "./types";
 
 import { format } from "prettier";
 import {
-  Operator,
-  Terminal,
-  Statement,
-  PositiveInteger,
   NextInteger,
-  Tuple
+  Operator,
+  OperatorBuilder,
+  PositiveInteger,
+  Statement,
+  Terminal,
+  TerminalBuilder,
+  Tuple,
+  Rng
 } from "./types";
+import { deepFreeze } from "../../util/deep-freeze";
 
 // Generic {{{
 
@@ -20,179 +24,109 @@ function formatStatement(code: string): string {
   );
 }
 
-export class UniversalOperator<Args extends PositiveInteger>
-  implements Operator<Args> {
-  public readonly args: Args;
-
-  public constructor(
-    public readonly name: string,
-    private readonly _code: Tuple<string, NextInteger[Args]>,
-    public readonly operands: Tuple<Statement, Args>
-  ) {
-    this.args = operands.length;
-    Object.freeze(this);
-  }
-
-  public get code(): string {
-    return formatStatement(
-      this._code.reduce((acc, codeFragment, i): string => {
-        return i < this.operands.length
-          ? `${acc} ${codeFragment} (${this.operands[i].code})`
-          : acc + codeFragment;
-      }, "")
-    );
-  }
-
-  public get run(): Function {
-    return new Function(`"use strict"; return (${this.code});`);
-  }
-
-  public clone(): UniversalOperator<Args> {
-    return new UniversalOperator(
-      this.name,
-      this._code,
+function createOperatorBuilder<Args extends PositiveInteger>(
+  name: string,
+  args: Args,
+  ...codeFragments: Tuple<string, NextInteger[Args]>
+): OperatorBuilder<Args> {
+  function clone(this: Operator<Args>): Operator<Args> {
+    return create(
       this.operands.map((operand): Statement => operand.clone()) as Tuple<
         Statement,
         Args
       >
     );
   }
+
+  function create(operands: Tuple<Statement, Args>): Operator<Args> {
+    const code = formatStatement(
+      codeFragments.reduce((acc, codeFragment, i): string => {
+        return i < operands.length
+          ? `${acc} ${codeFragment} (${operands[i].code})`
+          : acc + codeFragment;
+      }, "")
+    );
+
+    const run = new Function(`"use strict"; return (${code});`);
+
+    return deepFreeze({
+      args,
+      clone,
+      code,
+      name,
+      operands,
+      run
+    });
+  }
+
+  return deepFreeze({ args, name, create });
 }
 
-export class UniversalTerminal implements Terminal {
-  public readonly args = 0 as const;
+function createTerminalBuilder(
+  name: string,
+  createCode: (rng: Rng) => string
+): TerminalBuilder {
+  function create(rng: Rng): Terminal {
+    const code = createCode(rng);
+    const run = new Function(`"use strict"; return (${code});`);
 
-  public constructor(
-    public readonly name: string,
-    public readonly code: string
-  ) {
-    Object.freeze(this);
+    function clone(this: Terminal): Terminal {
+      return deepFreeze({
+        args: 0,
+        clone,
+        code,
+        name,
+        run
+      });
+    }
+
+    return deepFreeze({
+      args: 0,
+      clone,
+      code,
+      name,
+      run
+    });
   }
 
-  public clone(): UniversalTerminal {
-    return new UniversalTerminal(this.name, this.code);
-  }
+  return deepFreeze({ args: 0, name, create });
 }
 
 // }}}
 // Terminals {{{
 
-// Bool {{{
-
-export class Bool extends UniversalTerminal implements Terminal {
-  public constructor(value: boolean) {
-    super("Bool", "" + value);
-  }
-}
-
-// }}}
-// Constant {{{
-
-export class Constant extends UniversalTerminal implements Terminal {
-  public constructor(value: number) {
-    super("constant", "" + value);
-  }
-}
-
-// }}}
-// RandomBipolarConstant {{{
-
-export class RandomBipolarConstant extends UniversalTerminal
-  implements Terminal {
-  public constructor() {
-    super(
-      "RandomBipolarConstant",
-      "" + Math.random() * Math.sign(Math.random() - 0.5)
-    );
-  }
-}
-
-// }}}
+export const constant = createTerminalBuilder(
+  "Constant",
+  (rng: Rng): string => "" + rng()
+);
+export const bipolarConstant = createTerminalBuilder(
+  "Bipolar Constant",
+  (rng: Rng): string => "" + rng() * Math.sign(rng() - 0.5)
+);
+export const bool = createTerminalBuilder("Bool", (rng: Rng): string =>
+  rng() < 0.5 ? "false" : "true"
+);
+export const smallIntegerConstant = createTerminalBuilder(
+  "Small Integer Constant",
+  (rng: Rng): string => "" + Math.floor(rng() * 100)
+);
+export const integerConstant = createTerminalBuilder(
+  "Integer Constant",
+  (rng: Rng): string => "" + Math.floor(rng() * 1000000)
+);
 
 // }}}
 // Operators {{{
 
-// And {{{
-
-export class And extends UniversalOperator<2> implements Operator<2> {
-  public constructor(...operands: Tuple<Statement, 2>) {
-    super("Minus", ["", "&&", ""], operands);
-  }
-}
-
-// }}}
-// Divide {{{
-
-export class Divide extends UniversalOperator<2> implements Operator<2> {
-  public constructor(...operands: Tuple<Statement, 2>) {
-    super("Minus", ["", "/", ""], operands);
-  }
-}
-
-// }}}
-// Floor {{{
-
-export class Floor extends UniversalOperator<1> implements Operator<1> {
-  public constructor(...operands: Tuple<Statement, 1>) {
-    super("Floor", ["Math.floor(", ")"], operands);
-  }
-}
-
-// }}}
-// Minus {{{
-
-export class Minus extends UniversalOperator<2> implements Operator<2> {
-  public constructor(...operands: Tuple<Statement, 2>) {
-    super("Minus", ["", "-", ""], operands);
-  }
-}
-
-// }}}
-// Not {{{
-
-export class Not extends UniversalOperator<1> implements Operator<1> {
-  public constructor(...operands: Tuple<Statement, 1>) {
-    super("Minus", ["!", ""], operands);
-  }
-}
-
-// }}}
-// Or {{{
-
-export class Or extends UniversalOperator<2> implements Operator<2> {
-  public constructor(...operands: Tuple<Statement, 2>) {
-    super("Minus", ["", "||", ""], operands);
-  }
-}
-
-// }}}
-// Plus {{{
-
-export class Plus extends UniversalOperator<2> implements Operator<2> {
-  public constructor(...operands: Tuple<Statement, 2>) {
-    super("Plus", ["", "+", ""], operands);
-  }
-}
-
-// }}}
-// Power {{{
-
-export class Power extends UniversalOperator<2> implements Operator<2> {
-  public constructor(...operands: Tuple<Statement, 2>) {
-    super("Power", ["", "**", ""], operands);
-  }
-}
-
-// }}}
-// Times {{{
-
-export class Times extends UniversalOperator<2> implements Operator<2> {
-  public constructor(...operands: Tuple<Statement, 2>) {
-    super("Minus", ["", "*", ""], operands);
-  }
-}
-
-// }}}
+export const and = createOperatorBuilder("And", 2, "", "&&", "");
+export const or = createOperatorBuilder("Or", 2, "", "||", "");
+export const divide = createOperatorBuilder("Divide", 2, "", "/", "");
+export const floor = createOperatorBuilder("Floor", 1, "Math.floor(", ")");
+export const not = createOperatorBuilder("Not", 1, "!", "");
+export const minus = createOperatorBuilder("Minus", 2, "", "-", "");
+export const plus = createOperatorBuilder("Plus", 2, "", "+", "");
+export const power = createOperatorBuilder("Power", 2, "", "**", "");
+export const times = createOperatorBuilder("Times", 2, "", "*", "");
 
 // }}}
 

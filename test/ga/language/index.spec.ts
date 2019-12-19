@@ -1,76 +1,107 @@
 import { expect } from "chai";
 
 import {
-  Minus,
-  Plus,
-  Constant,
-  RandomBipolarConstant,
-  And,
-  Bool,
-  Operator,
+  NonNegativeInteger,
+  OperatorBuilder,
   PositiveInteger,
-  Or,
-  Not,
-  Floor,
-  Divide,
-  Times,
-  Power
+  Rng,
+  Statement,
+  Terminal,
+  and,
+  bipolarConstant,
+  bool,
+  constant,
+  divide,
+  floor,
+  integerConstant,
+  minus,
+  not,
+  or,
+  plus,
+  power,
+  times
 } from "../../../src/ga/language";
+
+const createRng = (seed = 0): Rng => (): number => {
+  seed = (seed + 1) % 1000000;
+  return seed / 1000000;
+};
+
+const testCommon = <Args extends NonNegativeInteger>(
+  args: Args,
+  code: null | string,
+  statement: Statement
+): void => {
+  expect(
+    statement,
+    "There should be an args property equal to the number of operands"
+  )
+    .to.have.property("args")
+    .that.is.a("number")
+    .and.equals(args);
+
+  expect(statement, "There should be a string code property")
+    .to.have.property("code")
+    .that.is.a("string");
+  if (code != null) {
+    expect(statement.code, "Unexpected code").and.equals(code);
+  }
+
+  expect(statement, "There should be a function run property")
+    .to.have.property("run")
+    .that.is.a("function");
+
+  expect((): void => {
+    statement.run();
+  }, "The code should not throw when run").to.not.throw();
+};
 
 describe("Language", function(): void {
   it("Code construction", function(): void {
-    const c1 = new Constant(1);
-    const c2 = new Constant(2);
-    const c3 = new Constant(3);
-    const c4 = new Constant(4);
+    const rng = createRng();
 
-    const p1 = new Plus(c1, c2);
-    const p2 = new Plus(c3, c4);
+    const c1 = integerConstant.create(rng);
+    const c2 = integerConstant.create(rng);
+    const c3 = integerConstant.create(rng);
+    const c4 = integerConstant.create(rng);
 
-    const m1 = new Minus(p1, p2);
+    const p1 = plus.create([c1, c2]);
+    const p2 = plus.create([c3, c4]);
 
-    expect(c1)
-      .to.have.property("code")
-      .that.equals("1");
-    expect(c2)
-      .to.have.property("code")
-      .that.equals("2");
-    expect(c3)
-      .to.have.property("code")
-      .that.equals("3");
-    expect(c4)
-      .to.have.property("code")
-      .that.equals("4");
+    const m1 = minus.create([p1, p2]);
 
-    expect(p1)
-      .to.have.property("code")
-      .that.equals("1 + 2");
-    expect(p2)
-      .to.have.property("code")
-      .that.equals("3 + 4");
-
-    expect(m1)
-      .to.have.property("code")
-      .that.equals("1 + 2 - (3 + 4)");
-
-    expect(m1)
-      .to.have.property("run")
-      .that.is.a("function");
-    expect(m1.run()).to.equal(-4);
+    testCommon(0, "1", c1);
+    testCommon(0, "2", c2);
+    testCommon(0, "3", c3);
+    testCommon(0, "4", c4);
+    testCommon(2, "1 + 2", p1);
+    testCommon(2, "3 + 4", p2);
+    testCommon(2, "1 + 2 - (3 + 4)", m1);
   });
 
   it("Cloning", function(): void {
-    const c1 = new Constant(1);
-    const c2 = new Constant(2);
-    const c3 = new Constant(3);
-    const c4 = new Constant(4);
+    const rng = createRng();
 
-    const p1 = new Plus(c1, c2);
-    const p2 = new Plus(c3, c4);
+    const c1 = integerConstant.create(rng);
+    const c2 = integerConstant.create(rng);
+    const c3 = integerConstant.create(rng);
+    const c4 = integerConstant.create(rng);
 
-    const m1 = new Minus(p1, p2);
+    const p1 = plus.create([c1, c2]);
+    const p2 = plus.create([c3, c4]);
+
+    const m1 = minus.create([p1, p2]);
 
     const m2 = m1.clone();
+
+    testCommon(0, "1", c1);
+    testCommon(0, "2", c2);
+    testCommon(0, "3", c3);
+    testCommon(0, "4", c4);
+    testCommon(2, "1 + 2", p1);
+    testCommon(2, "3 + 4", p2);
+    testCommon(2, "1 + 2 - (3 + 4)", m1);
+    testCommon(2, "1 + 2 - (3 + 4)", m2);
 
     // Same structure.
     expect(m1)
@@ -102,87 +133,88 @@ describe("Language", function(): void {
   });
 
   it("Random Bipolar Constant", function(): void {
+    const rng = createRng();
+
     const rbcs = new Array(1000).fill(null).map(
-      (): RandomBipolarConstant => {
-        return new RandomBipolarConstant();
+      (): Terminal => {
+        return bipolarConstant.create(rng);
       }
     );
 
     rbcs.forEach((rbc): void => {
-      expect(rbc)
-        .to.have.property("code")
-        .that.is.a("string");
-      expect(+rbc.code)
+      testCommon(0, null, rbc);
+
+      expect(+rbc.code, "Bipolar constant should be within (-1, 1) range")
         .to.be.lessThan(1)
         .and.greaterThan(-1);
     });
   });
 
   describe("Operators", function(): void {
-    const configs: [
-      new (...operands: any[]) => Operator<PositiveInteger>,
-      any[],
-      string,
-      any
-    ][] = [
+    const configs: [OperatorBuilder<PositiveInteger>, any[], string, any][] = [
       // [Divide, [0, 0], "0 / 0", Number.NaN], // TODO
-      [And, [false, false], "false && false", false],
-      [And, [false, true], "false && true", false],
-      [And, [true, false], "true && false", false],
-      [And, [true, true], "true && true", true],
-      [Divide, [-77, -11], "-77 / -11", 7],
-      [Divide, [1, -16], "1 / -16", -0.0625],
-      [Divide, [21, 7], "21 / 7", 3],
-      [Floor, [-0.3], "Math.floor(-0.3)", -1],
-      [Floor, [-0.5], "Math.floor(-0.5)", -1],
-      [Floor, [-0.7], "Math.floor(-0.7)", -1],
-      [Floor, [-1], "Math.floor(-1)", -1],
-      [Floor, [0.3], "Math.floor(0.3)", 0],
-      [Floor, [0.5], "Math.floor(0.5)", 0],
-      [Floor, [0.7], "Math.floor(0.7)", 0],
-      [Floor, [0], "Math.floor(0)", 0],
-      [Floor, [1], "Math.floor(1)", 1],
-      [Minus, [-77, -14], "-77 - -14", -63],
-      [Minus, [0, 0], "0 - 0", 0],
-      [Minus, [1, -14], "1 - -14", 15],
-      [Minus, [33, 456789], "33 - 456789", -456756],
-      [Not, [false], "!false", true],
-      [Not, [true], "!true", false],
-      [Or, [false, false], "false || false", false],
-      [Or, [false, true], "false || true", true],
-      [Or, [true, false], "true || false", true],
-      [Or, [true, true], "true || true", true],
-      [Plus, [-77, -14], "-77 + -14", -91],
-      [Plus, [0, 0], "0 + 0", 0],
-      [Plus, [1, -14], "1 + -14", -13],
-      [Plus, [33, 456789], "33 + 456789", 456822],
-      [Power, [-2, -3], "(-2) ** -3", -0.125],
-      [Power, [-2, 10], "(-2) ** 10", 1024],
-      [Power, [2, -3], "2 ** -3", 0.125],
-      [Power, [2, 10], "2 ** 10", 1024],
-      [Times, [-77, -14], "-77 * -14", 1078],
-      [Times, [0, 0], "0 * 0", 0],
-      [Times, [1, -14], "1 * -14", -14],
-      [Times, [33, 456789], "33 * 456789", 15074037]
+      [and, [false, false], "false && false", false],
+      [and, [false, true], "false && true", false],
+      [and, [true, false], "true && false", false],
+      [and, [true, true], "true && true", true],
+      [divide, [-77, -11], "-77 / -11", 7],
+      [divide, [1, -16], "1 / -16", -0.0625],
+      [divide, [21, 7], "21 / 7", 3],
+      [floor, [-0.3], "Math.floor(-0.3)", -1],
+      [floor, [-0.5], "Math.floor(-0.5)", -1],
+      [floor, [-0.7], "Math.floor(-0.7)", -1],
+      [floor, [-1], "Math.floor(-1)", -1],
+      [floor, [0.3], "Math.floor(0.3)", 0],
+      [floor, [0.5], "Math.floor(0.5)", 0],
+      [floor, [0.7], "Math.floor(0.7)", 0],
+      [floor, [0], "Math.floor(0)", 0],
+      [floor, [1], "Math.floor(1)", 1],
+      [minus, [-77, -14], "-77 - -14", -63],
+      [minus, [0, 0], "0 - 0", 0],
+      [minus, [1, -14], "1 - -14", 15],
+      [minus, [33, 456789], "33 - 456789", -456756],
+      [not, [false], "!false", true],
+      [not, [true], "!true", false],
+      [or, [false, false], "false || false", false],
+      [or, [false, true], "false || true", true],
+      [or, [true, false], "true || false", true],
+      [or, [true, true], "true || true", true],
+      [plus, [-77, -14], "-77 + -14", -91],
+      [plus, [0, 0], "0 + 0", 0],
+      [plus, [1, -14], "1 + -14", -13],
+      [plus, [33, 456789], "33 + 456789", 456822],
+      [power, [-2, -3], "(-2) ** -3", -0.125],
+      [power, [-2, 10], "(-2) ** 10", 1024],
+      [power, [2, -3], "2 ** -3", 0.125],
+      [power, [2, 10], "2 ** 10", 1024],
+      [times, [-77, -14], "-77 * -14", 1078],
+      [times, [0, 0], "0 * 0", 0],
+      [times, [1, -14], "1 * -14", -14],
+      [times, [33, 456789], "33 * 456789", 15074037]
     ];
 
-    configs.forEach(([Operator, inputs, code, output]): void => {
-      it(`${Operator.name}: ${JSON.stringify(inputs)})`, function(): void {
+    configs.forEach(([operatorBuilder, inputs, code, output]): void => {
+      const name = `${operatorBuilder.name}: ${JSON.stringify(inputs)})`;
+
+      it(name, function(): void {
         const operands = inputs.map((input): any => {
           switch (typeof input) {
             case "boolean":
-              return new Bool(input);
+              return bool.create((): number => (input ? 1 : 0));
             case "number":
-              return new Constant(input);
+              return constant.create((): number => input);
             default:
               throw new TypeError("No such terminal.");
           }
         });
 
-        const operator = new Operator(...(operands as any));
+        const operator = operatorBuilder.create(operands as any);
 
-        expect(operator.code).to.equal(code);
-        expect(operator.run()).to.equal(output);
+        testCommon(operands.length as NonNegativeInteger, code, operator);
+        expect(
+          operator.run(),
+          "Unexpected value returned after code execution"
+        ).to.equal(output);
       });
     });
   });
