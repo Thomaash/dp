@@ -53,13 +53,22 @@ function createOperatorBuilder<Args extends PositiveInteger>(
       args,
       clone,
       code,
+      get prettyCode(): string {
+        return formatStatement(code);
+      },
       name,
       operands,
       run
     });
   }
 
-  return deepFreeze({ args, name, create });
+  const createOperandtuple = <U extends Statement>(
+    callbackfn: (value: null, index: number, array: (null | U)[]) => U,
+    thisArg?: any
+  ): Tuple<U, Args> =>
+    new Array(args).fill(null).map(callbackfn, thisArg) as Tuple<U, Args>;
+
+  return deepFreeze({ args, create, createOperandtuple, name });
 }
 
 function createTerminalBuilder(
@@ -90,6 +99,25 @@ function createTerminalBuilder(
   }
 
   return deepFreeze({ args: 0, name, create });
+}
+
+// }}}
+// Helpers {{{
+
+export function isOperator(
+  value: Statement
+): value is Operator<PositiveInteger>;
+export function isOperator<Args extends PositiveInteger>(
+  args: Args,
+  value: Statement
+): value is Operator<Args>;
+export function isOperator(
+  ...rest: [Statement] | [number, Statement]
+): boolean {
+  return rest.length === 1 ? rest[0].args > 0 : rest[1].args === rest[0];
+}
+export function isTerminal(value: Statement): value is Terminal {
+  return value.args === 0;
 }
 
 // }}}

@@ -28,14 +28,21 @@ export type Rng = () => number;
 
 export interface OperatorBuilder<Args extends PositiveInteger> {
   args: Args;
-  name: string;
   create(operands: Tuple<Statement, Args>): Operator<Args>;
+  createOperandtuple<U extends Statement>(
+    callbackfn: (value: null, index: number, array: (null | U)[]) => U,
+    thisArg?: any
+  ): Tuple<U, Args>;
+  name: string;
 }
 export interface TerminalBuilder {
   args: 0;
-  name: string;
   create(rng: Rng): Terminal;
+  name: string;
 }
+export type StatementBuilder =
+  | OperatorBuilder<PositiveInteger>
+  | TerminalBuilder;
 
 export interface Operator<Args extends PositiveInteger> {
   args: Args;
