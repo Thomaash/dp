@@ -5,8 +5,10 @@
   "main": "dist/code",
   "types": "dist/types",
   "scripts": {
+    "playground": "ts-node --project tsconfig.start.json playground.ts",
+    "playground:inspect": "TS_NODE_PROJECT=tsconfig.start.json node -r ts-node/register --inspect-brk playground.ts",
     "start": "ts-node --project tsconfig.start.json src/index.ts",
-    "test": "mocha -p tsconfig.start.json --exit",
+    "test": "NODE_ENV=test mocha -p tsconfig.start.json --exit",
     "type-check": "tsc --noemit"
   },
   "repository": {
