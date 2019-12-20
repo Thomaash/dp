@@ -50,6 +50,7 @@ export interface Operator<Args extends PositiveInteger> {
   code: string;
   name: string;
   operands: (Operator<PositiveInteger> | Terminal)[] & { length: Args };
+  prettyCode: string;
   run: Function;
 }
 export interface Terminal {
@@ -57,6 +58,7 @@ export interface Terminal {
   clone(): Terminal;
   code: string;
   name: string;
+  prettyCode: string;
   run: Function;
 }
 export type Statement = Operator<PositiveInteger> | Terminal;

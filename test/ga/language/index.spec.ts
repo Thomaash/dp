@@ -27,9 +27,11 @@ const createRng = (seed = 0): Rng => (): number => {
   return seed / 1000000;
 };
 
+const numberRE = /^-?\d+(\.\d+)?$/;
+
 const testCommon = <Args extends NonNegativeInteger>(
   args: Args,
-  code: null | string,
+  code: string | RegExp,
   statement: Statement
 ): void => {
   expect(
@@ -43,8 +45,10 @@ const testCommon = <Args extends NonNegativeInteger>(
   expect(statement, "There should be a string code property")
     .to.have.property("code")
     .that.is.a("string");
-  if (code != null) {
-    expect(statement.code, "Unexpected code").and.equals(code);
+  if (typeof code === "string") {
+    expect(statement.prettyCode, "Unexpected code").to.equal(code);
+  } else if (code instanceof RegExp) {
+    expect(statement.prettyCode, "Unexpected code").to.match(code);
   }
 
   expect(statement, "There should be a function run property")
@@ -133,6 +137,8 @@ describe("Language", function(): void {
   });
 
   it("Random Bipolar Constant", function(): void {
+    this.timeout(20000);
+
     const rng = createRng();
 
     const rbcs = new Array(1000).fill(null).map(
@@ -142,9 +148,9 @@ describe("Language", function(): void {
     );
 
     rbcs.forEach((rbc): void => {
-      testCommon(0, null, rbc);
+      testCommon(0, numberRE, rbc);
 
-      expect(+rbc.code, "Bipolar constant should be within (-1, 1) range")
+      expect(+rbc.prettyCode, "Bipolar constant should be within (-1, 1) range")
         .to.be.lessThan(1)
         .and.greaterThan(-1);
     });

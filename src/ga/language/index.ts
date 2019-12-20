@@ -12,7 +12,6 @@ import {
   Tuple,
   Rng
 } from "./types";
-import { deepFreeze } from "../../util/deep-freeze";
 
 // Generic {{{
 
@@ -39,17 +38,15 @@ function createOperatorBuilder<Args extends PositiveInteger>(
   }
 
   function create(operands: Tuple<Statement, Args>): Operator<Args> {
-    const code = formatStatement(
-      codeFragments.reduce((acc, codeFragment, i): string => {
-        return i < operands.length
-          ? `${acc} ${codeFragment} (${operands[i].code})`
-          : acc + codeFragment;
-      }, "")
-    );
+    const code = codeFragments.reduce((acc, codeFragment, i): string => {
+      return i < operands.length
+        ? `${acc} ${codeFragment} (${operands[i].code})`
+        : acc + codeFragment;
+    }, "");
 
     const run = new Function(`"use strict"; return (${code});`);
 
-    return deepFreeze({
+    return {
       args,
       clone,
       code,
@@ -59,7 +56,7 @@ function createOperatorBuilder<Args extends PositiveInteger>(
       name,
       operands,
       run
-    });
+    };
   }
 
   const createOperandtuple = <U extends Statement>(
@@ -68,7 +65,7 @@ function createOperatorBuilder<Args extends PositiveInteger>(
   ): Tuple<U, Args> =>
     new Array(args).fill(null).map(callbackfn, thisArg) as Tuple<U, Args>;
 
-  return deepFreeze({ args, create, createOperandtuple, name });
+  return { args, create, createOperandtuple, name };
 }
 
 function createTerminalBuilder(
@@ -80,25 +77,31 @@ function createTerminalBuilder(
     const run = new Function(`"use strict"; return (${code});`);
 
     function clone(this: Terminal): Terminal {
-      return deepFreeze({
+      return {
         args: 0,
         clone,
         code,
+        get prettyCode(): string {
+          return formatStatement(code);
+        },
         name,
         run
-      });
+      };
     }
 
-    return deepFreeze({
+    return {
       args: 0,
       clone,
       code,
+      get prettyCode(): string {
+        return formatStatement(code);
+      },
       name,
       run
-    });
+    };
   }
 
-  return deepFreeze({ args: 0, name, create });
+  return { args: 0, name, create };
 }
 
 // }}}
@@ -123,10 +126,6 @@ export function isTerminal(value: Statement): value is Terminal {
 // }}}
 // Terminals {{{
 
-export const constant = createTerminalBuilder(
-  "Constant",
-  (rng: Rng): string => "" + rng()
-);
 export const bipolarConstant = createTerminalBuilder(
   "Bipolar Constant",
   (rng: Rng): string => "" + rng() * Math.sign(rng() - 0.5)
@@ -134,27 +133,56 @@ export const bipolarConstant = createTerminalBuilder(
 export const bool = createTerminalBuilder("Bool", (rng: Rng): string =>
   rng() < 0.5 ? "false" : "true"
 );
-export const smallIntegerConstant = createTerminalBuilder(
-  "Small Integer Constant",
-  (rng: Rng): string => "" + Math.floor(rng() * 100)
+export const constant = createTerminalBuilder(
+  "Constant",
+  (rng: Rng): string => "" + rng()
 );
 export const integerConstant = createTerminalBuilder(
   "Integer Constant",
   (rng: Rng): string => "" + Math.floor(rng() * 1000000)
 );
+export const smallIntegerConstant = createTerminalBuilder(
+  "Small Integer Constant",
+  (rng: Rng): string => "" + Math.floor(rng() * 100)
+);
+
+export const terminals = [
+  bipolarConstant,
+  bool,
+  constant,
+  integerConstant,
+  smallIntegerConstant
+];
 
 // }}}
 // Operators {{{
 
 export const and = createOperatorBuilder("And", 2, "", "&&", "");
-export const or = createOperatorBuilder("Or", 2, "", "||", "");
 export const divide = createOperatorBuilder("Divide", 2, "", "/", "");
 export const floor = createOperatorBuilder("Floor", 1, "Math.floor(", ")");
-export const not = createOperatorBuilder("Not", 1, "!", "");
 export const minus = createOperatorBuilder("Minus", 2, "", "-", "");
+export const not = createOperatorBuilder("Not", 1, "!", "");
+export const or = createOperatorBuilder("Or", 2, "", "||", "");
 export const plus = createOperatorBuilder("Plus", 2, "", "+", "");
 export const power = createOperatorBuilder("Power", 2, "", "**", "");
 export const times = createOperatorBuilder("Times", 2, "", "*", "");
+
+export const operators = [
+  and,
+  divide,
+  floor,
+  minus,
+  not,
+  or,
+  plus,
+  power,
+  times
+];
+
+// }}}
+// Other {{{
+
+export const statements = [...operators, ...terminals];
 
 // }}}
 
