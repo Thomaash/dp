@@ -4,11 +4,11 @@ import { format } from "prettier";
 import {
   NextInteger,
   Operator,
-  OperatorBuilder,
+  OperatorFactory,
   PositiveInteger,
   Statement,
   Terminal,
-  TerminalBuilder,
+  TerminalFactory,
   Tuple,
   Rng
 } from "./types";
@@ -23,11 +23,11 @@ function formatStatement(code: string): string {
   );
 }
 
-function createOperatorBuilder<Args extends PositiveInteger>(
+function createOperatorFactory<Args extends PositiveInteger>(
   name: string,
   args: Args,
   ...codeFragments: Tuple<string, NextInteger[Args]>
-): OperatorBuilder<Args> {
+): OperatorFactory<Args> {
   function clone(this: Operator<Args>): Operator<Args> {
     return create(
       this.operands.map((operand): Statement => operand.clone()) as Tuple<
@@ -35,6 +35,16 @@ function createOperatorBuilder<Args extends PositiveInteger>(
         Args
       >
     );
+  }
+
+  function createOperandtuple<U extends Statement>(
+    callbackfn: (value: null, index: number, array: (null | U)[]) => U,
+    thisArg?: any
+  ): Tuple<U, Args> {
+    return new Array(args).fill(null).map(callbackfn, thisArg) as Tuple<
+      U,
+      Args
+    >;
   }
 
   function create(operands: Tuple<Statement, Args>): Operator<Args> {
@@ -50,6 +60,8 @@ function createOperatorBuilder<Args extends PositiveInteger>(
       args,
       clone,
       code,
+      create,
+      createOperandtuple,
       get prettyCode(): string {
         return formatStatement(code);
       },
@@ -59,19 +71,13 @@ function createOperatorBuilder<Args extends PositiveInteger>(
     };
   }
 
-  const createOperandtuple = <U extends Statement>(
-    callbackfn: (value: null, index: number, array: (null | U)[]) => U,
-    thisArg?: any
-  ): Tuple<U, Args> =>
-    new Array(args).fill(null).map(callbackfn, thisArg) as Tuple<U, Args>;
-
   return { args, create, createOperandtuple, name };
 }
 
-function createTerminalBuilder(
+function createTerminalFactory(
   name: string,
   createCode: (rng: Rng) => string
-): TerminalBuilder {
+): TerminalFactory {
   function create(rng: Rng): Terminal {
     const code = createCode(rng);
     const run = new Function(`"use strict"; return (${code});`);
@@ -81,6 +87,7 @@ function createTerminalBuilder(
         args: 0,
         clone,
         code,
+        create,
         get prettyCode(): string {
           return formatStatement(code);
         },
@@ -93,6 +100,7 @@ function createTerminalBuilder(
       args: 0,
       clone,
       code,
+      create,
       get prettyCode(): string {
         return formatStatement(code);
       },
@@ -126,22 +134,22 @@ export function isTerminal(value: Statement): value is Terminal {
 // }}}
 // Terminals {{{
 
-export const bipolarConstant = createTerminalBuilder(
+export const bipolarConstant = createTerminalFactory(
   "Bipolar Constant",
   (rng: Rng): string => "" + rng() * Math.sign(rng() - 0.5)
 );
-export const bool = createTerminalBuilder("Bool", (rng: Rng): string =>
+export const bool = createTerminalFactory("Bool", (rng: Rng): string =>
   rng() < 0.5 ? "false" : "true"
 );
-export const constant = createTerminalBuilder(
+export const constant = createTerminalFactory(
   "Constant",
   (rng: Rng): string => "" + rng()
 );
-export const integerConstant = createTerminalBuilder(
+export const integerConstant = createTerminalFactory(
   "Integer Constant",
   (rng: Rng): string => "" + Math.floor(rng() * 1000000)
 );
-export const smallIntegerConstant = createTerminalBuilder(
+export const smallIntegerConstant = createTerminalFactory(
   "Small Integer Constant",
   (rng: Rng): string => "" + Math.floor(rng() * 100)
 );
@@ -157,15 +165,15 @@ export const terminals = [
 // }}}
 // Operators {{{
 
-export const and = createOperatorBuilder("And", 2, "", "&&", "");
-export const divide = createOperatorBuilder("Divide", 2, "", "/", "");
-export const floor = createOperatorBuilder("Floor", 1, "Math.floor(", ")");
-export const minus = createOperatorBuilder("Minus", 2, "", "-", "");
-export const not = createOperatorBuilder("Not", 1, "!", "");
-export const or = createOperatorBuilder("Or", 2, "", "||", "");
-export const plus = createOperatorBuilder("Plus", 2, "", "+", "");
-export const power = createOperatorBuilder("Power", 2, "", "**", "");
-export const times = createOperatorBuilder("Times", 2, "", "*", "");
+export const and = createOperatorFactory("And", 2, "", "&&", "");
+export const divide = createOperatorFactory("Divide", 2, "", "/", "");
+export const floor = createOperatorFactory("Floor", 1, "Math.floor(", ")");
+export const minus = createOperatorFactory("Minus", 2, "", "-", "");
+export const not = createOperatorFactory("Not", 1, "!", "");
+export const or = createOperatorFactory("Or", 2, "", "||", "");
+export const plus = createOperatorFactory("Plus", 2, "", "+", "");
+export const power = createOperatorFactory("Power", 2, "", "**", "");
+export const times = createOperatorFactory("Times", 2, "", "*", "");
 
 export const operators = [
   and,

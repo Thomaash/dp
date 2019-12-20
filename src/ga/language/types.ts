@@ -26,7 +26,7 @@ export interface Expression {
 
 export type Rng = () => number;
 
-export interface OperatorBuilder<Args extends PositiveInteger> {
+export interface OperatorFactory<Args extends PositiveInteger> {
   args: Args;
   create(operands: Tuple<Statement, Args>): Operator<Args>;
   createOperandtuple<U extends Statement>(
@@ -35,30 +35,32 @@ export interface OperatorBuilder<Args extends PositiveInteger> {
   ): Tuple<U, Args>;
   name: string;
 }
-export interface TerminalBuilder {
+export interface TerminalFactory {
   args: 0;
   create(rng: Rng): Terminal;
   name: string;
 }
-export type StatementBuilder =
-  | OperatorBuilder<PositiveInteger>
-  | TerminalBuilder;
+export type StatementFactory =
+  | OperatorFactory<PositiveInteger>
+  | TerminalFactory;
 
-export interface Operator<Args extends PositiveInteger> {
+export interface StatementBase<Args extends NonNegativeInteger> {
   args: Args;
-  clone(): Operator<Args>;
+  clone(): StatementBase<Args>;
   code: string;
   name: string;
-  operands: (Operator<PositiveInteger> | Terminal)[] & { length: Args };
   prettyCode: string;
   run: Function;
 }
-export interface Terminal {
-  args: 0;
+export interface Operator<Args extends PositiveInteger>
+  extends StatementBase<Args>,
+    OperatorFactory<Args> {
+  clone(): Operator<Args>;
+  create: OperatorFactory<Args>["create"];
+  operands: (Operator<PositiveInteger> | Terminal)[] & { length: Args };
+}
+export interface Terminal extends StatementBase<0>, TerminalFactory {
   clone(): Terminal;
-  code: string;
-  name: string;
-  prettyCode: string;
-  run: Function;
+  create: TerminalFactory["create"];
 }
 export type Statement = Operator<PositiveInteger> | Terminal;

@@ -1,35 +1,35 @@
 import { xor4096 } from "seedrandom";
 import {
-  Rng,
-  OperatorBuilder,
-  PositiveInteger,
-  TerminalBuilder,
-  StatementBuilder,
-  Terminal,
   Operator,
-  Statement
+  OperatorFactory,
+  PositiveInteger,
+  Rng,
+  Statement,
+  StatementFactory,
+  Terminal,
+  TerminalFactory
 } from "../language";
 
 export class PopulationGenerator {
   private readonly _rng: Rng;
 
-  private readonly _operatorBuilders: OperatorBuilder<PositiveInteger>[];
-  private readonly _statementBuilders: StatementBuilder[];
-  private readonly _terminalBuilders: TerminalBuilder[];
+  private readonly _operatorFactories: OperatorFactory<PositiveInteger>[];
+  private readonly _statementFactories: StatementFactory[];
+  private readonly _terminalFactories: TerminalFactory[];
 
   public constructor(
     public readonly seed: string,
-    statements: StatementBuilder[]
+    statements: StatementFactory[]
   ) {
     this._rng = xor4096(seed);
 
-    this._operatorBuilders = statements.filter(
-      (statement): statement is OperatorBuilder<PositiveInteger> =>
+    this._operatorFactories = statements.filter(
+      (statement): statement is OperatorFactory<PositiveInteger> =>
         statement.args > 0
     );
-    this._statementBuilders = statements;
-    this._terminalBuilders = statements.filter(
-      (statement): statement is TerminalBuilder => statement.args === 0
+    this._statementFactories = statements;
+    this._terminalFactories = statements.filter(
+      (statement): statement is TerminalFactory => statement.args === 0
     );
   }
 
@@ -37,32 +37,32 @@ export class PopulationGenerator {
     return arr[Math.floor(arr.length * this._rng())];
   }
 
-  public operatorBuilder(): OperatorBuilder<PositiveInteger> {
-    return this._randomFrom(this._operatorBuilders);
+  public operatorFactory(): OperatorFactory<PositiveInteger> {
+    return this._randomFrom(this._operatorFactories);
   }
 
-  public statementBuilder(): StatementBuilder {
-    return this._randomFrom(this._statementBuilders);
+  public statementFactory(): StatementFactory {
+    return this._randomFrom(this._statementFactories);
   }
 
-  public terminalBuilder(): TerminalBuilder {
-    return this._randomFrom(this._terminalBuilders);
+  public terminalFactory(): TerminalFactory {
+    return this._randomFrom(this._terminalFactories);
   }
 
   public full(depth: 1): Terminal;
   public full(depth: number): Operator<PositiveInteger>;
   public full(depth: number): Statement {
     if (depth > 1) {
-      const builder = this.operatorBuilder();
-      return builder.create(
-        builder.createOperandtuple(
+      const factory = this.operatorFactory();
+      return factory.create(
+        factory.createOperandtuple(
           (): Statement => {
             return this.full(depth - 1);
           }
         )
       );
     } else {
-      return this.terminalBuilder().create(this._rng);
+      return this.terminalFactory().create(this._rng);
     }
   }
 
@@ -71,12 +71,12 @@ export class PopulationGenerator {
   public grow(min: number, max: number): Statement {
     if (max <= 1) {
       // Max size limit was reached, return a terminal.
-      return this.terminalBuilder().create(this._rng);
+      return this.terminalFactory().create(this._rng);
     } else if (min > 0) {
       // Min size was no reached yet, return an operator.
-      const builder = this.operatorBuilder();
-      return builder.create(
-        builder.createOperandtuple(
+      const factory = this.operatorFactory();
+      return factory.create(
+        factory.createOperandtuple(
           (): Statement => {
             return this.grow(min - 1, max - 1);
           }
@@ -84,12 +84,12 @@ export class PopulationGenerator {
       );
     } else {
       // It's withing min and max, pick at random.
-      const builder = this.statementBuilder();
-      if (builder.args === 0) {
-        return builder.create(this._rng);
+      const factory = this.statementFactory();
+      if (factory.args === 0) {
+        return factory.create(this._rng);
       } else {
-        return builder.create(
-          builder.createOperandtuple(
+        return factory.create(
+          factory.createOperandtuple(
             (): Statement => {
               return this.grow(min - 1, max - 1);
             }

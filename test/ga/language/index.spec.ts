@@ -2,10 +2,8 @@ import { expect } from "chai";
 
 import {
   NonNegativeInteger,
-  OperatorBuilder,
+  OperatorFactory,
   PositiveInteger,
-  Rng,
-  Statement,
   Terminal,
   and,
   bipolarConstant,
@@ -21,44 +19,7 @@ import {
   power,
   times
 } from "../../../src/ga/language";
-
-const createRng = (seed = 0): Rng => (): number => {
-  seed = (seed + 1) % 1000000;
-  return seed / 1000000;
-};
-
-const numberRE = /^-?\d+(\.\d+)?$/;
-
-const testCommon = <Args extends NonNegativeInteger>(
-  args: Args,
-  code: string | RegExp,
-  statement: Statement
-): void => {
-  expect(
-    statement,
-    "There should be an args property equal to the number of operands"
-  )
-    .to.have.property("args")
-    .that.is.a("number")
-    .and.equals(args);
-
-  expect(statement, "There should be a string code property")
-    .to.have.property("code")
-    .that.is.a("string");
-  if (typeof code === "string") {
-    expect(statement.prettyCode, "Unexpected code").to.equal(code);
-  } else if (code instanceof RegExp) {
-    expect(statement.prettyCode, "Unexpected code").to.match(code);
-  }
-
-  expect(statement, "There should be a function run property")
-    .to.have.property("run")
-    .that.is.a("function");
-
-  expect((): void => {
-    statement.run();
-  }, "The code should not throw when run").to.not.throw();
-};
+import { createRng, numberRE, testCommon } from "../util";
 
 describe("Language", function(): void {
   it("Code construction", function(): void {
@@ -157,7 +118,7 @@ describe("Language", function(): void {
   });
 
   describe("Operators", function(): void {
-    const configs: [OperatorBuilder<PositiveInteger>, any[], string, any][] = [
+    const configs: [OperatorFactory<PositiveInteger>, any[], string, any][] = [
       // [Divide, [0, 0], "0 / 0", Number.NaN], // TODO
       [and, [false, false], "false && false", false],
       [and, [false, true], "false && true", false],
@@ -199,8 +160,8 @@ describe("Language", function(): void {
       [times, [33, 456789], "33 * 456789", 15074037]
     ];
 
-    configs.forEach(([operatorBuilder, inputs, code, output]): void => {
-      const name = `${operatorBuilder.name}: ${JSON.stringify(inputs)})`;
+    configs.forEach(([operatorFactory, inputs, code, output]): void => {
+      const name = `${operatorFactory.name}: ${JSON.stringify(inputs)})`;
 
       it(name, function(): void {
         const operands = inputs.map((input): any => {
@@ -214,7 +175,7 @@ describe("Language", function(): void {
           }
         });
 
-        const operator = operatorBuilder.create(operands as any);
+        const operator = operatorFactory.create(operands as any);
 
         testCommon(operands.length as NonNegativeInteger, code, operator);
         expect(
