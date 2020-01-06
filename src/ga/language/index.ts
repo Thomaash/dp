@@ -56,7 +56,7 @@ function createOperatorFactory<Args extends PositiveInteger>(
 
     const run = new Function(`"use strict"; return (${code});`);
 
-    return {
+    return Object.freeze({
       args,
       clone,
       code,
@@ -68,10 +68,10 @@ function createOperatorFactory<Args extends PositiveInteger>(
       name,
       operands,
       run
-    };
+    });
   }
 
-  return { args, create, createOperandtuple, name };
+  return Object.freeze({ args, create, createOperandtuple, name });
 }
 
 function createTerminalFactory(
@@ -83,7 +83,7 @@ function createTerminalFactory(
     const run = new Function(`"use strict"; return (${code});`);
 
     function clone(this: Terminal): Terminal {
-      return {
+      return Object.freeze({
         args: 0,
         clone,
         code,
@@ -93,10 +93,10 @@ function createTerminalFactory(
         },
         name,
         run
-      };
+      });
     }
 
-    return {
+    return Object.freeze({
       args: 0,
       clone,
       code,
@@ -106,10 +106,10 @@ function createTerminalFactory(
       },
       name,
       run
-    };
+    });
   }
 
-  return { args: 0, name, create };
+  return Object.freeze({ args: 0, name, create });
 }
 
 // }}}
