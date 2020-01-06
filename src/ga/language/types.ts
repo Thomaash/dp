@@ -15,7 +15,8 @@ export interface NextInteger {
   12: 13;
 }
 
-export interface Tuple<T extends any, L extends number> extends Array<T> {
+export interface Tuple<T extends any, L extends number>
+  extends ReadonlyArray<T> {
   0: T;
   length: L;
 }
@@ -57,7 +58,9 @@ export interface Operator<Args extends PositiveInteger>
     OperatorFactory<Args> {
   clone(): Operator<Args>;
   create: OperatorFactory<Args>["create"];
-  operands: (Operator<PositiveInteger> | Terminal)[] & { length: Args };
+  operands: readonly (Operator<PositiveInteger> | Terminal)[] & {
+    length: Args;
+  };
 }
 export interface Terminal extends StatementBase<0>, TerminalFactory {
   clone(): Terminal;

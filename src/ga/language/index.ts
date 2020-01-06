@@ -30,10 +30,9 @@ function createOperatorFactory<Args extends PositiveInteger>(
 ): OperatorFactory<Args> {
   function clone(this: Operator<Args>): Operator<Args> {
     return create(
-      this.operands.map((operand): Statement => operand.clone()) as Tuple<
-        Statement,
-        Args
-      >
+      Object.freeze(
+        this.operands.map((operand): Statement => operand.clone())
+      ) as Tuple<Statement, Args>
     );
   }
 
@@ -41,10 +40,9 @@ function createOperatorFactory<Args extends PositiveInteger>(
     callbackfn: (value: null, index: number, array: (null | U)[]) => U,
     thisArg?: any
   ): Tuple<U, Args> {
-    return new Array(args).fill(null).map(callbackfn, thisArg) as Tuple<
-      U,
-      Args
-    >;
+    return Object.freeze(
+      new Array(args).fill(null).map(callbackfn, thisArg)
+    ) as Tuple<U, Args>;
   }
 
   function create(operands: Tuple<Statement, Args>): Operator<Args> {
