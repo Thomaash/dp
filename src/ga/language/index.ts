@@ -17,7 +17,7 @@ import {
 
 function formatStatement(code: string): string {
   return (
-    format(code, { filepath: "statement.ts", endOfLine: "lf" })
+    format(code, { filepath: "statement.js", endOfLine: "lf" })
       // Remove the last two characters (linefeed and newline).
       .slice(0, -2)
   );
