@@ -1,13 +1,16 @@
 import { expect } from "chai";
 
 import {
+  Statement,
   bipolarConstant,
+  floor,
+  integerConstant,
+  isOperator,
   minus,
+  not,
   plus,
   smallIntegerConstant,
-  Statement,
-  isOperator,
-  integerConstant
+  ifElse
 } from "../../../src/ga/language";
 import {
   PopulationGenerator,
@@ -78,6 +81,35 @@ describe("Population", function(): void {
           generator.operatorFactory(),
           "The operator factory has to be selected from the supplied options"
         ).to.be.oneOf([minus, plus]);
+      }
+    });
+
+    describe("Fixed number of args operator Factories", function(): void {
+      const population = deepFreeze([
+        bipolarConstant,
+        floor,
+        ifElse,
+        minus,
+        not,
+        plus,
+        smallIntegerConstant
+      ]);
+
+      for (const { args, operators } of [
+        { args: 1, operators: [floor, not] },
+        { args: 2, operators: [minus, plus] },
+        { args: 3, operators: [ifElse] }
+      ] as const) {
+        it(`Agruments: ${args}`, function(): void {
+          const generator = new PopulationGenerator("TEST", population);
+
+          for (let i = 0; i < 1000; ++i) {
+            expect(
+              generator.fixedArgsOperatorFactory(args),
+              "The operator factory has to be selected from the supplied options"
+            ).to.be.oneOf(operators);
+          }
+        });
       }
     });
 

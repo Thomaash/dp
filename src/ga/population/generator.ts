@@ -10,9 +10,15 @@ import {
   TerminalFactory
 } from "../language";
 
+type FixArgsFactories = Map<
+  PositiveInteger,
+  OperatorFactory<PositiveInteger>[]
+>;
+
 export class PopulationGenerator {
   private readonly _rng: Rng;
 
+  private readonly _fixedArgsOperatorFactories: FixArgsFactories;
   private readonly _operatorFactories: OperatorFactory<PositiveInteger>[];
   private readonly _statementFactories: StatementFactory[];
   private readonly _terminalFactories: TerminalFactory[];
@@ -31,10 +37,37 @@ export class PopulationGenerator {
     this._terminalFactories = statements.filter(
       (statement): statement is TerminalFactory => statement.args === 0
     );
+
+    this._fixedArgsOperatorFactories = this._operatorFactories.reduce(
+      (acc, factory): FixArgsFactories => {
+        (
+          acc.get(factory.args) || acc.set(factory.args, []).get(factory.args)!
+        ).push(factory);
+
+        return acc;
+      },
+      new Map()
+    );
   }
 
   private _randomFrom<T>(arr: T[]): T {
     return arr[Math.floor(arr.length * this._rng())];
+  }
+
+  public fixedArgsOperatorFactory<Args extends PositiveInteger>(
+    args: Args
+  ): OperatorFactory<Args> {
+    const factories:
+      | OperatorFactory<Args>[]
+      | undefined = this._fixedArgsOperatorFactories.get(args) as
+      | OperatorFactory<Args>[]
+      | undefined;
+
+    if (factories == null) {
+      throw new Error("There are no factories with given number of arguments.");
+    } else {
+      return this._randomFrom(factories);
+    }
   }
 
   public operatorFactory(): OperatorFactory<PositiveInteger> {

@@ -167,24 +167,34 @@ export const terminals = [
 
 export const and = createOperatorFactory("And", 2, "", "&&", "");
 export const divide = createOperatorFactory("Divide", 2, "", "/", "");
+export const equals = createOperatorFactory("Equals", 2, "", "===", "");
 export const floor = createOperatorFactory("Floor", 1, "Math.floor(", ")");
+export const ifElse = createOperatorFactory("IfElse", 3, "", "?", ":", "");
+export const lessThan = createOperatorFactory("LessThan", 2, "", "<", "");
 export const minus = createOperatorFactory("Minus", 2, "", "-", "");
+export const moreThan = createOperatorFactory("MoreThan", 2, "", ">", "");
 export const not = createOperatorFactory("Not", 1, "!", "");
 export const or = createOperatorFactory("Or", 2, "", "||", "");
 export const plus = createOperatorFactory("Plus", 2, "", "+", "");
 export const power = createOperatorFactory("Power", 2, "", "**", "");
 export const times = createOperatorFactory("Times", 2, "", "*", "");
+export const weakEquals = createOperatorFactory("WeakEquals", 2, "", "==", "");
 
 export const operators = [
   and,
   divide,
+  equals,
   floor,
+  ifElse,
+  lessThan,
   minus,
+  moreThan,
   not,
   or,
   plus,
   power,
-  times
+  times,
+  weakEquals
 ];
 
 // }}}
