@@ -52,6 +52,17 @@ function createOperatorFactory<Args extends PositiveInteger>(
         : acc + codeFragment;
     }, "");
 
+    const heightMax =
+      1 +
+      operands.reduce((acc, operand): number => {
+        return Math.max(acc, operand.heightMax);
+      }, Number.NEGATIVE_INFINITY);
+    const heightMin =
+      1 +
+      operands.reduce((acc, operand): number => {
+        return Math.min(acc, operand.heightMin);
+      }, Number.POSITIVE_INFINITY);
+
     const run = new Function(`"use strict"; return (${code});`);
 
     return Object.freeze({
@@ -63,6 +74,8 @@ function createOperatorFactory<Args extends PositiveInteger>(
       get prettyCode(): string {
         return formatStatement(code);
       },
+      heightMax,
+      heightMin,
       name,
       operands,
       run
@@ -89,6 +102,8 @@ function createTerminalFactory(
         get prettyCode(): string {
           return formatStatement(code);
         },
+        heightMax: 1,
+        heightMin: 1,
         name,
         run
       });
@@ -102,6 +117,8 @@ function createTerminalFactory(
       get prettyCode(): string {
         return formatStatement(code);
       },
+      heightMax: 1,
+      heightMin: 1,
       name,
       run
     });

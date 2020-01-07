@@ -19,27 +19,26 @@ import {
 import { deepFreeze } from "../../../src/util/deep-freeze";
 import { createRng, testCommon } from "../util";
 
-const getHeight = (statement: Statement): { min: number; max: number } => {
-  if (isOperator(statement)) {
-    return statement.operands.reduce(
-      (
-        acc,
-        operand
-      ): {
-        min: number;
-        max: number;
-      } => {
-        const val = getHeight(operand);
-        return {
-          min: Math.min(acc.min, val.min + 1),
-          max: Math.max(acc.max, val.max + 1)
-        };
-      },
-      { min: Number.POSITIVE_INFINITY, max: Number.NEGATIVE_INFINITY }
-    );
-  } else {
-    return { min: 1, max: 1 };
-  }
+const create = (
+  seed: number = 0
+): Record<
+  "c1" | "c2" | "c3" | "c4" | "c5" | "p1c1c2" | "p2c3c4" | "m1p1p2",
+  Statement
+> => {
+  const rng = createRng(seed);
+
+  const c1 = integerConstant.create(rng);
+  const c2 = integerConstant.create(rng);
+  const c3 = integerConstant.create(rng);
+  const c4 = integerConstant.create(rng);
+  const c5 = integerConstant.create(rng);
+
+  const p1c1c2 = plus.create([c1, c2]);
+  const p2c3c4 = plus.create([c3, c4]);
+
+  const m1p1p2 = minus.create([p1c1c2, p2c3c4]);
+
+  return { c1, c2, c3, c4, c5, p1c1c2, p2c3c4, m1p1p2 };
 };
 
 describe("Population", function(): void {
@@ -100,7 +99,7 @@ describe("Population", function(): void {
         { args: 2, operators: [minus, plus] },
         { args: 3, operators: [ifElse] }
       ] as const) {
-        it(`Agruments: ${args}`, function(): void {
+        it(`Arguments: ${args}`, function(): void {
           const generator = new PopulationGenerator("TEST", population);
 
           for (let i = 0; i < 1000; ++i) {
@@ -125,12 +124,13 @@ describe("Population", function(): void {
 
           for (let i = 0; i < 3; ++i) {
             const tree = generator.full(height);
-            const { min, max } = getHeight(tree);
+            const { heightMin, heightMax } = tree;
 
-            expect(min, "All the leaves should be at the same height").to.equal(
-              max
-            );
-            expect(min, "The tree should have requested height").to.equal(
+            expect(
+              heightMin,
+              "All the leaves should be at the same height"
+            ).to.equal(heightMax);
+            expect(heightMin, "The tree should have requested height").to.equal(
               height
             );
           }
@@ -154,22 +154,22 @@ describe("Population", function(): void {
 
           for (let i = 0; i < 3; ++i) {
             const tree = generator.grow(min, max);
-            const measured = getHeight(tree);
+            const measured = tree;
 
             expect(
-              measured.min,
+              measured.heightMin,
               "Min and max height should be withit the limits"
             ).to.be.at.least(min);
             expect(
-              measured.max,
+              measured.heightMax,
               "Min and max height should be withit the limits"
             ).to.be.at.least(min);
             expect(
-              measured.min,
+              measured.heightMin,
               "Min and max height should be withit the limits"
             ).to.be.at.most(max);
             expect(
-              measured.max,
+              measured.heightMax,
               "Min and max height should be withit the limits"
             ).to.be.at.most(max);
           }
@@ -180,26 +180,6 @@ describe("Population", function(): void {
 
   describe("Mutator", function(): void {
     describe("Subtree", function(): void {
-      const create = (): Record<
-        "c1" | "c2" | "c3" | "c4" | "c5" | "p1c1c2" | "p2c3c4" | "m1p1p2",
-        Statement
-      > => {
-        const rng = createRng();
-
-        const c1 = integerConstant.create(rng);
-        const c2 = integerConstant.create(rng);
-        const c3 = integerConstant.create(rng);
-        const c4 = integerConstant.create(rng);
-        const c5 = integerConstant.create(rng);
-
-        const p1c1c2 = plus.create([c1, c2]);
-        const p2c3c4 = plus.create([c3, c4]);
-
-        const m1p1p2 = minus.create([p1c1c2, p2c3c4]);
-
-        return { c1, c2, c3, c4, c5, p1c1c2, p2c3c4, m1p1p2 };
-      };
-
       for (const chance of [0, 0.1, 1]) {
         it(`Chance ${chance}`, function(): void {
           this.timeout(4000);

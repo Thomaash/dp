@@ -49,6 +49,8 @@ export interface StatementBase<Args extends NonNegativeInteger> {
   args: Args;
   clone(): StatementBase<Args>;
   code: string;
+  heightMax: number;
+  heightMin: number;
   name: string;
   prettyCode: string;
   run: Function;
@@ -58,12 +60,12 @@ export interface Operator<Args extends PositiveInteger>
     OperatorFactory<Args> {
   clone(): Operator<Args>;
   create: OperatorFactory<Args>["create"];
-  operands: readonly (Operator<PositiveInteger> | Terminal)[] & {
-    length: Args;
-  };
+  operands: Tuple<Statement, Args>;
 }
 export interface Terminal extends StatementBase<0>, TerminalFactory {
   clone(): Terminal;
   create: TerminalFactory["create"];
+  heightMax: 1;
+  heightMin: 1;
 }
 export type Statement = Operator<PositiveInteger> | Terminal;
