@@ -3,16 +3,19 @@ import { expect } from "chai";
 import {
   Statement,
   bipolarConstant,
+  divide,
   floor,
+  ifElse,
   integerConstant,
-  isOperator,
   minus,
   not,
   plus,
+  power,
   smallIntegerConstant,
-  ifElse
+  times
 } from "../../../src/ga/language";
 import {
+  PopulationCrossover,
   PopulationGenerator,
   PopulationMutator
 } from "../../../src/ga/population";
@@ -20,7 +23,7 @@ import { deepFreeze } from "../../../src/util/deep-freeze";
 import { createRng, testCommon } from "../util";
 
 const create = (
-  seed: number = 0
+  seed = 0
 ): Record<
   "c1" | "c2" | "c3" | "c4" | "c5" | "p1c1c2" | "p2c3c4" | "m1p1p2",
   Statement
@@ -228,6 +231,90 @@ describe("Population", function(): void {
           }
         });
       }
+    });
+  });
+
+  describe("Crossover", function(): void {
+    it("Simple", function(): void {
+      this.timeout(4000);
+
+      const ancestorA = ((): Statement => {
+        const rng = createRng(0);
+
+        const c1 = integerConstant.create(rng);
+        const c2 = integerConstant.create(rng);
+        const c3 = integerConstant.create(rng);
+        const c4 = integerConstant.create(rng);
+        const c5 = integerConstant.create(rng);
+        const c6 = integerConstant.create(rng);
+
+        const o1 = plus.create([c1, c2]);
+        const o2 = plus.create([c3, c4]);
+        const o3 = plus.create([c5, c6]);
+        const o4 = plus.create([o1, o2]);
+
+        return minus.create([o3, o4]);
+      })();
+
+      const ancestorB = ((): Statement => {
+        const rng = createRng(0);
+
+        const c1 = integerConstant.create(rng);
+        const c2 = integerConstant.create(rng);
+        const c3 = integerConstant.create(rng);
+        const c4 = integerConstant.create(rng);
+        const c5 = integerConstant.create(rng);
+        const c6 = integerConstant.create(rng);
+
+        const o1 = minus.create([c1, c2]);
+        const o2 = power.create([c3, c4]);
+        const o3 = divide.create([o1, o2]);
+        const o4 = times.create([c5, c6]);
+
+        return plus.create([o3, o4]);
+      })();
+
+      const crossover = new PopulationCrossover("TEST");
+
+      testCommon(2, "5 + 6 - (1 + 2 + (3 + 4))", ancestorA);
+      testCommon(2, "(1 - 2) / 3 ** 4 + 5 * 6", ancestorB);
+
+      const accumulator = new Set<string>();
+
+      for (let i = 0; i < 50; ++i) {
+        const [offspringA, offspringB] = crossover.simple(ancestorA, ancestorB);
+
+        for (const offspring of [offspringA, offspringB]) {
+          testCommon(offspring.args, null, offspring);
+
+          accumulator.add(offspring.prettyCode);
+
+          expect(
+            offspring,
+            "The offspring should not be the same instance as any of it's ancestors"
+          )
+            .to.not.equal(ancestorA)
+            .and.to.not.equal(ancestorB);
+
+          expect(
+            offspring.prettyCode,
+            // Note that the chance is zero only thanks to the seed used above.
+            // Changes to the way random numbers are generated may require the
+            // seed to be changed as the same code may be randomly generated
+            // for both ancestors.
+            "The offspring should not have the same code as it's ancestors"
+          )
+            .to.not.equal(ancestorA.prettyCode)
+            .and.to.not.equal(ancestorB.prettyCode);
+        }
+      }
+
+      // Note that the chance this will happen is one only thanks to the seed
+      // used above.
+      expect(
+        accumulator,
+        "There are two possible ways how to do a crossover on these and all of them should happen."
+      ).to.have.lengthOf(4);
     });
   });
 });
