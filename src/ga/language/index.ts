@@ -63,7 +63,9 @@ function createOperatorFactory<Args extends PositiveInteger>(
         return Math.min(acc, operand.heightMin);
       }, Number.POSITIVE_INFINITY);
 
-    const run = new Function(`"use strict"; return (${code});`);
+    const run = new Function(`"use strict"; return (${code});`) as (
+      ...args: any[]
+    ) => any;
 
     return Object.freeze({
       args,
@@ -91,7 +93,9 @@ function createTerminalFactory(
 ): TerminalFactory {
   function create(rng: Rng): Terminal {
     const code = createCode(rng);
-    const run = new Function(`"use strict"; return (${code});`);
+    const run = new Function(`"use strict"; return (${code});`) as (
+      ...args: any[]
+    ) => any;
 
     function clone(this: Terminal): Terminal {
       return Object.freeze({
@@ -163,6 +167,11 @@ export const constant = createTerminalFactory(
 export const integerConstant = createTerminalFactory(
   "Integer Constant",
   (rng: Rng): string => "" + Math.floor(rng() * 1000000)
+);
+export const input = createTerminalFactory(
+  "Input",
+  (rng: Rng): string =>
+    `arguments[Math.floor(arguments.length * ${rng()})] || 0`
 );
 export const smallIntegerConstant = createTerminalFactory(
   "Small Integer Constant",

@@ -11,6 +11,7 @@ import {
   constant,
   divide,
   floor,
+  input,
   integerConstant,
   minus,
   not,
@@ -19,7 +20,7 @@ import {
   power,
   times
 } from "../../../src/ga/language";
-import { createRng, numberRE, testCommon } from "../util";
+import { createRng, ddIt, numberRE, testCommon } from "../util";
 
 describe("Language", function(): void {
   it("Code construction", function(): void {
@@ -115,6 +116,53 @@ describe("Language", function(): void {
         .to.be.lessThan(1)
         .and.greaterThan(-1);
     });
+  });
+
+  describe("Inputs", function(): void {
+    ddIt(
+      "Order independent",
+      (): ((...args: number[]) => number) => {
+        const p1 = input.create((): number => 0 / 2);
+        const p2 = input.create((): number => 1 / 2);
+
+        return times.create([p1, p2]).run;
+      },
+      (given): void => {
+        given().expect(
+          0,
+          "In case of no inputs zeros should be used as fallback values."
+        );
+        given(7).expect(
+          49,
+          "If there are some inputs missing the present should be used multiple times."
+        );
+        given(2, 3).expect(6, "Both inputs should be used.");
+        given(4, 5, 900).expect(20, "Additional inputs should be ignored.");
+      }
+    );
+
+    ddIt(
+      "Order dependent",
+      (): ((...args: number[]) => number) => {
+        const p1 = input.create((): number => 0 / 3);
+        const p2 = input.create((): number => 1 / 3);
+        const p3 = input.create((): number => 2 / 3);
+
+        const o1 = plus.create([p3, p2]);
+        const o2 = minus.create([p1, p3]);
+        const o3 = times.create([o1, o2]);
+
+        return o3.run;
+      },
+      (given): void => {
+        given(1, 2, 3).expect(-10);
+        given(1, 3, 2).expect(-5);
+        given(2, 1, 3).expect(-4);
+        given(2, 3, 1).expect(4);
+        given(3, 1, 2).expect(3);
+        given(3, 2, 1).expect(6);
+      }
+    );
   });
 
   describe("Operators", function(): void {

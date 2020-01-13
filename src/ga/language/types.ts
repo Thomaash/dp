@@ -53,7 +53,7 @@ export interface StatementBase<Args extends NonNegativeInteger> {
   heightMin: number;
   name: string;
   prettyCode: string;
-  run: Function;
+  run: (...args: any[]) => any;
 }
 export interface Operator<Args extends PositiveInteger>
   extends StatementBase<Args>,

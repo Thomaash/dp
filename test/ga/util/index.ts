@@ -1,3 +1,5 @@
+export * from "../../util";
+
 import { expect } from "chai";
 
 import { NonNegativeInteger, Rng, Statement } from "../../../src/ga/language";
