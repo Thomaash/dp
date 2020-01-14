@@ -22,9 +22,9 @@ export function ddIt<T extends (...args: any[]) => any>(
     test(
       (...args): GivenRet<T> => ({
         expect: (ret, message): void => {
-          const argsName = JSON.stringify(args);
+          const argsName = JSON.stringify(args).slice(1, -1);
           const retName = JSON.stringify(ret);
-          it(`${argsName} => ${retName}`, function(): void {
+          it(`(${argsName}) => ${retName}`, function(): void {
             expect(fun(...args)).to.equal(ret, message);
           });
         }
