@@ -15,12 +15,15 @@ import {
   times
 } from "../../../src/ga/language";
 import {
+  PopulationCompetition,
   PopulationCrossover,
   PopulationGenerator,
-  PopulationMutator
+  PopulationMutator,
+  codeLengthPenalty,
+  heightPenalty
 } from "../../../src/ga/population";
 import { deepFreeze } from "../../../src/util/deep-freeze";
-import { createRng, testCommon } from "../util";
+import { createRng, testCommon, prop } from "../util";
 
 const create = (
   seed = 0
@@ -315,6 +318,55 @@ describe("Population", function(): void {
         accumulator,
         "There are two possible ways how to do a crossover on these and all of them should happen."
       ).to.have.lengthOf(4);
+    });
+  });
+
+  describe("Competition", function(): void {
+    it("Evaluate One", function(): void {
+      const c1 = smallIntegerConstant.create((): number => 1 / 100);
+      const c2 = smallIntegerConstant.create((): number => 2 / 100);
+      const c3 = smallIntegerConstant.create((): number => 32 / 100);
+
+      const o1 = minus.create([c1, c2]);
+      const o2 = plus.create([c1, c2]);
+      const o3 = times.create([c1, c2]);
+      const o4 = divide.create([c1, c2]);
+
+      const pc = new PopulationCompetition(
+        "TEST",
+        (statement): number => 100 - statement.run(),
+        codeLengthPenalty(),
+        heightPenalty()
+      );
+
+      expect(pc.evaluateOne(c1))
+        .to.have.ownProperty("fit")
+        .that.equals(100 - 1);
+      expect(pc.evaluateOne(c2))
+        .to.have.ownProperty("fit")
+        .that.equals(100 - 2);
+      expect(pc.evaluateOne(c3))
+        .to.have.ownProperty("fit")
+        .that.equals(100 - 32);
+      expect(pc.evaluateOne(o1))
+        .to.have.ownProperty("fit")
+        .that.equals(100 - -1);
+      expect(pc.evaluateOne(o2))
+        .to.have.ownProperty("fit")
+        .that.equals(100 - 3);
+      expect(pc.evaluateOne(o3))
+        .to.have.ownProperty("fit")
+        .that.equals(100 - 2);
+      expect(pc.evaluateOne(o4))
+        .to.have.ownProperty("fit")
+        .that.equals(100 - 0.5);
+
+      const ordered = pc
+        .allVsAll([o4, o3, o2, o1, c3, c2, c1])
+        .map(prop("prettyCode"));
+      const expected = [c3, o2, c2, o3, c1, o4, o1].map(prop("prettyCode"));
+
+      expect(ordered).to.deep.equal(expected);
     });
   });
 });

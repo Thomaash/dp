@@ -1,15 +1,21 @@
 import { expect } from "chai";
 
-export interface GivenRet<T extends (...args: any[]) => any> {
-  expect: (ret: ReturnType<T>, name?: string) => void;
+export type Prepare<T> = (() => T) | (() => Promise<T>);
+
+export interface Assertion<T> {
+  expect: (ret: T, name?: string) => void;
 }
+
 export type Given<T extends (...args: any[]) => any> = (
   ...args: Parameters<T>
-) => GivenRet<T>;
+) => Assertion<ReturnType<T>>;
+export type Use<T extends any[], R> = (
+  instruction: (...args: T) => R
+) => Assertion<R>;
 
 export function ddIt<T extends (...args: any[]) => any>(
   name: string,
-  prepare: (() => T) | (() => Promise<T>),
+  prepare: Prepare<T>,
   test: (given: Given<T>) => void
 ): void {
   describe(name, function(): void {
@@ -20,7 +26,7 @@ export function ddIt<T extends (...args: any[]) => any>(
     });
 
     test(
-      (...args): GivenRet<T> => ({
+      (...args): Assertion<ReturnType<T>> => ({
         expect: (ret, message): void => {
           const argsName = JSON.stringify(args).slice(1, -1);
           const retName = JSON.stringify(ret);
