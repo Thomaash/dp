@@ -1,10 +1,5 @@
 import { EventNames, EventPayloads } from "./events";
-
-export interface Content {
-  attributes: Record<string, string>;
-  name: string;
-  xml: any;
-}
+import { Content } from "./manager";
 
 function number(input: string): number | undefined {
   return input != null ? +input : void 0;
@@ -101,6 +96,8 @@ export function createPayload(
 
     default:
       const never: never = eventName;
-      throw new TypeError(`Unacceptable value “${never}”.`);
+      throw new TypeError(
+        `Unacceptable value "${never}" with xml:\n${content.raw}\n\n`
+      );
   }
 }

@@ -9,6 +9,7 @@ import { createPayload } from "./payload";
 export interface Content {
   attributes: Record<string, string>;
   name: string;
+  raw: string;
   xml: any;
 }
 
@@ -23,8 +24,8 @@ type EventNamePayloadPairMap = {
 export type EventNamePayloadPair = EventNamePayloadPairMap[keyof EventNamePayloadPairMap];
 
 const xmlParser = new xml2js.Parser();
-async function processSOAP(soapText: string): Promise<Content> {
-  const soapXML = await xmlParser.parseStringPromise(soapText);
+async function processSOAP(raw: string): Promise<Content> {
+  const soapXML = await xmlParser.parseStringPromise(raw);
 
   // There will never be less or more than one element in the body of a valid
   // SOAP message. If the input is not valid let's just crash for now.
@@ -35,6 +36,7 @@ async function processSOAP(soapText: string): Promise<Content> {
   return {
     attributes,
     name,
+    raw,
     xml
   };
 }
