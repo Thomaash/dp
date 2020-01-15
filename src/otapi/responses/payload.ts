@@ -32,6 +32,7 @@ export function createPayload(
       };
 
     case "ping":
+    case "simContinued":
     case "simPaused":
     case "simStarted":
     case "simStopped":

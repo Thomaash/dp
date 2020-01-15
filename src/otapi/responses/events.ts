@@ -21,6 +21,7 @@ export interface EventPayloads {
     signalAspect?: string;
     time: number;
   };
+  simContinued: { time: number };
   simPaused: { time: number };
   simReadyForSimulation: {};
   simServerStarted: {};
