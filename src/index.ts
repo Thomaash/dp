@@ -15,22 +15,54 @@ const otBinaryPath =
 const otRunfile = "/mnt/c/Users/st46664/Documents/Model/runfile.txt";
 const otLog = "/mnt/c/Users/st46664/Documents/Model/OpenTrack.log";
 
+function buildChunkLogger(
+  prefix: string,
+  method: "log" | "info" | "warn" | "error"
+): (chunk: string) => void {
+  let text = "";
+
+  return (chunk): void => {
+    text += chunk;
+    const parts = text.split("\n");
+
+    const last = parts.pop();
+    if (last !== "" && last != null) {
+      text = last;
+    } else {
+      text = "";
+    }
+
+    parts.forEach((part): void => {
+      console[method](`${prefix}: ${part}`);
+    });
+  };
+}
+
 function spawnAndLog(
   binaryPath: string,
   args: string[],
   logPath: string
-): Promise<{ code: number }> {
+): Promise<{ code: number; stderr: string; stdout: string }> {
   return new Promise((resolve, reject): void => {
     let stdout = "";
     let stderr = "";
 
+    const logStdout = buildChunkLogger("OT", "info");
+    const logStderr = buildChunkLogger("OT", "error");
+
     const command = spawn(binaryPath, args);
 
-    command.stdout.on("data", (data): void => {
-      stdout += data.toString();
+    command.stdout.on("data", (chunk): void => {
+      const string: string = chunk.toString();
+
+      stdout += string;
+      logStdout(string);
     });
-    command.stderr.on("data", (data): void => {
-      stderr += data.toString();
+    command.stderr.on("data", (chunk): void => {
+      const string: string = chunk.toString();
+
+      stderr += string;
+      logStderr(string);
     });
 
     command.on("close", (code): void => {
@@ -42,7 +74,7 @@ function spawnAndLog(
           `STDERR:\n${stderr}`
         ].join("\n\n")
       )
-        .then(resolve.bind(null, { code }))
+        .then(resolve.bind(null, { code, stderr, stdout }))
         .catch(reject);
     });
   });
