@@ -1,3 +1,4 @@
+import waitPort from "wait-port";
 import { promisify } from "util";
 import {
   readFile as readFileCallback,
@@ -6,6 +7,7 @@ import {
 import { spawn } from "child_process";
 
 import { AnyEventCallback, OTAPI, parseRunfile } from "./otapi";
+import { buildChunkLogger } from "./util";
 
 const readFile = promisify(readFileCallback);
 const writeFile = promisify(writeFileCallback);
@@ -15,27 +17,20 @@ const otBinaryPath =
 const otRunfile = "/mnt/c/Users/st46664/Documents/Model/runfile.txt";
 const otLog = "/mnt/c/Users/st46664/Documents/Model/OpenTrack.log";
 
-function buildChunkLogger(
-  prefix: string,
-  method: "log" | "info" | "warn" | "error"
-): (chunk: string) => void {
-  let text = "";
+async function main(otapi: OTAPI): Promise<void> {
+  await Promise.all([
+    otapi.on("trainCreated", (_, { trainID }): void => {
+      otapi
+        .setWaitForDepartureCommand({ trainID, flag: true })
+        .catch(console.error.bind(console, "set wait for departure command"));
+    }),
+    otapi.on("trainArrival", (_, { delay, time, trainID }): void => {
+      const departureTime = time + (600 - delay);
+      otapi.setDepartureCommand({ trainID, time: departureTime });
+    })
+  ]);
 
-  return (chunk): void => {
-    text += chunk;
-    const parts = text.split("\n");
-
-    const last = parts.pop();
-    if (last !== "" && last != null) {
-      text = last;
-    } else {
-      text = "";
-    }
-
-    parts.forEach((part): void => {
-      console[method](`${prefix}: ${part}`);
-    });
-  };
+  await otapi.startSimulation();
 }
 
 function spawnAndLog(
@@ -87,7 +82,7 @@ function spawnAndLog(
 
   const otArgs = [
     "-otd",
-    "-scriptinit",
+    // "-scriptinit",
     `-runfile=${
       otRunfile.startsWith("/mnt/")
         ? `${
@@ -115,18 +110,39 @@ function spawnAndLog(
   try {
     await otapi.start();
 
-    otapi.on(debugCallback);
+    // otapi.on(debugCallback);
 
-    const sumlationStart = otapi.once("simStarted");
+    const readyForSimulation = otapi.once("simReadyForSimulation");
     const simulationEnd = otapi.once("simStopped");
+    const simulationServerStarted = otapi.once("simServerStarted");
+    // const simulationStart = otapi.once("simStarted");
 
     console.info("Starting OpenTrack...");
     console.info([otBinaryPath, ...otArgs]);
     const command = spawnAndLog(otBinaryPath, otArgs, otLog);
 
     console.info("Waiting for OpenTrack...");
-    await sumlationStart;
-    console.info("OpenTrack has started the simulation.");
+    await Promise.all([
+      (async (): Promise<void> => {
+        await readyForSimulation;
+        console.info("OpenTrack is ready for simulation.");
+      })(),
+      (async (): Promise<void> => {
+        await simulationServerStarted;
+        console.info("OpenTrack has started simulation server.");
+      })(),
+      // (async (): Promise<void> => {
+      //   await simulationStart;
+      //   console.info("OpenTrack has started the simulation.");
+      // })(),
+      (async (): Promise<void> => {
+        await waitPort({ port: portOT, output: "silent" });
+        console.info("OpenTrack has started the OTD server.");
+      })()
+    ]);
+    console.info("Everything's ready.");
+
+    main(otapi);
 
     await simulationEnd;
     console.info("Simulation ended.");
