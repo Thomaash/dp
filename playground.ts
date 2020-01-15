@@ -11,3 +11,12 @@ console.log("\n");
 
 // }}}
 
+import { PopulationGenerator, statements } from "./src/ga";
+
+const generator = new PopulationGenerator("PLAYGROUND", statements);
+
+console.time("Generation");
+const tree = generator.full(10);
+console.timeEnd("Generation");
+
+console.log(`root: ${tree.name}`);

@@ -164,10 +164,7 @@ export function endSimulation(
 /// infoPanel {{{
 
 export interface InfoPanelParameters {}
-export function infoPanel(
-  this: Config,
-  {}: InfoPanelParameters = {}
-): ReturnType<typeof send> {
+export function infoPanel(this: Config): ReturnType<typeof send> {
   return send.call(this, "infoPanel", []);
 }
 
@@ -252,10 +249,7 @@ export function resetRequestedSpeed(
 /// resetTimetable {{{
 
 export interface ResetTimetableParameters {}
-export function resetTimetable(
-  this: Config,
-  {}: ResetTimetableParameters = {}
-): ReturnType<typeof send> {
+export function resetTimetable(this: Config): ReturnType<typeof send> {
   return send.call(this, "resetTimetable", []);
 }
 
@@ -821,10 +815,7 @@ export function startSimulation(
 /// stepSimulation {{{
 
 export interface StepSimulationParameters {}
-export function stepSimulation(
-  this: Config,
-  {}: StepSimulationParameters = {}
-): ReturnType<typeof send> {
+export function stepSimulation(this: Config): ReturnType<typeof send> {
   return send.call(this, "stepSimulation", []);
 }
 
@@ -832,10 +823,7 @@ export function stepSimulation(
 /// terminateApplication {{{
 
 export interface TerminateApplicationParameters {}
-export function terminateApplication(
-  this: Config,
-  {}: TerminateApplicationParameters = {}
-): ReturnType<typeof send> {
+export function terminateApplication(this: Config): ReturnType<typeof send> {
   return send.call(this, "terminateApplication", []);
 }
 

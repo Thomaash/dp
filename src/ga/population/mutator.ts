@@ -1,29 +1,6 @@
 import { xor4096 } from "seedrandom";
 import { Rng, Statement, isOperator } from "../language";
 
-const getHeight = (statement: Statement): { min: number; max: number } => {
-  if (isOperator(statement)) {
-    return statement.operands.reduce(
-      (
-        acc,
-        operand
-      ): {
-        min: number;
-        max: number;
-      } => {
-        const val = getHeight(operand);
-        return {
-          min: Math.min(acc.min, val.min + 1),
-          max: Math.max(acc.max, val.max + 1)
-        };
-      },
-      { min: Number.POSITIVE_INFINITY, max: Number.NEGATIVE_INFINITY }
-    );
-  } else {
-    return { min: 1, max: 1 };
-  }
-};
-
 export class PopulationMutator {
   private readonly _rng: Rng;
 
