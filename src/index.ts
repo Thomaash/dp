@@ -143,7 +143,7 @@ function spawnAndLog(
     ]);
     console.info("Everything's ready.");
 
-    main(otapi);
+    await main(otapi);
 
     await simulationEnd;
     console.info("Simulation ended.");
