@@ -148,6 +148,10 @@ function spawnAndLog(
     await simulationEnd;
     console.info("Simulation ended.");
 
+    console.info("Closing OpenTrack...");
+    await otapi.terminateApplication();
+    console.info("OpenTrack closed.");
+
     const { code } = await command;
     console.info(`OpenTrack exited with exit code ${code}.`);
   } finally {
