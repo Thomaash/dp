@@ -96,6 +96,9 @@ export class OTAPI {
   public stop(): Promise<void> {
     return this._responseManager.stop();
   }
+  public kill(): Promise<void> {
+    return this._responseManager.kill();
+  }
 
   /*
    * Requests

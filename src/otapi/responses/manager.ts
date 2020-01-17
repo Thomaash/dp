@@ -44,14 +44,16 @@ async function processSOAP(raw: string): Promise<Content> {
 const anyEvent = Symbol("Any event");
 
 export class ResponseManager {
-  private _manies = new Map<
+  private readonly _manies = new Map<
     string | typeof anyEvent,
     EventCallback<keyof EventPayloads>[]
   >();
-  private _onces = new Map<
+  private readonly _onces = new Map<
     string | typeof anyEvent,
     EventCallback<keyof EventPayloads>[]
   >();
+
+  private readonly _rejectOnKill = new Set<() => void>();
 
   private _server: null | Server = null;
 
@@ -104,10 +106,23 @@ export class ResponseManager {
         this._server.close(
           (error): void => void (error ? reject(error) : resolve())
         );
+        this._server = null;
       } else {
         resolve();
       }
     });
+  }
+
+  public async kill(): Promise<void> {
+    try {
+      await this.stop();
+    } finally {
+      this._manies.clear();
+      this._onces.clear();
+
+      this._rejectOnKill.forEach((reject): void => reject());
+      this._rejectOnKill.clear();
+    }
   }
 
   public on(callback: EventCallback<keyof EventPayloads>): void;
@@ -157,7 +172,8 @@ export class ResponseManager {
   public once<EventName extends keyof EventPayloads>(
     eventName?: EventName
   ): Promise<EventNamePayloadPair> {
-    return new Promise<any>((resolve): void => {
+    return new Promise<any>((resolve, reject): void => {
+      this._rejectOnKill.add(reject);
       this._push(this._onces, eventName || anyEvent, resolve);
     });
   }

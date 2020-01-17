@@ -120,6 +120,7 @@ function spawnAndLog(
     console.info("Starting OpenTrack...");
     console.info([otBinaryPath, ...otArgs]);
     const command = spawnAndLog(otBinaryPath, otArgs, otLog);
+    command.then(otapi.kill.bind(otapi)).catch(otapi.kill.bind(otapi));
 
     console.info("Waiting for OpenTrack...");
     await Promise.all([
@@ -150,8 +151,7 @@ function spawnAndLog(
     const { code } = await command;
     console.info(`OpenTrack exited with exit code ${code}.`);
   } finally {
-    otapi.off(debugCallback);
-    await otapi.stop();
+    await otapi.kill();
     console.info("Finished.");
   }
 })().catch((error): void => {
