@@ -53,7 +53,7 @@ export class ResponseManager {
     EventCallback<keyof EventPayloads>[]
   >();
 
-  private readonly _rejectOnKill = new Set<() => void>();
+  private readonly _rejectOnKill = new Set<(error: Error) => void>();
 
   private _server: null | Server = null;
 
@@ -120,7 +120,9 @@ export class ResponseManager {
       this._manies.clear();
       this._onces.clear();
 
-      this._rejectOnKill.forEach((reject): void => reject());
+      this._rejectOnKill.forEach((reject): void =>
+        reject(new Error("This OTAPI session has been killed."))
+      );
       this._rejectOnKill.clear();
     }
   }
