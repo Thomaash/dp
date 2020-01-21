@@ -7,6 +7,8 @@ import {
 import { spawn } from "child_process";
 
 import { AnyEventCallback, OTAPI, parseRunfile } from "./otapi";
+import { Deferred } from "./util";
+import { args } from "./cli";
 import { buildChunkLogger } from "./util";
 
 const readFile = promisify(readFileCallback);
@@ -17,20 +19,32 @@ const otBinaryPath =
 const otRunfile = "/mnt/c/Users/st46664/Documents/Model/runfile.txt";
 const otLog = "/mnt/c/Users/st46664/Documents/Model/OpenTrack.log";
 
-async function main(otapi: OTAPI): Promise<void> {
-  await Promise.all([
-    otapi.on("trainCreated", (_, { trainID }): void => {
-      otapi
-        .setWaitForDepartureCommand({ trainID, flag: true })
-        .catch(console.error.bind(console, "set wait for departure command"));
-    }),
-    otapi.on("trainArrival", (_, { delay, time, trainID }): void => {
-      const departureTime = time + (600 - delay);
-      otapi.setDepartureCommand({ trainID, time: departureTime });
-    })
-  ]);
+function main(
+  otapi: OTAPI,
+  otReady: Promise<void>
+): { preparing: Promise<void>; running: Promise<void> } {
+  const preparing = (async (): Promise<void> => {
+    await Promise.all([
+      otapi.on("trainCreated", (_, { trainID }): void => {
+        otapi
+          .setWaitForDepartureCommand({ trainID, flag: true })
+          .catch(console.error.bind(console, "set wait for departure command"));
+      }),
+      otapi.on("trainArrival", (_, { delay, time, trainID }): void => {
+        const departureTime = time + (600 - delay);
+        otapi
+          .setDepartureCommand({ trainID, time: departureTime })
+          .catch(console.error.bind(console, "set departure command"));
+      })
+    ]);
+  })();
 
-  await otapi.startSimulation();
+  const running = (async (): Promise<void> => {
+    await preparing;
+    await otReady;
+  })();
+
+  return { preparing, running };
 }
 
 function spawnAndLog(
@@ -98,62 +112,84 @@ function spawnAndLog(
 
   const otapi = new OTAPI({ portApp, portOT });
 
-  const debugCallback: AnyEventCallback = async function(
-    name,
-    payload
-  ): Promise<void> {
-    process.stdout.write(
-      `\n\n===> OT: ${name}\n${JSON.stringify(payload, null, 4)}\n\n`
-    );
-  };
-
   try {
     await otapi.start();
 
-    // otapi.on(debugCallback);
+    if (args["log-ot-responses"]) {
+      const debugCallback: AnyEventCallback = async function(
+        name,
+        payload
+      ): Promise<void> {
+        process.stdout.write(
+          `\n\n===> OT: ${name}\n${JSON.stringify(payload, null, 4)}\n\n`
+        );
+      };
 
-    const readyForSimulation = otapi.once("simReadyForSimulation");
-    const simulationEnd = otapi.once("simStopped");
-    const simulationServerStarted = otapi.once("simServerStarted");
-    // const simulationStart = otapi.once("simStarted");
+      otapi.on(debugCallback);
+    }
 
-    console.info("Starting OpenTrack...");
-    console.info([otBinaryPath, ...otArgs]);
-    const command = spawnAndLog(otBinaryPath, otArgs, otLog);
-    command.then(otapi.kill.bind(otapi)).catch(otapi.kill.bind(otapi));
+    if (args["manage-ot"]) {
+      const ready = new Deferred<void>();
+      const { preparing, running } = main(otapi, ready.promise);
 
-    console.info("Waiting for OpenTrack...");
-    await Promise.all([
-      (async (): Promise<void> => {
-        await readyForSimulation;
-        console.info("OpenTrack is ready for simulation.");
-      })(),
-      (async (): Promise<void> => {
-        await simulationServerStarted;
-        console.info("OpenTrack has started simulation server.");
-      })(),
-      // (async (): Promise<void> => {
-      //   await simulationStart;
-      //   console.info("OpenTrack has started the simulation.");
-      // })(),
-      (async (): Promise<void> => {
-        await waitPort({ port: portOT, output: "silent" });
-        console.info("OpenTrack has started the OTD server.");
-      })()
-    ]);
-    console.info("Everything's ready.");
+      const readyForSimulation = otapi.once("simReadyForSimulation");
+      const simulationServerStarted = otapi.once("simServerStarted");
 
-    await main(otapi);
+      console.info("Starting OpenTrack...");
+      console.info([otBinaryPath, ...otArgs]);
+      const command = spawnAndLog(otBinaryPath, otArgs, otLog);
+      command.then(otapi.kill.bind(otapi)).catch(otapi.kill.bind(otapi));
 
-    await simulationEnd;
-    console.info("Simulation ended.");
+      console.info("Waiting for OpenTrack...");
+      await Promise.all([
+        preparing,
+        readyForSimulation,
+        simulationServerStarted,
+        waitPort({ port: portOT, output: "silent" })
+      ]);
+      const simulationEnd = otapi.once("simStopped");
+      console.info("Starting simulation...");
+      const simulationStart = otapi.once("simStarted");
+      await otapi.startSimulation();
+      await simulationStart;
+      console.info("Simulating...");
 
-    console.info("Closing OpenTrack...");
-    await otapi.terminateApplication();
-    console.info("OpenTrack closed.");
+      ready.resolve();
+      await running;
 
-    const { code } = await command;
-    console.info(`OpenTrack exited with exit code ${code}.`);
+      await simulationEnd;
+      console.info("Simulation ended.");
+
+      console.info("Closing OpenTrack...");
+      await otapi.terminateApplication();
+      console.info("OpenTrack closed.");
+
+      const { code } = await command;
+      console.info(`OpenTrack exited with exit code ${code}.`);
+    } else {
+      console.info("Waiting for OpenTrack...");
+      await waitPort({ port: portOT, output: "silent" });
+
+      for (;;) {
+        const ready = new Deferred<void>();
+        const { preparing, running } = main(otapi, ready.promise);
+        await preparing;
+
+        const simulationStart = otapi.once("simStarted");
+
+        console.info("Simulation can be started now.");
+        await simulationStart;
+        const simulationEnd = otapi.once("simStopped");
+        console.info("Simulating...");
+
+        ready.resolve();
+        await running;
+
+        await simulationEnd;
+        console.info("Simulation ended.");
+        console.info();
+      }
+    }
   } finally {
     await otapi.kill();
     console.info("Finished.");
