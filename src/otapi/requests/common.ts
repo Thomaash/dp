@@ -53,14 +53,21 @@ export async function sendSimpleRequest(
     value: undefined | null | boolean | number | string;
   }[]
 ): Promise<void> {
-  // console.log(buildBody(name, attributes));
-  await fetch(getURL.call(this), {
-    body: buildBody(name, attributes),
-    headers: {
-      "Content-Type": "application/xml; charset=utf-8",
-      connection: "close"
-    },
-    method: "POST",
-    timeout: 5000
-  });
+  const body = buildBody(name, attributes);
+
+  try {
+    await fetch(getURL.call(this), {
+      body,
+      headers: {
+        "Content-Type": "application/xml; charset=utf-8",
+        connection: "close"
+      },
+      method: "POST",
+      timeout: 5000
+    });
+  } catch (error) {
+    console.error(["", "Failed to send request:", body, ""].join("\n"));
+
+    throw error;
+  }
 }
