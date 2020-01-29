@@ -10,14 +10,17 @@ import { AnyEventCallback, OTAPI, parseRunfile } from "./otapi";
 import { Deferred } from "./util";
 import { args } from "./cli";
 import { buildChunkLogger } from "./util";
+import { parseInfrastructure } from "./infrastructure";
 
 const readFile = promisify(readFileCallback);
 const writeFile = promisify(writeFileCallback);
 
 const otBinaryPath =
   "/mnt/c/Program Files (x86)/OpenTrack V1.9/OpenTrack.app/OpenTrack.exe";
-const otRunfile = "/mnt/c/Users/st46664/Documents/Model/runfile.txt";
+const otInfrastructure =
+  "/mnt/c/Users/st46664/Documents/Model/Exports/infrastructure.xml";
 const otLog = "/mnt/c/Users/st46664/Documents/Model/OpenTrack.log";
+const otRunfile = "/mnt/c/Users/st46664/Documents/Model/runfile.txt";
 
 function main(
   otapi: OTAPI,
@@ -25,13 +28,21 @@ function main(
 ): { preparing: Promise<void>; running: Promise<void> } {
   const preparing = (async (): Promise<void> => {
     await Promise.all([
-      otapi.on("trainCreated", (_, { trainID }): void => {
-        otapi
-          .setWaitForDepartureCommand({ trainID, flag: true })
-          .catch(console.error.bind(console, "set wait for departure command"));
-      }),
-      otapi.on("trainArrival", (_, { delay, time, trainID }): void => {
-        const departureTime = time + (600 - delay);
+      otapi.on(
+        "trainCreated",
+        async (_, { time, trainID }): Promise<void> => {
+          const departureTime = Math.round(time + 600) + 0.1;
+
+          try {
+            await otapi.setWaitForDepartureCommand({ trainID, flag: true });
+            await otapi.setDepartureCommand({ trainID, time: departureTime });
+          } catch (error) {
+            console.error("configure new train", error);
+          }
+        }
+      ),
+      otapi.on("trainArrival", (_, { time, trainID }): void => {
+        const departureTime = Math.round(time + 600) + 0.1;
         otapi
           .setDepartureCommand({ trainID, time: departureTime })
           .catch(console.error.bind(console, "set departure command"));
@@ -113,6 +124,28 @@ function spawnAndLog(
   const otapi = new OTAPI({ portApp, portOT });
 
   try {
+    const infrastructure = await parseInfrastructure(
+      await readFile(otInfrastructure, "utf-8")
+    );
+
+    process.stdout.write(
+      [
+        "Infrastructure:",
+
+        `  ${infrastructure.itineraries.size} itineraries ` +
+          `(${infrastructure.itinerariesLength / 1000} km),`,
+
+        `  ${infrastructure.paths.size} paths ` +
+          `(${infrastructure.pathsLength / 1000} km),`,
+
+        `  ${infrastructure.routes.size} routes ` +
+          `(${infrastructure.routesLength / 1000} km).`,
+
+        "",
+        ""
+      ].join("\n")
+    );
+
     await otapi.start();
 
     if (args["log-ot-responses"]) {
