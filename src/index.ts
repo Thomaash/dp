@@ -13,6 +13,7 @@ import {
   randomizePortsInRunfile
 } from "./otapi";
 import { Deferred } from "./util";
+import { TrainTracker } from "./train-tracker";
 import { args } from "./cli";
 import { buildChunkLogger } from "./util";
 import { parseInfrastructure } from "./infrastructure";
@@ -161,6 +162,7 @@ function spawnAndLog(
   const trainTracker = new TrainTracker(otapi, infrastructure);
 
   try {
+    trainTracker.startTracking(1);
     await otapi.start();
 
     if (args["log-ot-responses"]) {
