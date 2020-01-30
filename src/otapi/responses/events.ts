@@ -7,19 +7,21 @@ export interface EventPayloads {
   routeEntry: { trainID: string; routeID: string; time: number };
   routeExit: { trainID: string; routeID: string; time: number };
   routePartReleased: {
-    trainID: string;
-    routeID: string;
     partID: string;
+    routeID: string;
     time: number;
+    trainID: string;
   };
   routeReleased: { trainID: string; routeID: string; time: number };
   routeReserved: { trainID: string; routeID: string; time: number };
   signalPassed: {
-    trainID: string;
+    routeID?: string;
+    signalAspectDistant?: string;
+    signalAspectMain?: string;
     signalID: string;
     signalType: string;
-    signalAspect?: string;
     time: number;
+    trainID: string;
   };
   simContinued: { time: number };
   simPaused: { time: number };
@@ -28,33 +30,33 @@ export interface EventPayloads {
   simStarted: { time: number };
   simStopped: { time: number };
   trainArrival: {
-    trainID: string;
+    delay: number;
     stationID: string;
     time: number;
-    delay: number;
+    trainID: string;
   };
   trainCreated: { trainID: string; time: number };
   trainDeleted: { trainID: string; time: number };
   trainDeparture: {
-    trainID: string;
+    delay: number;
     stationID: string;
     time: number;
-    delay: number;
+    trainID: string;
   };
   trainPass: {
-    trainID: string;
+    delay: number;
     stationID: string;
     time: number;
-    delay: number;
+    trainID: string;
   };
   trainPositionReport: {
-    trainID: string;
+    acceleration: number;
+    delay: number;
     routeID: string;
     routeOffset: number;
-    time: number;
-    delay: number;
     speed: number;
-    acceleration: number;
+    time: number;
+    trainID: string;
   };
 }
 
