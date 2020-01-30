@@ -338,12 +338,12 @@ export class OTAPI {
     return this._responseManager.off(...rest);
   }
 
-  public on(callback: EventCallback<keyof EventPayloads>): void;
+  public on(callback: EventCallback<keyof EventPayloads>): () => void;
   public on<EventName extends keyof EventPayloads>(
     eventName: EventName,
     callback: EventCallback<EventName>
-  ): void;
-  public on(...rest: [any] | [any | any]): void {
+  ): () => void;
+  public on(...rest: [any] | [any | any]): () => void {
     return this._responseManager.on(...rest);
   }
 

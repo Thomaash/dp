@@ -127,23 +127,21 @@ export class ResponseManager {
     }
   }
 
-  public on(callback: EventCallback<keyof EventPayloads>): void;
+  public on(callback: EventCallback<keyof EventPayloads>): () => void;
   public on<EventName extends keyof EventPayloads>(
     eventName: EventName,
     callback: EventCallback<EventName>
-  ): void;
+  ): () => void;
   public on<EventName extends keyof EventPayloads = keyof EventPayloads>(
     ...rest:
       | [EventCallback<EventNames>]
       | [EventName, EventCallback<EventNames>]
-  ): void {
+  ): () => void {
     switch (rest.length) {
       case 1:
-        this._push(this._manies, anyEvent, rest[0]);
-        break;
+        return this._push(this._manies, anyEvent, rest[0]);
       case 2:
-        this._push(this._manies, rest[0], rest[1]);
-        break;
+        return this._push(this._manies, rest[0], rest[1]);
       default:
         throw new TypeError("Wrong number of arguments.");
     }
@@ -184,7 +182,7 @@ export class ResponseManager {
     map: Map<string | typeof anyEvent, EventCallback<keyof EventPayloads>[]>,
     key: string | typeof anyEvent,
     callback: EventCallback<keyof EventPayloads>
-  ): void {
+  ): () => void {
     const original = map.get(key);
 
     if (original != null) {
@@ -193,6 +191,8 @@ export class ResponseManager {
       const created: EventCallback<keyof EventPayloads>[] = [callback];
       map.set(key, created);
     }
+
+    return this._delete.bind(this, map, key, callback);
   }
 
   private _delete(
