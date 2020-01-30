@@ -17,6 +17,8 @@ const writeFile = promisify(writeFileCallback);
 
 const otBinaryPath =
   "/mnt/c/Program Files (x86)/OpenTrack V1.9/OpenTrack.app/OpenTrack.exe";
+const otCourses =
+  "/mnt/c/Users/st46664/Documents/Model/Exports/courses.zee.oneway.xml";
 const otInfrastructure =
   "/mnt/c/Users/st46664/Documents/Model/Exports/infrastructure.xml";
 const otLog = "/mnt/c/Users/st46664/Documents/Model/OpenTrack.log";
@@ -125,16 +127,20 @@ function spawnAndLog(
   const otapi = new OTAPI({ portApp, portOT });
 
   try {
-    const infrastructure = await parseInfrastructure(
-      await readFile(otInfrastructure, "utf-8")
-    );
+    const infrastructure = await parseInfrastructure({
+      courses: await readFile(otCourses, "utf-8"),
+      infrastructure: await readFile(otInfrastructure, "utf-8")
+    });
 
     console.info(
       [
         "Infrastructure:",
 
+        `  ${infrastructure.courses.size} courses,`,
+
         `  ${infrastructure.itineraries.size} itineraries ` +
-          `(${infrastructure.itinerariesLength / 1000} km),`,
+          `(${infrastructure.itinerariesLength / 1000} km, ` +
+          `${infrastructure.mainItineraries.size} used as main itineraries),`,
 
         `  ${infrastructure.paths.size} paths ` +
           `(${infrastructure.pathsLength / 1000} km),`,

@@ -1,69 +1,26 @@
 import xml2js from "xml2js";
 import { expect } from "chai";
 
-function ck(...rest: (boolean | number | string)[]): string {
-  return JSON.stringify(rest);
-}
-function xmlVertexCK(vertex: any): string {
-  return ck(vertex.$.documentname, vertex.$.id);
-}
+import { ck, filterChildren, idFromXML, xmlVertexCK } from "./common";
+import { Route, Path, Itinerary, Infrastructure, Course } from "./types";
 
-function filterChildren(xmlElement: any, ...names: string[]): any[] {
-  return ((xmlElement.$$ as any[]) || []).filter((child): boolean =>
-    names.includes(child["#name"])
-  );
-}
+export { Route, Path, Itinerary, Infrastructure };
 
-function id(
-  documentname: string,
-  numbericId: number | string,
-  name: string
-): string;
-function id(...rest: (number | string)[]): string {
-  return rest.join("-");
-}
-
-function idFromXML(xmlElement: any): string {
-  return id(xmlElement.$.documentname, xmlElement.$.id, xmlElement.$.name);
-}
-
-export interface Route {
-  readonly routeID: string;
-  readonly length: number;
-}
-
-export interface Path {
-  readonly pathID: string;
-  readonly routes: readonly Route[];
-  readonly length: number;
-}
-
-export interface Itinerary {
-  readonly itineraryID: string;
-  readonly paths: readonly Path[];
-  readonly routes: readonly Route[];
-  readonly length: number;
-}
-
-export interface Infrastructure {
-  readonly itineraries: ReadonlyMap<string, Itinerary>;
-  readonly itinerariesLength: number;
-  readonly paths: ReadonlyMap<string, Path>;
-  readonly pathsLength: number;
-  readonly routes: ReadonlyMap<string, Route>;
-  readonly routesLength: number;
-}
-
-export async function parseInfrastructure(
-  xmlString: string
-): Promise<Infrastructure> {
-  const xml = await new xml2js.Parser({
+export async function parseInfrastructure(trafIT: {
+  infrastructure: string;
+  courses: string;
+}): Promise<Infrastructure> {
+  const xmlInfrastructureDocument = await new xml2js.Parser({
     explicitChildren: true,
     preserveChildrenOrder: true
-  }).parseStringPromise(xmlString);
+  }).parseStringPromise(trafIT.infrastructure);
+  const xmlCoursesDocument = await new xml2js.Parser({
+    explicitChildren: true,
+    preserveChildrenOrder: true
+  }).parseStringPromise(trafIT.courses);
 
   const xmlVertexes: any[] = filterChildren(
-    xml["trafIT"]["vertices"][0],
+    xmlInfrastructureDocument["trafIT"]["vertices"][0],
     "vertex",
     "stationvertex"
   );
@@ -85,7 +42,8 @@ export async function parseInfrastructure(
     "There should be a neighbor for each vertex."
   ).to.have.lengthOf(xmlVertexes.length);
 
-  const xmlEdges: any[] = xml["trafIT"]["edges"][0]["edge"];
+  const xmlEdges: any[] =
+    xmlInfrastructureDocument["trafIT"]["edges"][0]["edge"];
   const vertexToVertexDistance = xmlEdges.reduce<Map<string, number>>(
     (acc, xmlEdge): Map<string, number> => {
       const id1 = ck(xmlEdge.$.documentname, xmlEdge.$.vertex1);
@@ -107,7 +65,8 @@ export async function parseInfrastructure(
   /*
    * Routes.
    */
-  const xmlRoutes: any[] = xml["trafIT"]["routes"][0]["route"];
+  const xmlRoutes: any[] =
+    xmlInfrastructureDocument["trafIT"]["routes"][0]["route"];
   const routeNames = new Set(
     xmlRoutes.map((xmlRoute): string => idFromXML(xmlRoute))
   );
@@ -157,7 +116,8 @@ export async function parseInfrastructure(
   /*
    * Paths.
    */
-  const xmlPaths: any[] = xml["trafIT"]["paths"][0]["path"];
+  const xmlPaths: any[] =
+    xmlInfrastructureDocument["trafIT"]["paths"][0]["path"];
   const pathNames = new Set(
     xmlPaths.map((xmlPath): string => idFromXML(xmlPath))
   );
@@ -202,7 +162,8 @@ export async function parseInfrastructure(
   /*
    * Itineraries.
    */
-  const xmlItineraries: any[] = xml["trafIT"]["itineraries"][0]["itinerary"];
+  const xmlItineraries: any[] =
+    xmlInfrastructureDocument["trafIT"]["itineraries"][0]["itinerary"];
   const itineraries = xmlItineraries.reduce<Map<string, Itinerary>>(
     (acc, xmlItinerary): Map<string, Itinerary> => {
       const itineraryID = xmlItinerary.$.name;
@@ -245,9 +206,58 @@ export async function parseInfrastructure(
     0
   );
 
+  /*
+   * Courses.
+   */
+  const xmlCourses: any[] =
+    xmlCoursesDocument["trafIT"]["courses"][0]["course"];
+  const courses = xmlCourses.reduce<Map<string, Course>>((acc, xmlCourse): Map<
+    string,
+    Course
+  > => {
+    const courseID = xmlCourse.$.courseID;
+
+    const courseItineraries = filterChildren(xmlCourse, "itinerary")
+      .sort(
+        (xmlItineraryA, xmlItineraryB): number =>
+          xmlItineraryA.$.priority - xmlItineraryB.$.priority
+      )
+      .map(
+        (xmlItinerary): Itinerary => {
+          const itineraryID = xmlItinerary.$.name;
+
+          const itinerary = itineraries.get(itineraryID);
+          if (itinerary == null) {
+            throw new Error(
+              `Can't find itinerary named ${itineraryID} from the course ${courseID}.`
+            );
+          }
+
+          return itinerary;
+        }
+      );
+
+    acc.set(courseID, {
+      courseID,
+      itineraries: courseItineraries,
+      mainItinerary: courseItineraries[0]
+    });
+
+    return acc;
+  }, new Map());
+
+  /*
+   * Main itineraries.
+   */
+  const mainItineraries = new Set<Itinerary>(
+    [...courses.values()].map((course): Itinerary => course.mainItinerary)
+  );
+
   return {
+    courses,
     itineraries,
     itinerariesLength,
+    mainItineraries,
     paths,
     pathsLength,
     routes,
