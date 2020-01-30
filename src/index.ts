@@ -107,7 +107,6 @@ function spawnAndLog(
 
   const otArgs = [
     "-otd",
-    // "-scriptinit",
     `-runfile=${
       otRunfile.startsWith("/mnt/")
         ? `${
