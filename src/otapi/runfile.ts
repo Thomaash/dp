@@ -1,3 +1,12 @@
+import { promisify } from "util";
+import {
+  readFile as readFileCallback,
+  writeFile as writeFileCallback
+} from "fs";
+
+const readFile = promisify(readFileCallback);
+const writeFile = promisify(writeFileCallback);
+
 export type Runfile = Record<
   | "Adhesion Outside"
   | "Adhesion Tunnel"
@@ -84,6 +93,33 @@ export type Runfile = Record<
 
 const newline = /\r?\n/g;
 const comment = /^\/\//;
+
+function generatePort(): number {
+  return Math.floor(1024 + Math.random() * (65535 - 1024));
+}
+
+export async function randomizePortsInRunfile(
+  runfilePath: string
+): Promise<void> {
+  const port1 = generatePort();
+  const port2 = port1 === 1024 ? 65535 : port1 - 1;
+
+  await writeFile(
+    runfilePath,
+    (await readFile(runfilePath, "utf8"))
+      .split(newline)
+      .map((line): string => {
+        if (line.startsWith("OTD Server Port#")) {
+          return `OTD Server Port#${port1}#`;
+        } else if (line.startsWith("OpenTrack Server Port#")) {
+          return `OpenTrack Server Port#${port2}#`;
+        } else {
+          return line;
+        }
+      })
+      .join("\n")
+  );
+}
 
 export function parseRunfile(text: string): Runfile {
   return text

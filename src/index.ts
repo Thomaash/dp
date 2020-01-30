@@ -6,7 +6,12 @@ import {
 } from "fs";
 import { spawn } from "child_process";
 
-import { AnyEventCallback, OTAPI, parseRunfile } from "./otapi";
+import {
+  AnyEventCallback,
+  OTAPI,
+  parseRunfile,
+  randomizePortsInRunfile
+} from "./otapi";
 import { Deferred } from "./util";
 import { args } from "./cli";
 import { buildChunkLogger } from "./util";
@@ -105,6 +110,7 @@ function spawnAndLog(
 }
 
 (async (): Promise<void> => {
+  await randomizePortsInRunfile(otRunfile);
   const runfile = parseRunfile((await readFile(otRunfile)).toString());
   const portOT = +runfile["OpenTrack Server Port"][0];
   const portApp = +runfile["OTD Server Port"][0];
@@ -124,35 +130,37 @@ function spawnAndLog(
     }`
   ];
 
+  const infrastructure = await parseInfrastructure({
+    courses: await readFile(otCourses, "utf-8"),
+    infrastructure: await readFile(otInfrastructure, "utf-8")
+  });
+
+  console.info(
+    [
+      "Infrastructure:",
+
+      `  ${infrastructure.courses.size} courses,`,
+
+      `  ${infrastructure.itineraries.size} itineraries ` +
+        `(${infrastructure.itinerariesLength / 1000} km, ` +
+        `${infrastructure.mainItineraries.size} used as main itineraries),`,
+
+      `  ${infrastructure.paths.size} paths ` +
+        `(${infrastructure.pathsLength / 1000} km),`,
+
+      `  ${infrastructure.routes.size} routes ` +
+        `(${infrastructure.routesLength / 1000} km).`,
+
+      "",
+      ""
+    ].join("\n")
+  );
+
+  console.info(`Ports: OT ${portOT} <-> App ${portApp}`);
   const otapi = new OTAPI({ portApp, portOT });
+  const trainTracker = new TrainTracker(otapi, infrastructure);
 
   try {
-    const infrastructure = await parseInfrastructure({
-      courses: await readFile(otCourses, "utf-8"),
-      infrastructure: await readFile(otInfrastructure, "utf-8")
-    });
-
-    console.info(
-      [
-        "Infrastructure:",
-
-        `  ${infrastructure.courses.size} courses,`,
-
-        `  ${infrastructure.itineraries.size} itineraries ` +
-          `(${infrastructure.itinerariesLength / 1000} km, ` +
-          `${infrastructure.mainItineraries.size} used as main itineraries),`,
-
-        `  ${infrastructure.paths.size} paths ` +
-          `(${infrastructure.pathsLength / 1000} km),`,
-
-        `  ${infrastructure.routes.size} routes ` +
-          `(${infrastructure.routesLength / 1000} km).`,
-
-        "",
-        ""
-      ].join("\n")
-    );
-
     await otapi.start();
 
     if (args["log-ot-responses"]) {
