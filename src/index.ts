@@ -25,7 +25,7 @@ const otRunfile = "/mnt/c/Users/st46664/Documents/Model/runfile.txt";
 function main(
   otapi: OTAPI,
   otReady: Promise<void>
-): { preparing: Promise<void>; running: Promise<void> } {
+): { preparing: Promise<void>; starting: Promise<void> } {
   const preparing = (async (): Promise<void> => {
     await Promise.all([
       otapi.on(
@@ -50,42 +50,42 @@ function main(
     ]);
   })();
 
-  const running = (async (): Promise<void> => {
+  const starting = (async (): Promise<void> => {
     await preparing;
     await otReady;
   })();
 
-  return { preparing, running };
+  return { preparing, starting };
 }
 
 function spawnAndLog(
   binaryPath: string,
   args: string[],
   logPath: string
-): Promise<{ code: number; stderr: string; stdout: string }> {
-  return new Promise((resolve, reject): void => {
+): { returnCode: Promise<number> } {
+  const returnCode = new Promise<number>((resolve, reject): void => {
     let stdout = "";
     let stderr = "";
 
     const logStdout = buildChunkLogger("OT", "info");
     const logStderr = buildChunkLogger("OT", "error");
 
-    const command = spawn(binaryPath, args);
+    const childProcess = spawn(binaryPath, args);
 
-    command.stdout.on("data", (chunk): void => {
+    childProcess.stdout.on("data", (chunk): void => {
       const string: string = chunk.toString();
 
       stdout += string;
       logStdout(string);
     });
-    command.stderr.on("data", (chunk): void => {
+    childProcess.stderr.on("data", (chunk): void => {
       const string: string = chunk.toString();
 
       stderr += string;
       logStderr(string);
     });
 
-    command.on("close", (code): void => {
+    childProcess.on("close", (code): void => {
       writeFile(
         logPath,
         [
@@ -94,10 +94,12 @@ function spawnAndLog(
           `STDERR:\n${stderr}`
         ].join("\n\n")
       )
-        .then(resolve.bind(null, { code, stderr, stdout }))
+        .then(resolve.bind(null, code))
         .catch(reject);
     });
   });
+
+  return { returnCode };
 }
 
 (async (): Promise<void> => {
@@ -127,7 +129,7 @@ function spawnAndLog(
       await readFile(otInfrastructure, "utf-8")
     );
 
-    process.stdout.write(
+    console.info(
       [
         "Infrastructure:",
 
@@ -162,7 +164,7 @@ function spawnAndLog(
 
     if (args["manage-ot"]) {
       const ready = new Deferred<void>();
-      const { preparing, running } = main(otapi, ready.promise);
+      const { preparing, starting } = main(otapi, ready.promise);
 
       const readyForSimulation = otapi.once("simReadyForSimulation");
       const simulationServerStarted = otapi.once("simServerStarted");
@@ -170,24 +172,35 @@ function spawnAndLog(
       console.info("Starting OpenTrack...");
       console.info([otBinaryPath, ...otArgs]);
       const command = spawnAndLog(otBinaryPath, otArgs, otLog);
-      command.then(otapi.kill.bind(otapi)).catch(otapi.kill.bind(otapi));
+      command.returnCode
+        .then(otapi.kill.bind(otapi))
+        .catch(otapi.kill.bind(otapi));
 
-      console.info("Waiting for OpenTrack...");
-      await Promise.all([
-        preparing,
-        readyForSimulation,
-        simulationServerStarted,
-        waitPort({ port: portOT, output: "silent" })
-      ]);
       const simulationEnd = otapi.once("simStopped");
-      console.info("Starting simulation...");
-      const simulationStart = otapi.once("simStarted");
-      await otapi.startSimulation();
-      await simulationStart;
-      console.info("Simulating...");
+      try {
+        console.info("Waiting for OpenTrack...");
+        await Promise.all([
+          preparing,
+          readyForSimulation,
+          simulationServerStarted,
+          waitPort({ port: portOT, output: "silent" })
+        ]);
+        console.info("Starting simulation...");
+        const simulationStart = otapi.once("simStarted");
+        await otapi.startSimulation();
+        await simulationStart;
+      } catch (error) {
+        console.error("Startup failed.");
 
+        console.info("Waiting for OpenTrack process to terminate...");
+        await command.returnCode;
+
+        throw error;
+      }
+
+      console.info("Simulating...");
       ready.resolve();
-      await running;
+      await starting;
 
       await simulationEnd;
       console.info("Simulation ended.");
@@ -196,15 +209,15 @@ function spawnAndLog(
       await otapi.terminateApplication();
       console.info("OpenTrack closed.");
 
-      const { code } = await command;
-      console.info(`OpenTrack exited with exit code ${code}.`);
+      const returnCode = await command.returnCode;
+      console.info(`OpenTrack exited with exit code ${returnCode}.`);
     } else {
       console.info("Waiting for OpenTrack...");
       await waitPort({ port: portOT, output: "silent" });
 
       for (;;) {
         const ready = new Deferred<void>();
-        const { preparing, running } = main(otapi, ready.promise);
+        const { preparing, starting: running } = main(otapi, ready.promise);
         await preparing;
 
         const simulationStart = otapi.once("simStarted");
@@ -225,8 +238,13 @@ function spawnAndLog(
   } finally {
     await otapi.kill();
     console.info("Finished.");
+    console.info();
   }
-})().catch((error): void => {
-  console.error(error);
-  process.exit(1);
-});
+})()
+  .then((): void => {
+    process.exit(0);
+  })
+  .catch((error): void => {
+    console.error(error);
+    process.exit(1);
+  });
