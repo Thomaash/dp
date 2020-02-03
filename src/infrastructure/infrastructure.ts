@@ -1,7 +1,7 @@
 import { promisify } from "util";
 import { readFile as readFileCallback } from "fs";
 
-import { Course, InfrastructureData, Itinerary, Path, Route } from "./types";
+import { Train, InfrastructureData, Itinerary, Path, Route } from "./types";
 
 import { parseInfrastructure } from "./parser";
 
@@ -36,28 +36,28 @@ export const infrastructureFactory = {
   ): Promise<Infrastructure> {
     const data = await parseInfrastructure(trafIT);
     return new Infrastructure(
-      data.courses,
       data.itineraries,
       data.itinerariesLength,
       data.mainItineraries,
       data.paths,
       data.pathsLength,
       data.routes,
-      data.routesLength
+      data.routesLength,
+      data.trains
     );
   }
 };
 
 export class Infrastructure implements InfrastructureData {
   public constructor(
-    public readonly courses: ReadonlyMap<string, Course>,
     public readonly itineraries: ReadonlyMap<string, Itinerary>,
     public readonly itinerariesLength: number,
     public readonly mainItineraries: ReadonlySet<Itinerary>,
     public readonly paths: ReadonlyMap<string, Path>,
     public readonly pathsLength: number,
     public readonly routes: ReadonlyMap<string, Route>,
-    public readonly routesLength: number
+    public readonly routesLength: number,
+    public readonly trains: ReadonlyMap<string, Train>
   ) {}
 
   public getItineraryOffset(

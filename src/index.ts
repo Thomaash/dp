@@ -142,7 +142,7 @@ function spawnAndLog(
     [
       "Infrastructure:",
 
-      `  ${infrastructure.courses.size} courses,`,
+      `  ${infrastructure.trains.size} trains,`,
 
       `  ${infrastructure.itineraries.size} itineraries ` +
         `(${infrastructure.itinerariesLength / 1000} km, ` +

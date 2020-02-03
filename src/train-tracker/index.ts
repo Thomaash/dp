@@ -36,7 +36,7 @@ export class TrainTracker {
   }
 
   public getTrainPositionOnMainItinerary(trainID: string): number | null {
-    const train = this._infrastructure.courses.get(trainID);
+    const train = this._infrastructure.trains.get(trainID);
     if (train == null) {
       throw new Error(`There's no train with ${trainID} id.`);
     }

@@ -2,7 +2,7 @@ import xml2js from "xml2js";
 import { expect } from "chai";
 
 import { ck, filterChildren, idFromXML, xmlVertexCK } from "./common";
-import { Course, InfrastructureData, Itinerary, Path, Route } from "./types";
+import { Train, InfrastructureData, Itinerary, Path, Route } from "./types";
 
 export async function parseInfrastructure(trafIT: {
   infrastructure: string;
@@ -218,17 +218,17 @@ export async function parseInfrastructure(trafIT: {
   );
 
   /*
-   * Courses.
+   * Trains.
    */
   const xmlCourses: any[] =
     xmlCoursesDocument["trafIT"]["courses"][0]["course"];
-  const courses = xmlCourses.reduce<Map<string, Course>>((acc, xmlCourse): Map<
+  const trains = xmlCourses.reduce<Map<string, Train>>((acc, xmlCourse): Map<
     string,
-    Course
+    Train
   > => {
-    const courseID = xmlCourse.$.courseID;
+    const trainID = xmlCourse.$.courseID;
 
-    const courseItineraries = Object.freeze(
+    const trainItineraries = Object.freeze(
       filterChildren(xmlCourse, "itinerary")
         .sort(
           (xmlItineraryA, xmlItineraryB): number =>
@@ -241,7 +241,7 @@ export async function parseInfrastructure(trafIT: {
             const itinerary = itineraries.get(itineraryID);
             if (itinerary == null) {
               throw new Error(
-                `Can't find itinerary named ${itineraryID} from the course ${courseID}.`
+                `Can't find itinerary named ${itineraryID} from the course ${trainID}.`
               );
             }
 
@@ -251,11 +251,11 @@ export async function parseInfrastructure(trafIT: {
     );
 
     acc.set(
-      courseID,
+      trainID,
       Object.freeze({
-        courseID,
-        itineraries: courseItineraries,
-        mainItinerary: courseItineraries[0]
+        trainID,
+        itineraries: trainItineraries,
+        mainItinerary: trainItineraries[0]
       })
     );
 
@@ -266,11 +266,11 @@ export async function parseInfrastructure(trafIT: {
    * Main itineraries.
    */
   const mainItineraries = new Set<Itinerary>(
-    [...courses.values()].map((course): Itinerary => course.mainItinerary)
+    [...trains.values()].map((train): Itinerary => train.mainItinerary)
   );
 
   return Object.freeze({
-    courses,
+    trains,
     itineraries,
     itinerariesLength,
     mainItineraries,
