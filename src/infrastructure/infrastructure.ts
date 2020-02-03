@@ -59,4 +59,23 @@ export class Infrastructure implements InfrastructureData {
     public readonly routes: ReadonlyMap<string, Route>,
     public readonly routesLength: number
   ) {}
+
+  public getItineraryOffset(
+    itinerary: Itinerary,
+    routeID: string,
+    offset: number
+  ): number | null {
+    const routeIndex = itinerary.routes.findIndex(
+      (route): boolean => route.routeID === routeID
+    );
+    if (routeIndex === -1) {
+      return null;
+    }
+
+    return itinerary.routes
+      .slice(0, routeIndex)
+      .reduce((acc, route): number => {
+        return acc + route.length;
+      }, offset);
+  }
 }

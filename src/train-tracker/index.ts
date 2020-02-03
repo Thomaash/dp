@@ -35,6 +35,24 @@ export class TrainTracker {
       .map((report): string => report.trainID);
   }
 
+  public getTrainPositionOnMainItinerary(trainID: string): number | null {
+    const train = this._infrastructure.courses.get(trainID);
+    if (train == null) {
+      throw new Error(`There's no train with ${trainID} id.`);
+    }
+
+    const report = this._reports.get(trainID);
+    if (report == null) {
+      throw new Error(`There's no report available for ${trainID}.`);
+    }
+
+    return this._infrastructure.getItineraryOffset(
+      train.mainItinerary,
+      report.routeID,
+      report.routeOffset
+    );
+  }
+
   public startTracking(frequency: number): this {
     this._cleanupCallbacks.push(
       this._otapi.on(
