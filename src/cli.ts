@@ -12,6 +12,11 @@ const y = yargs
     describe: "If enabled OpenTrack responses will be logged to the console.",
     type: "boolean"
   })
+  .option("randomize-ports", {
+    default: false,
+    describe: "Put random pair of ports into the runfile.",
+    type: "boolean"
+  })
   .option("manage-ot", {
     default: false,
     describe: "If enabled OpenTrack will be started and terminated.",

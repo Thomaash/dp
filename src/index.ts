@@ -111,7 +111,9 @@ function spawnAndLog(
 }
 
 (async (): Promise<void> => {
-  await randomizePortsInRunfile(otRunfile);
+  if (args["randomize-ports"]) {
+    await randomizePortsInRunfile(otRunfile);
+  }
   const runfile = parseRunfile((await readFile(otRunfile)).toString());
   const portOT = +runfile["OpenTrack Server Port"][0];
   const portApp = +runfile["OTD Server Port"][0];
