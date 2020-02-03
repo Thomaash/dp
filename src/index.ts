@@ -193,9 +193,15 @@ function spawnAndLog(
       console.info("Starting OpenTrack...");
       console.info([otBinaryPath, ...otArgs]);
       const command = spawnAndLog(otBinaryPath, otArgs, otLog);
-      command.returnCode
-        .then(otapi.kill.bind(otapi))
-        .catch(otapi.kill.bind(otapi));
+      command.returnCode.catch().then(
+        async (): Promise<void> => {
+          console.info(
+            `OpenTrack exited with exit code ${await command.returnCode}.`
+          );
+          console.info("Stopping the app...");
+          otapi.kill();
+        }
+      );
 
       const simulationEnd = otapi.once("simStopped");
       try {
@@ -230,8 +236,9 @@ function spawnAndLog(
       await otapi.terminateApplication();
       console.info("OpenTrack closed.");
 
-      const returnCode = await command.returnCode;
-      console.info(`OpenTrack exited with exit code ${returnCode}.`);
+      // Wait for the process to finish. OpenTrack doesn't handle well when the
+      // app stops responding when it's running.
+      await command.returnCode;
     } else {
       console.info("Waiting for OpenTrack...");
       await waitPort({ port: portOT, output: "silent" });
