@@ -16,7 +16,7 @@ import { Deferred } from "./util";
 import { TrainTracker } from "./train-tracker";
 import { args } from "./cli";
 import { buildChunkLogger } from "./util";
-import { parseInfrastructure } from "./infrastructure";
+import { infrastructureFactory } from "./infrastructure";
 
 const readFile = promisify(readFileCallback);
 const writeFile = promisify(writeFileCallback);
@@ -133,9 +133,9 @@ function spawnAndLog(
     }`
   ];
 
-  const infrastructure = await parseInfrastructure({
-    courses: await readFile(otCourses, "utf-8"),
-    infrastructure: await readFile(otInfrastructure, "utf-8")
+  const infrastructure = await infrastructureFactory.buildFromFiles({
+    courses: otCourses,
+    infrastructure: otInfrastructure
   });
 
   console.info(

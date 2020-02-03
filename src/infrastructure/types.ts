@@ -22,7 +22,7 @@ export interface Course {
   readonly mainItinerary: Itinerary;
 }
 
-export interface Infrastructure {
+export interface InfrastructureData {
   readonly courses: ReadonlyMap<string, Course>;
   readonly itineraries: ReadonlyMap<string, Itinerary>;
   readonly itinerariesLength: number;
