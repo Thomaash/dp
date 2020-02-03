@@ -18,7 +18,7 @@ export interface Itinerary {
 
 export interface Course {
   readonly courseID: string;
-  readonly itineraries: Itinerary[];
+  readonly itineraries: readonly Itinerary[];
   readonly mainItinerary: Itinerary;
 }
 

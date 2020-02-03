@@ -77,31 +77,34 @@ export async function parseInfrastructure(trafIT: {
   > => {
     const routeID = idFromXML(xmlRoute);
 
-    acc.set(routeID, {
-      length: filterChildren(xmlRoute, "vertex", "stationvertex").reduce<
-        number
-      >((acc, vertex2, i, arr): number => {
-        if (i === 0) {
-          return acc;
-        }
+    acc.set(
+      routeID,
+      Object.freeze({
+        length: filterChildren(xmlRoute, "vertex", "stationvertex").reduce<
+          number
+        >((acc, vertex2, i, arr): number => {
+          if (i === 0) {
+            return acc;
+          }
 
-        const id1 = xmlVertexCK(vertex2);
-        const id2 = vertexNeighborCK.get(xmlVertexCK(arr[i - 1]));
-        if (id2 == null) {
-          throw new Error(`Can't find neighbor vertex of ${id1}.`);
-        }
+          const id1 = xmlVertexCK(vertex2);
+          const id2 = vertexNeighborCK.get(xmlVertexCK(arr[i - 1]));
+          if (id2 == null) {
+            throw new Error(`Can't find neighbor vertex of ${id1}.`);
+          }
 
-        const distance = vertexToVertexDistance.get(ck(id1, id2));
-        if (distance == null) {
-          throw new Error(
-            `Can't find distance between vertexes ${id1} and ${id2}.`
-          );
-        }
+          const distance = vertexToVertexDistance.get(ck(id1, id2));
+          if (distance == null) {
+            throw new Error(
+              `Can't find distance between vertexes ${id1} and ${id2}.`
+            );
+          }
 
-        return acc + distance;
-      }, 0),
-      routeID
-    });
+          return acc + distance;
+        }, 0),
+        routeID
+      })
+    );
 
     return acc;
   }, new Map());
@@ -128,26 +131,31 @@ export async function parseInfrastructure(trafIT: {
   > => {
     const pathID = idFromXML(xmlPath);
 
-    const pathRoutes = (xmlPath["route"] as any[]).map(
-      (xmlRoute): Route => {
-        const routeID = idFromXML(xmlRoute);
-        const route = routes.get(routeID);
+    const pathRoutes = Object.freeze(
+      (xmlPath["route"] as any[]).map(
+        (xmlRoute): Route => {
+          const routeID = idFromXML(xmlRoute);
+          const route = routes.get(routeID);
 
-        if (route != null) {
-          return route;
-        } else {
-          throw new Error(`There is no route called ${routeID}.`);
+          if (route != null) {
+            return route;
+          } else {
+            throw new Error(`There is no route called ${routeID}.`);
+          }
         }
-      }
+      )
     );
 
-    acc.set(pathID, {
-      length: pathRoutes.reduce<number>((acc, route): number => {
-        return acc + route.length;
-      }, 0),
+    acc.set(
       pathID,
-      routes: pathRoutes
-    });
+      Object.freeze({
+        length: pathRoutes.reduce<number>((acc, route): number => {
+          return acc + route.length;
+        }, 0),
+        pathID,
+        routes: pathRoutes
+      })
+    );
 
     return acc;
   }, new Map());
@@ -166,33 +174,38 @@ export async function parseInfrastructure(trafIT: {
     (acc, xmlItinerary): Map<string, Itinerary> => {
       const itineraryID = xmlItinerary.$.name;
 
-      const itineraryPaths = filterChildren(xmlItinerary, "path").map(
-        (xmlPath): Path => {
-          const pathID = idFromXML(xmlPath);
+      const itineraryPaths = Object.freeze(
+        filterChildren(xmlItinerary, "path").map(
+          (xmlPath): Path => {
+            const pathID = idFromXML(xmlPath);
 
-          const path = paths.get(pathID);
-          if (path == null) {
-            throw new Error(
-              `Can't find path named ${pathID} that is a part of the itinerary ${itineraryID}.`
-            );
+            const path = paths.get(pathID);
+            if (path == null) {
+              throw new Error(
+                `Can't find path named ${pathID} that is a part of the itinerary ${itineraryID}.`
+              );
+            }
+
+            return path;
           }
-
-          return path;
-        }
+        )
       );
-      const itineraryRoutes = itineraryPaths.flatMap(
-        (path): readonly Route[] => path.routes
+      const itineraryRoutes = Object.freeze(
+        itineraryPaths.flatMap((path): readonly Route[] => path.routes)
       );
       const length = itineraryPaths.reduce((acc, path): number => {
         return acc + path.length;
       }, 0);
 
-      acc.set(itineraryID, {
+      acc.set(
         itineraryID,
-        length,
-        paths: itineraryPaths,
-        routes: itineraryRoutes
-      });
+        Object.freeze({
+          itineraryID,
+          length,
+          paths: itineraryPaths,
+          routes: itineraryRoutes
+        })
+      );
 
       return acc;
     },
@@ -215,31 +228,36 @@ export async function parseInfrastructure(trafIT: {
   > => {
     const courseID = xmlCourse.$.courseID;
 
-    const courseItineraries = filterChildren(xmlCourse, "itinerary")
-      .sort(
-        (xmlItineraryA, xmlItineraryB): number =>
-          xmlItineraryA.$.priority - xmlItineraryB.$.priority
-      )
-      .map(
-        (xmlItinerary): Itinerary => {
-          const itineraryID = xmlItinerary.$.name;
+    const courseItineraries = Object.freeze(
+      filterChildren(xmlCourse, "itinerary")
+        .sort(
+          (xmlItineraryA, xmlItineraryB): number =>
+            xmlItineraryA.$.priority - xmlItineraryB.$.priority
+        )
+        .map(
+          (xmlItinerary): Itinerary => {
+            const itineraryID = xmlItinerary.$.name;
 
-          const itinerary = itineraries.get(itineraryID);
-          if (itinerary == null) {
-            throw new Error(
-              `Can't find itinerary named ${itineraryID} from the course ${courseID}.`
-            );
+            const itinerary = itineraries.get(itineraryID);
+            if (itinerary == null) {
+              throw new Error(
+                `Can't find itinerary named ${itineraryID} from the course ${courseID}.`
+              );
+            }
+
+            return itinerary;
           }
+        )
+    );
 
-          return itinerary;
-        }
-      );
-
-    acc.set(courseID, {
+    acc.set(
       courseID,
-      itineraries: courseItineraries,
-      mainItinerary: courseItineraries[0]
-    });
+      Object.freeze({
+        courseID,
+        itineraries: courseItineraries,
+        mainItinerary: courseItineraries[0]
+      })
+    );
 
     return acc;
   }, new Map());
@@ -251,7 +269,7 @@ export async function parseInfrastructure(trafIT: {
     [...courses.values()].map((course): Itinerary => course.mainItinerary)
   );
 
-  return {
+  return Object.freeze({
     courses,
     itineraries,
     itinerariesLength,
@@ -260,5 +278,5 @@ export async function parseInfrastructure(trafIT: {
     pathsLength,
     routes,
     routesLength
-  };
+  });
 }
