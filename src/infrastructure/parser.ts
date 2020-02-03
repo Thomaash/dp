@@ -4,18 +4,60 @@ import { expect } from "chai";
 import { ck, filterChildren, idFromXML, xmlVertexCK } from "./common";
 import { Train, InfrastructureData, Itinerary, Path, Route } from "./types";
 
-export async function parseInfrastructure(trafIT: {
-  infrastructure: string;
+export async function parseInfrastructure(xml: {
   courses: string;
+  infrastructure: string;
+  rollingStock: string;
 }): Promise<InfrastructureData> {
-  const xmlInfrastructureDocument = await new xml2js.Parser({
-    explicitChildren: true,
-    preserveChildrenOrder: true
-  }).parseStringPromise(trafIT.infrastructure);
   const xmlCoursesDocument = await new xml2js.Parser({
     explicitChildren: true,
     preserveChildrenOrder: true
-  }).parseStringPromise(trafIT.courses);
+  }).parseStringPromise(xml.courses);
+  const xmlInfrastructureDocument = await new xml2js.Parser({
+    explicitChildren: true,
+    preserveChildrenOrder: true
+  }).parseStringPromise(xml.infrastructure);
+  const xmlRollingStockDocument = await new xml2js.Parser({
+    explicitChildren: true,
+    preserveChildrenOrder: true
+  }).parseStringPromise(xml.rollingStock);
+
+  const xmlVehicles: any[] =
+    xmlRollingStockDocument["railml"]["rollingstock"][0]["vehicles"][0][
+      "vehicle"
+    ];
+  const vehicleMaxSpeeds = xmlVehicles.reduce<Map<string, number>>(
+    (acc, xmlVehicle): Map<string, number> => {
+      acc.set(xmlVehicle.$.id, +xmlVehicle.$.speed);
+      return acc;
+    },
+    new Map()
+  );
+
+  const xmlFormations: any[] =
+    xmlRollingStockDocument["railml"]["rollingstock"][0]["formations"][0][
+      "formation"
+    ];
+  const formationMaxSpeeds = xmlFormations.reduce<Map<string, number>>(
+    (acc, xmlFormation): Map<string, number> => {
+      const refs: any[] = xmlFormation["trainOrder"][0]["vehicleRef"];
+      const maxSpeeds = refs.map((ref): any => {
+        const vehicleID = ref.$.vehicleRef;
+        const vehicleMaxSpeed = vehicleMaxSpeeds.get(vehicleID);
+
+        if (vehicleMaxSpeed == null) {
+          throw new Error(`Can't find max speed for vehicle ${vehicleID}.`);
+        }
+
+        return vehicleMaxSpeed;
+      });
+      const maxSpeed = Math.min(...maxSpeeds);
+
+      acc.set(xmlFormation.$.name, maxSpeed);
+      return acc;
+    },
+    new Map()
+  );
 
   const xmlVertexes: any[] = filterChildren(
     xmlInfrastructureDocument["trafIT"]["vertices"][0],
@@ -241,7 +283,7 @@ export async function parseInfrastructure(trafIT: {
             const itinerary = itineraries.get(itineraryID);
             if (itinerary == null) {
               throw new Error(
-                `Can't find itinerary named ${itineraryID} from the course ${trainID}.`
+                `Can't find itinerary named ${itineraryID} from the train ${trainID}.`
               );
             }
 
@@ -250,12 +292,18 @@ export async function parseInfrastructure(trafIT: {
         )
     );
 
+    const maxSpeed = formationMaxSpeeds.get(xmlCourse.$.train);
+    if (maxSpeed == null) {
+      throw new Error(`Can't find max speed for train ${trainID}.`);
+    }
+
     acc.set(
       trainID,
       Object.freeze({
-        trainID,
         itineraries: trainItineraries,
-        mainItinerary: trainItineraries[0]
+        mainItinerary: trainItineraries[0],
+        maxSpeed,
+        trainID
       })
     );
 

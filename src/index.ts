@@ -28,6 +28,8 @@ const otCourses =
 const otInfrastructure =
   "/mnt/c/Users/st46664/Documents/Model/Exports/infrastructure.xml";
 const otLog = "/mnt/c/Users/st46664/Documents/Model/OpenTrack.log";
+const otRollingStock =
+  "/mnt/c/Users/st46664/Documents/Model/Exports/rolling-stock.railml";
 const otRunfile = "/mnt/c/Users/st46664/Documents/Model/runfile.txt";
 
 function main(
@@ -135,7 +137,8 @@ function spawnAndLog(
 
   const infrastructure = await infrastructureFactory.buildFromFiles({
     courses: otCourses,
-    infrastructure: otInfrastructure
+    infrastructure: otInfrastructure,
+    rollingStock: otRollingStock
   });
 
   console.info(

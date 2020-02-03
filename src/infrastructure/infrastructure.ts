@@ -15,26 +15,30 @@ export const infrastructureFactory = {
     paths: {
       courses: string;
       infrastructure: string;
+      rollingStock: string;
     }
   ): Promise<Infrastructure> {
-    const [courses, infrastructure] = await Promise.all([
+    const [courses, infrastructure, rollingStock] = await Promise.all([
       readFile(paths.courses, "utf-8"),
-      readFile(paths.infrastructure, "utf-8")
+      readFile(paths.infrastructure, "utf-8"),
+      readFile(paths.rollingStock, "utf-8")
     ]);
 
     return infrastructureFactory.buildFromText({
       courses,
-      infrastructure
+      infrastructure,
+      rollingStock
     });
   },
   async buildFromText(
     this: unknown,
-    trafIT: {
+    xml: {
       courses: string;
       infrastructure: string;
+      rollingStock: string;
     }
   ): Promise<Infrastructure> {
-    const data = await parseInfrastructure(trafIT);
+    const data = await parseInfrastructure(xml);
     return new Infrastructure(
       data.itineraries,
       data.itinerariesLength,
@@ -59,6 +63,12 @@ export class Infrastructure implements InfrastructureData {
     public readonly routesLength: number,
     public readonly trains: ReadonlyMap<string, Train>
   ) {}
+
+  public getFastest(...trains: Train[]): Train {
+    return trains.reduce((acc, train): Train => {
+      return train.maxSpeed > acc.maxSpeed ? train : acc;
+    }, trains[0]);
+  }
 
   public getItineraryOffset(
     itinerary: Itinerary,

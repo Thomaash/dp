@@ -19,6 +19,7 @@ export interface Itinerary {
 export interface Train {
   readonly itineraries: readonly Itinerary[];
   readonly mainItinerary: Itinerary;
+  readonly maxSpeed: number;
   readonly trainID: string;
 }
 
