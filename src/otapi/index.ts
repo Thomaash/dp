@@ -7,6 +7,7 @@ import {
   deactivateTrain,
   endSimulation,
   infoPanel,
+  openSimulationPanel,
   pauseSimulation,
   removeTrain,
   resetMovementAuthority,
@@ -143,6 +144,11 @@ export class OTAPI {
     ...rest: Parameters<typeof infoPanel>
   ): ReturnType<typeof infoPanel> {
     return infoPanel.apply(this.config, rest);
+  }
+  public openSimulationPanel(
+    ...rest: Parameters<typeof openSimulationPanel>
+  ): ReturnType<typeof openSimulationPanel> {
+    return openSimulationPanel.apply(this.config, rest);
   }
   public pauseSimulation(
     ...rest: Parameters<typeof pauseSimulation>

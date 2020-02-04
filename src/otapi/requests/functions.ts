@@ -169,6 +169,21 @@ export function infoPanel(this: Config): ReturnType<typeof send> {
 }
 
 /// }}}
+/// openSimulationPanel {{{
+
+export interface OpenSimulationPanelParameters {
+  mode?: "Simulation" | "Controller" | "Output";
+}
+export function openSimulationPanel(
+  this: Config,
+  { mode }: OpenSimulationPanelParameters = {}
+): ReturnType<typeof send> {
+  return send.call(this, "openSimulationPanel", [
+    { name: "mode", value: mode }
+  ]);
+}
+
+/// }}}
 /// pauseSimulation {{{
 
 export interface PauseSimulationParameters {
