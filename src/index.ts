@@ -4,7 +4,7 @@ import {
   readFile as readFileCallback,
   writeFile as writeFileCallback
 } from "fs";
-import { spawn } from "child_process";
+import { ChildProcessWithoutNullStreams, spawn } from "child_process";
 
 import {
   AnyEventCallback,
@@ -20,17 +20,6 @@ import { infrastructureFactory } from "./infrastructure";
 
 const readFile = promisify(readFileCallback);
 const writeFile = promisify(writeFileCallback);
-
-const otBinaryPath =
-  "/mnt/c/Program Files (x86)/OpenTrack V1.9/OpenTrack.app/OpenTrack.exe";
-const otCourses =
-  "/mnt/c/Users/st46664/Documents/Model/Exports/courses.zee.oneway.xml";
-const otInfrastructure =
-  "/mnt/c/Users/st46664/Documents/Model/Exports/infrastructure.xml";
-const otLog = "/mnt/c/Users/st46664/Documents/Model/OpenTrack.log";
-const otRollingStock =
-  "/mnt/c/Users/st46664/Documents/Model/Exports/rolling-stock.railml";
-const otRunfile = "/mnt/c/Users/st46664/Documents/Model/runfile.txt";
 
 function main(
   otapi: OTAPI,
@@ -70,9 +59,11 @@ function main(
 
 function spawnAndLog(
   binaryPath: string,
-  args: string[],
+  args: readonly string[],
   logPath: string
-): { returnCode: Promise<number> } {
+): { child: ChildProcessWithoutNullStreams; returnCode: Promise<number> } {
+  const child = spawn(binaryPath, args);
+
   const returnCode = new Promise<number>((resolve, reject): void => {
     let stdout = "";
     let stderr = "";
@@ -80,22 +71,20 @@ function spawnAndLog(
     const logStdout = buildChunkLogger("OT", "info");
     const logStderr = buildChunkLogger("OT", "error");
 
-    const childProcess = spawn(binaryPath, args);
-
-    childProcess.stdout.on("data", (chunk): void => {
+    child.stdout.on("data", (chunk): void => {
       const string: string = chunk.toString();
 
       stdout += string;
       logStdout(string);
     });
-    childProcess.stderr.on("data", (chunk): void => {
+    child.stderr.on("data", (chunk): void => {
       const string: string = chunk.toString();
 
       stderr += string;
       logStderr(string);
     });
 
-    childProcess.on("close", (code): void => {
+    child.on("close", (code): void => {
       writeFile(
         logPath,
         [
@@ -109,36 +98,56 @@ function spawnAndLog(
     });
   });
 
-  return { returnCode };
+  return { child, returnCode };
+}
+
+async function startOpenTrack(otapi: OTAPI): Promise<{ command: any }> {
+  const otArgs = Object.freeze(["-otd", `-runfile=${args["ot-runfile"]}`]);
+
+  for (;;) {
+    const readyForSimulation = otapi.once("simReadyForSimulation");
+    const simulationServerStarted = otapi.once("simServerStarted");
+
+    console.info("Starting OpenTrack...");
+    console.info([args["ot-binary"], ...otArgs]);
+    const command = spawnAndLog(args["ot-binary"], otArgs, args["ot-log"]);
+
+    try {
+      console.info("Waiting for OpenTrack...");
+      await Promise.all([
+        readyForSimulation,
+        simulationServerStarted,
+        waitPort({ port: otapi.config.portOT, output: "silent" })
+      ]);
+      await otapi.openSimulationPanel();
+
+      return { command };
+    } catch (error) {
+      console.error("Startup failed.");
+
+      console.info("Waiting for OpenTrack process to terminate...");
+      command.child.kill("SIGTERM");
+      await command.returnCode;
+      console.info("OpenTrack terminated.");
+
+      console.info("Trying again...");
+      continue;
+    }
+  }
 }
 
 (async (): Promise<void> => {
   if (args["randomize-ports"]) {
-    await randomizePortsInRunfile(otRunfile);
+    await randomizePortsInRunfile(args["ot-runfile"]);
   }
-  const runfile = parseRunfile((await readFile(otRunfile)).toString());
+  const runfile = parseRunfile((await readFile(args["ot-runfile"])).toString());
   const portOT = +runfile["OpenTrack Server Port"][0];
   const portApp = +runfile["OTD Server Port"][0];
 
-  const otArgs = [
-    "-otd",
-    `-runfile=${
-      otRunfile.startsWith("/mnt/")
-        ? `${
-            // Uppercase drive letter.
-            otRunfile.slice(5, 6).toUpperCase()
-          }:${
-            // The relative path on given drive with backslashes instead of shlashes.
-            otRunfile.slice(6).replace(/\//g, "\\")
-          }`
-        : otRunfile
-    }`
-  ];
-
   const infrastructure = await infrastructureFactory.buildFromFiles({
-    courses: otCourses,
-    infrastructure: otInfrastructure,
-    rollingStock: otRollingStock
+    courses: args["ot-export-courses"],
+    infrastructure: args["ot-export-infrastructure"],
+    rollingStock: args["ot-export-rolling-stock"]
   });
 
   console.info(
@@ -185,14 +194,8 @@ function spawnAndLog(
 
     if (args["manage-ot"]) {
       const ready = new Deferred<void>();
-      const { preparing, starting } = main(otapi, ready.promise);
 
-      const readyForSimulation = otapi.once("simReadyForSimulation");
-      const simulationServerStarted = otapi.once("simServerStarted");
-
-      console.info("Starting OpenTrack...");
-      console.info([otBinaryPath, ...otArgs]);
-      const command = spawnAndLog(otBinaryPath, otArgs, otLog);
+      const { command } = await startOpenTrack(otapi);
       command.returnCode.catch().then(
         async (): Promise<void> => {
           console.info(
@@ -203,27 +206,14 @@ function spawnAndLog(
         }
       );
 
+      const { preparing, starting } = main(otapi, ready.promise);
+      await preparing;
+
       const simulationEnd = otapi.once("simStopped");
-      try {
-        console.info("Waiting for OpenTrack...");
-        await Promise.all([
-          preparing,
-          readyForSimulation,
-          simulationServerStarted,
-          waitPort({ port: portOT, output: "silent" })
-        ]);
-        console.info("Starting simulation...");
-        const simulationStart = otapi.once("simStarted");
-        await otapi.startSimulation();
-        await simulationStart;
-      } catch (error) {
-        console.error("Startup failed.");
-
-        console.info("Waiting for OpenTrack process to terminate...");
-        await command.returnCode;
-
-        throw error;
-      }
+      console.info("Starting simulation...");
+      const simulationStart = otapi.once("simStarted");
+      await otapi.startSimulation();
+      await simulationStart;
 
       console.info("Simulating...");
       ready.resolve();

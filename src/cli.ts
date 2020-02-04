@@ -7,6 +7,37 @@ const y = yargs
   .config()
   .help()
 
+  .option("ot-binary", {
+    describe: "!",
+    required: true,
+    type: "string"
+  })
+  .option("ot-export-courses", {
+    describe: "!",
+    required: true,
+    type: "string"
+  })
+  .option("ot-export-infrastructure", {
+    describe: "!",
+    required: true,
+    type: "string"
+  })
+  .option("ot-export-rolling-stock", {
+    describe: "!",
+    required: true,
+    type: "string"
+  })
+  .option("ot-log", {
+    describe: "!",
+    required: true,
+    type: "string"
+  })
+  .option("ot-runfile", {
+    describe: "!",
+    required: true,
+    type: "string"
+  })
+
   .option("log-ot-responses", {
     default: false,
     describe: "If enabled OpenTrack responses will be logged to the console.",
