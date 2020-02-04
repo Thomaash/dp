@@ -60,7 +60,8 @@ function main(
 function spawnAndLog(
   binaryPath: string,
   args: readonly string[],
-  logPath: string
+  logPath: string,
+  onLogLine: (logLine: string) => void = (): void => {}
 ): { child: ChildProcessWithoutNullStreams; returnCode: Promise<number> } {
   const child = spawn(binaryPath, args);
 
@@ -68,8 +69,8 @@ function spawnAndLog(
     let stdout = "";
     let stderr = "";
 
-    const logStdout = buildChunkLogger("OT", "info");
-    const logStderr = buildChunkLogger("OT", "error");
+    const logStdout = buildChunkLogger("OT", "info", onLogLine);
+    const logStderr = buildChunkLogger("OT", "error", onLogLine);
 
     child.stdout.on("data", (chunk): void => {
       const string: string = chunk.toString();
@@ -103,23 +104,43 @@ function spawnAndLog(
 
 async function startOpenTrack(otapi: OTAPI): Promise<{ command: any }> {
   const otArgs = Object.freeze(["-otd", `-runfile=${args["ot-runfile"]}`]);
+  console.info("OpenTrack commandline:", [args["ot-binary"], ...otArgs]);
 
-  for (;;) {
+  for (let attempt = 1; ; ++attempt) {
     const readyForSimulation = otapi.once("simReadyForSimulation");
     const simulationServerStarted = otapi.once("simServerStarted");
 
-    console.info("Starting OpenTrack...");
-    console.info([args["ot-binary"], ...otArgs]);
-    const command = spawnAndLog(args["ot-binary"], otArgs, args["ot-log"]);
+    const failed = new Deferred();
+
+    console.info(
+      attempt === 1
+        ? "Starting OpenTrack..."
+        : `Starting OpenTrack (attempt ${attempt})...`
+    );
+    const command = spawnAndLog(
+      args["ot-binary"],
+      otArgs,
+      args["ot-log"],
+      (line): void => {
+        if (
+          line.endsWith("OTServerGenerator startPSMServer Socket NO success")
+        ) {
+          failed.reject(new Error(line));
+        }
+      }
+    );
 
     try {
-      console.info("Waiting for OpenTrack...");
-      await Promise.all([
-        readyForSimulation,
-        simulationServerStarted,
-        waitPort({ port: otapi.config.portOT, output: "silent" })
+      await Promise.race([
+        Promise.all([
+          readyForSimulation,
+          simulationServerStarted,
+          waitPort({ port: otapi.config.portOT, output: "silent" })
+        ]),
+        failed.promise
       ]);
       await otapi.openSimulationPanel();
+      console.info("OpenTrack is ready for simulation.");
 
       return { command };
     } catch (error) {
@@ -131,6 +152,7 @@ async function startOpenTrack(otapi: OTAPI): Promise<{ command: any }> {
       console.info("OpenTrack terminated.");
 
       console.info("Trying again...");
+      console.info();
       continue;
     }
   }

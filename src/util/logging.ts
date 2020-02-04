@@ -1,8 +1,12 @@
 export function buildChunkLogger(
   prefix: string,
-  method: "log" | "info" | "warn" | "error"
+  ...methods: (((line: string) => void) | "log" | "info" | "warn" | "error")[]
 ): (chunk: string) => void {
   let text = "";
+
+  const consumers = methods.map((method): ((line: string) => void) =>
+    typeof method === "function" ? method : console[method].bind(console)
+  );
 
   return (chunk): void => {
     text += chunk;
@@ -16,7 +20,9 @@ export function buildChunkLogger(
     }
 
     parts.forEach((part): void => {
-      console[method](`${prefix}: ${part}`);
+      consumers.forEach(
+        (consumer): void => void consumer(`${prefix}: ${part}`)
+      );
     });
   };
 }
