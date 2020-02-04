@@ -234,11 +234,11 @@ function spawnAndLog(
 
       console.info("Closing OpenTrack...");
       await otapi.terminateApplication();
-      console.info("OpenTrack closed.");
 
       // Wait for the process to finish. OpenTrack doesn't handle well when the
       // app stops responding when it's running.
       await command.returnCode;
+      console.info("OpenTrack closed.");
     } else {
       console.info("Waiting for OpenTrack...");
       await waitPort({ port: portOT, output: "silent" });
