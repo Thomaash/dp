@@ -1,3 +1,7 @@
+export interface ItineraryArgs {
+  overtaking: boolean;
+}
+
 export interface Route {
   readonly length: number;
   readonly routeID: string;
@@ -10,6 +14,7 @@ export interface Path {
 }
 
 export interface Itinerary {
+  readonly args: ItineraryArgs;
   readonly itineraryID: string;
   readonly length: number;
   readonly paths: readonly Path[];
@@ -20,6 +25,8 @@ export interface Train {
   readonly itineraries: readonly Itinerary[];
   readonly mainItinerary: Itinerary;
   readonly maxSpeed: number;
+  readonly paths: ReadonlySet<Path>;
+  readonly routes: ReadonlySet<Route>;
   readonly trainID: string;
 }
 

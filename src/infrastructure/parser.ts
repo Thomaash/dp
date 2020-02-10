@@ -2,7 +2,8 @@ import xml2js from "xml2js";
 import { expect } from "chai";
 
 import { ck, filterChildren, idFromXML, xmlVertexCK } from "./common";
-import { Train, InfrastructureData, Itinerary, Path, Route } from "./types";
+import { InfrastructureData, Itinerary, Path, Route, Train } from "./types";
+import { parseItineraryArgs } from "./args";
 
 export async function parseInfrastructure(xml: {
   courses: string;
@@ -239,9 +240,12 @@ export async function parseInfrastructure(xml: {
         return acc + path.length;
       }, 0);
 
+      const args = Object.freeze(parseItineraryArgs(itineraryID));
+
       acc.set(
         itineraryID,
         Object.freeze({
+          args,
           itineraryID,
           length,
           paths: itineraryPaths,
@@ -292,6 +296,17 @@ export async function parseInfrastructure(xml: {
         )
     );
 
+    const trainPaths = trainItineraries
+      .flatMap((itinerary): readonly Path[] => itinerary.paths)
+      .reduce<Set<Path>>((acc, path): Set<Path> => acc.add(path), new Set());
+
+    const trainRoutes = trainItineraries
+      .flatMap((itinerary): readonly Route[] => itinerary.routes)
+      .reduce<Set<Route>>(
+        (acc, route): Set<Route> => acc.add(route),
+        new Set()
+      );
+
     const maxSpeed = formationMaxSpeeds.get(xmlCourse.$.train);
     if (maxSpeed == null) {
       throw new Error(`Can't find max speed for train ${trainID}.`);
@@ -303,6 +318,8 @@ export async function parseInfrastructure(xml: {
         itineraries: trainItineraries,
         mainItinerary: trainItineraries[0],
         maxSpeed,
+        paths: trainPaths,
+        routes: trainRoutes,
         trainID
       })
     );
@@ -318,13 +335,13 @@ export async function parseInfrastructure(xml: {
   );
 
   return Object.freeze({
-    trains,
     itineraries,
     itinerariesLength,
     mainItineraries,
     paths,
     pathsLength,
     routes,
-    routesLength
+    routesLength,
+    trains
   });
 }
