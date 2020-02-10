@@ -1,7 +1,12 @@
 import { EventPayloads, OTAPI } from "../otapi";
-import { Infrastructure } from "../infrastructure";
+import { Infrastructure, Train } from "../infrastructure";
 
 export type Report = EventPayloads["trainPositionReport"];
+
+export interface TrainPositionOnItinerary {
+  train: Train;
+  position: number;
+}
 
 export class TrainTracker {
   private readonly _cleanupCallbacks: (() => void)[] = [];
@@ -22,6 +27,47 @@ export class TrainTracker {
 
   public getReport(trainID: string): Report | undefined {
     return this._reports.get(trainID);
+  }
+
+  /**
+   * The trains are sorted so that the train that is closes to the end of the
+   * itinerary is first.
+   */
+  public getTrainsOnItineraryInOrder(
+    itineraryID: string
+  ): TrainPositionOnItinerary[] {
+    const itinerary = this._infrastructure.itineraries.get(itineraryID);
+
+    if (itinerary == null) {
+      throw new Error(`There's no itinerary called ${itineraryID}.`);
+    }
+
+    const routes = new Set(
+      itinerary.routes.map((route): string => route.routeID)
+    );
+
+    return [...this._reports.values()]
+      .filter((report): boolean => routes.has(report.routeID))
+      .map(
+        ({
+          trainID,
+          routeID,
+          routeOffset
+        }): Partial<TrainPositionOnItinerary> => ({
+          train: this._infrastructure.trains.get(trainID),
+          position:
+            this._infrastructure.getItineraryOffset(
+              itinerary,
+              routeID,
+              routeOffset
+            ) ?? undefined
+        })
+      )
+      .filter(
+        (tpoi): tpoi is TrainPositionOnItinerary =>
+          tpoi.train != null && tpoi.position != null
+      )
+      .sort((a, b): number => b.position - a.position);
   }
 
   public getTrainsOnItinerary(itineraryID: string): string[] {
