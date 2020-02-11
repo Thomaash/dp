@@ -16,45 +16,248 @@ import { Deferred } from "./util";
 import { TrainTracker } from "./train-tracker";
 import { args } from "./cli";
 import { buildChunkLogger } from "./util";
-import { infrastructureFactory } from "./infrastructure";
+import {
+  infrastructureFactory,
+  Infrastructure,
+  Route,
+  Itinerary,
+  Train,
+  Station
+} from "./infrastructure";
 
 const readFile = promisify(readFileCallback);
 const writeFile = promisify(writeFileCallback);
 
-function main(
-  otapi: OTAPI,
-  otReady: Promise<void>
-): { preparing: Promise<void>; starting: Promise<void> } {
-  const preparing = (async (): Promise<void> => {
-    await Promise.all([
-      otapi.on(
-        "trainCreated",
-        async (_, { time, trainID }): Promise<void> => {
-          const departureTime = Math.round(time + 600) + 0.1;
+function ck(...rest: string[]): string {
+  return JSON.stringify(rest);
+}
 
-          try {
-            await otapi.setWaitForDepartureCommand({ trainID, flag: true });
-            await otapi.setDepartureCommand({ trainID, time: departureTime });
-          } catch (error) {
-            console.error("configure new train", error);
+class MWD<K, V> extends Map<K, V> {
+  public gwd(key: K, defaultValue: V): V {
+    if (this.has(key)) {
+      return this.get(key)!;
+    } else {
+      this.set(key, defaultValue);
+      return defaultValue;
+    }
+  }
+}
+
+class Blocking<V> {
+  private _data = new MWD<string, Set<V>>();
+
+  public block(stationID: string, blockerID: string, blocked: V): this {
+    const key = ck(stationID, blockerID);
+    this._data.gwd(key, new Set()).add(blocked);
+
+    return this;
+  }
+
+  public unblock(stationID: string, blockerID: string, blocked: V): this {
+    const key = ck(stationID, blockerID);
+    this._data.gwd(key, new Set()).delete(blocked);
+
+    return this;
+  }
+
+  public unblockAll(stationID: string, blockerID: string): this {
+    const key = ck(stationID, blockerID);
+    this._data.delete(key);
+
+    return this;
+  }
+
+  public isBlocked(tested: V): boolean {
+    for (const set of this._data.values()) {
+      if (set.has(tested)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  public getBlocked(stationID: string, blockerID: string): V[] {
+    const key = ck(stationID, blockerID);
+    return [...this._data.gwd(key, new Set()).values()];
+  }
+}
+
+interface OvertakingItinerary {
+  exitRoute: Route;
+  itinerary: Itinerary;
+  station: Station;
+}
+
+// TODO: Move this into separate file.
+function main({
+  infrastructure,
+  otapi
+}: {
+  infrastructure: Infrastructure;
+  otapi: OTAPI;
+}): {
+  setup: () => Promise<void>;
+  cleanup: () => Promise<void>;
+} {
+  const overtakingItiniraries = [...infrastructure.itineraries.values()]
+    .filter(({ args }): boolean => args.overtaking)
+    .filter(({ itineraryID, stations }): boolean => {
+      if (stations.length) {
+        return true;
+      } else {
+        throw new Error(
+          `No station to faciliate overtaking was found in ${itineraryID}.`
+        );
+      }
+    })
+    .map(
+      (itinerary): OvertakingItinerary => ({
+        exitRoute: itinerary.routes[itinerary.routes.length - 1],
+        itinerary,
+        station: itinerary.stations[itinerary.stations.length - 1]
+      })
+    );
+
+  const overtakingRouteIDs = overtakingItiniraries
+    .flatMap(({ itinerary: { routes } }): readonly Route[] => routes)
+    .reduce<Set<string>>(
+      (acc, route): Set<string> => acc.add(route.routeID),
+      new Set()
+    );
+
+  const blocking = new Blocking<Train>();
+  const cleanupCallbacks: (() => void)[] = [];
+
+  async function overtakeTrain(
+    overtaking: Train,
+    waiting: Train,
+    { itinerary, station }: OvertakingItinerary
+  ): Promise<void> {
+    blocking.block(station.stationID, overtaking.trainID, waiting);
+
+    await otapi.setRouteDisallowed({
+      trainID: waiting.trainID,
+      routeID: itinerary.routes[itinerary.routes.length - 1].routeID
+    });
+    await otapi.setStop({
+      stationID: station.stationID,
+      stopFlag: true,
+      trainID: waiting.trainID
+    });
+    await otapi.setDepartureTime({
+      stationID: station.stationID,
+      time: Number.MAX_SAFE_INTEGER,
+      trainID: waiting.trainID
+    });
+  }
+
+  async function releaseTrains(
+    station: Station,
+    overtaking: Train
+  ): Promise<void> {
+    const blockedByMe = blocking.getBlocked(
+      station.stationID,
+      overtaking.trainID
+    );
+    blocking.unblockAll(station.stationID, overtaking.trainID);
+
+    for (const waiting of blockedByMe.filter(
+      (train): boolean => !blocking.isBlocked(train)
+    )) {
+      for (const { routeID } of waiting.routes.values()) {
+        await otapi.setRouteAllowed({ routeID, trainID: waiting.trainID });
+      }
+      await otapi.setDepartureTime({
+        stationID: station.stationID,
+        time: 0, // TODO: The original time from the timetable should be used.
+        trainID: waiting.trainID
+      });
+    }
+  }
+
+  async function setup(): Promise<void> {
+    const tracker = new TrainTracker(otapi, infrastructure).startTracking(1);
+    cleanupCallbacks.push(tracker.stopTraking.bind(tracker));
+
+    const removeListeners = await Promise.all([
+      otapi.on(
+        "routeEntry",
+        async (_, { routeID, trainID }): Promise<void> => {
+          const train = infrastructure.trains.get(trainID);
+          if (train == null) {
+            throw new Error(`No train called ${trainID}.`);
+          }
+
+          if (overtakingRouteIDs.has(routeID)) {
+            for (const oi of overtakingItiniraries) {
+              const trainsOnItinerary = tracker.getTrainsOnItineraryInOrder(
+                oi.itinerary.itineraryID
+              );
+
+              if (trainsOnItinerary.length < 2) {
+                continue;
+              }
+
+              if (
+                trainsOnItinerary[0].train.maxSpeed <
+                trainsOnItinerary[1].train.maxSpeed
+              ) {
+                await overtakeTrain(
+                  trainsOnItinerary[1].train,
+                  trainsOnItinerary[0].train,
+                  oi
+                );
+              }
+            }
           }
         }
       ),
-      otapi.on("trainArrival", (_, { time, trainID }): void => {
-        const departureTime = Math.round(time + 600) + 0.1;
-        otapi
-          .setDepartureCommand({ trainID, time: departureTime })
-          .catch(console.error.bind(console, "set departure command"));
-      })
+      otapi.on(
+        "routeExit",
+        async (_, { routeID, trainID }): Promise<void> => {
+          const train = infrastructure.trains.get(trainID);
+          if (train == null) {
+            throw new Error(`No train called ${trainID}.`);
+          }
+
+          for (const oi of overtakingItiniraries.filter(
+            (oi): boolean => oi.exitRoute.routeID === routeID
+          )) {
+            releaseTrains(oi.station, train);
+          }
+        }
+      ),
+      otapi.on(
+        "trainCreated",
+        async (_, { trainID }): Promise<void> => {
+          const train = infrastructure.trains.get(trainID);
+          if (train == null) {
+            throw new Error(`No train called ${trainID}.`);
+          }
+
+          // TODO: Implement rate limiting in OTAPI.
+          // await Promise.all(
+          //   [...train.routes.values()].map(
+          //     ({ routeID }): Promise<void> =>
+          //       otapi.setRouteAllowed({ routeID, trainID })
+          //   )
+          // );
+
+          for (const { routeID } of train.routes.values()) {
+            await otapi.setRouteAllowed({ routeID, trainID });
+          }
+        }
+      )
     ]);
-  })();
+    cleanupCallbacks.push(...removeListeners);
+  }
 
-  const starting = (async (): Promise<void> => {
-    await preparing;
-    await otReady;
-  })();
+  async function cleanup(): Promise<void> {
+    cleanupCallbacks.splice(0).forEach((callback): void => void callback());
+  }
 
-  return { preparing, starting };
+  return { setup, cleanup };
 }
 
 function spawnAndLog(
@@ -217,8 +420,6 @@ async function startOpenTrack(otapi: OTAPI): Promise<{ command: any }> {
     }
 
     if (args["manage-ot"]) {
-      const ready = new Deferred<void>();
-
       const { command } = await startOpenTrack(otapi);
       command.returnCode.catch().then(
         async (): Promise<void> => {
@@ -230,21 +431,19 @@ async function startOpenTrack(otapi: OTAPI): Promise<{ command: any }> {
         }
       );
 
-      const { preparing, starting } = main(otapi, ready.promise);
-      await preparing;
+      const { cleanup, setup } = main({ otapi, infrastructure });
+      await setup();
 
       const simulationEnd = otapi.once("simStopped");
       console.info("Starting simulation...");
       const simulationStart = otapi.once("simStarted");
       await otapi.startSimulation();
       await simulationStart;
-
       console.info("Simulating...");
-      ready.resolve();
-      await starting;
 
       await simulationEnd;
       console.info("Simulation ended.");
+      await cleanup();
 
       console.info("Closing OpenTrack...");
       await otapi.terminateApplication();
@@ -258,9 +457,8 @@ async function startOpenTrack(otapi: OTAPI): Promise<{ command: any }> {
       await waitPort({ port: portOT, output: "silent" });
 
       for (;;) {
-        const ready = new Deferred<void>();
-        const { preparing, starting: running } = main(otapi, ready.promise);
-        await preparing;
+        const { setup, cleanup } = main({ otapi, infrastructure });
+        await setup();
 
         const simulationStart = otapi.once("simStarted");
 
@@ -269,11 +467,9 @@ async function startOpenTrack(otapi: OTAPI): Promise<{ command: any }> {
         const simulationEnd = otapi.once("simStopped");
         console.info("Simulating...");
 
-        ready.resolve();
-        await running;
-
         await simulationEnd;
         console.info("Simulation ended.");
+        await cleanup();
         console.info();
       }
     }
