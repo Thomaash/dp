@@ -1,7 +1,14 @@
 import { promisify } from "util";
 import { readFile as readFileCallback } from "fs";
 
-import { Train, InfrastructureData, Itinerary, Path, Route } from "./types";
+import {
+  InfrastructureData,
+  Itinerary,
+  Path,
+  Route,
+  Station,
+  Train
+} from "./types";
 
 import { parseInfrastructure } from "./parser";
 
@@ -47,6 +54,7 @@ export const infrastructureFactory = {
       data.pathsLength,
       data.routes,
       data.routesLength,
+      data.stations,
       data.trains
     );
   }
@@ -61,6 +69,7 @@ export class Infrastructure implements InfrastructureData {
     public readonly pathsLength: number,
     public readonly routes: ReadonlyMap<string, Route>,
     public readonly routesLength: number,
+    public readonly stations: ReadonlyMap<string, Station>,
     public readonly trains: ReadonlyMap<string, Train>
   ) {}
 

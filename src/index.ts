@@ -188,6 +188,8 @@ async function startOpenTrack(otapi: OTAPI): Promise<{ command: any }> {
       `  ${infrastructure.routes.size} routes ` +
         `(${infrastructure.routesLength / 1000} km).`,
 
+      `  ${infrastructure.stations.size} stations `,
+
       "",
       ""
     ].join("\n")

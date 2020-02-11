@@ -2,7 +2,14 @@ import xml2js from "xml2js";
 import { expect } from "chai";
 
 import { ck, filterChildren, idFromXML, xmlVertexCK } from "./common";
-import { InfrastructureData, Itinerary, Path, Route, Train } from "./types";
+import {
+  InfrastructureData,
+  Itinerary,
+  Path,
+  Route,
+  Train,
+  Station
+} from "./types";
 import { parseItineraryArgs } from "./args";
 
 export async function parseInfrastructure(xml: {
@@ -104,6 +111,21 @@ export async function parseInfrastructure(xml: {
   ).to.have.lengthOf(xmlEdges.length * 2);
 
   /*
+   * Stations.
+   */
+  const xmlStationVertexes: any[] = filterChildren(
+    xmlInfrastructureDocument["trafIT"]["vertices"][0],
+    "stationvertex"
+  );
+  const stations = xmlStationVertexes.reduce<Map<string, Station>>(
+    (acc, xmlStationVertex): Map<string, Station> => {
+      const stationID = xmlStationVertex.$.station;
+      return acc.set(stationID, Object.freeze({ stationID }));
+    },
+    new Map()
+  );
+
+  /*
    * Routes.
    */
   const xmlRoutes: any[] =
@@ -145,6 +167,18 @@ export async function parseInfrastructure(xml: {
 
           return acc + distance;
         }, 0),
+        stations: filterChildren(xmlRoute, "stationvertex").map(
+          (stationVertex): Station => {
+            const stationID = stationVertex.$.station;
+
+            const station = stations.get(stationID);
+            if (station == null) {
+              throw new Error(`Can't find any station called ${stationID}.`);
+            }
+
+            return station;
+          }
+        ),
         routeID
       })
     );
@@ -192,11 +226,15 @@ export async function parseInfrastructure(xml: {
     acc.set(
       pathID,
       Object.freeze({
-        length: pathRoutes.reduce<number>((acc, route): number => {
-          return acc + route.length;
-        }, 0),
+        length: pathRoutes.reduce<number>(
+          (acc, route): number => acc + route.length,
+          0
+        ),
         pathID,
-        routes: pathRoutes
+        routes: pathRoutes,
+        stations: pathRoutes.flatMap(
+          (route): readonly Station[] => route.stations
+        )
       })
     );
 
@@ -249,7 +287,10 @@ export async function parseInfrastructure(xml: {
           itineraryID,
           length,
           paths: itineraryPaths,
-          routes: itineraryRoutes
+          routes: itineraryRoutes,
+          stations: itineraryPaths.flatMap(
+            (path): readonly Station[] => path.stations
+          )
         })
       );
 
@@ -342,6 +383,7 @@ export async function parseInfrastructure(xml: {
     pathsLength,
     routes,
     routesLength,
+    stations,
     trains
   });
 }

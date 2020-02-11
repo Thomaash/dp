@@ -2,15 +2,21 @@ export interface ItineraryArgs {
   overtaking: boolean;
 }
 
+export interface Station {
+  readonly stationID: string;
+}
+
 export interface Route {
   readonly length: number;
   readonly routeID: string;
+  readonly stations: readonly Station[];
 }
 
 export interface Path {
   readonly length: number;
   readonly pathID: string;
   readonly routes: readonly Route[];
+  readonly stations: readonly Station[];
 }
 
 export interface Itinerary {
@@ -19,6 +25,7 @@ export interface Itinerary {
   readonly length: number;
   readonly paths: readonly Path[];
   readonly routes: readonly Route[];
+  readonly stations: readonly Station[];
 }
 
 export interface Train {
@@ -38,5 +45,6 @@ export interface InfrastructureData {
   readonly pathsLength: number;
   readonly routes: ReadonlyMap<string, Route>;
   readonly routesLength: number;
+  readonly stations: ReadonlyMap<string, Station>;
   readonly trains: ReadonlyMap<string, Train>;
 }
