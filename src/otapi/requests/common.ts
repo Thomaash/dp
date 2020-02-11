@@ -66,7 +66,9 @@ export async function sendSimpleRequest(
       timeout: 5000
     });
   } catch (error) {
-    console.error(["", "Failed to send request:", body, ""].join("\n"));
+    console.error(
+      ["", `Failed to send request (${new Date()}):`, body, ""].join("\n")
+    );
 
     throw error;
   }
