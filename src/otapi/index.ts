@@ -1,49 +1,50 @@
 import {
-  activateTrain,
-  addTimetableEntry,
-  addTrain,
-  cancelConnection,
-  cancelRoute,
-  deactivateTrain,
-  endSimulation,
-  infoPanel,
-  openSimulationPanel,
-  pauseSimulation,
-  removeTrain,
-  resetMovementAuthority,
-  resetRequestedDeceleration,
-  resetRequestedSpeed,
-  resetTimetable,
-  setArrivalTime,
-  setConnection,
-  setDelayScenario,
-  setDepartureCommand,
-  setDepartureTime,
-  setDwellTime,
-  setEngineSwitch,
-  setMovementAuthority,
-  setPassingTime,
-  setPerformance,
-  setPositionCoasting,
-  setPositionSpeed,
-  setPriorityOfStartItinerary,
-  setRequestedDeceleration,
-  setRequestedSpeed,
-  setRouteAllowed,
-  setRouteDisallowed,
-  setRouteReserve,
-  setSendPositionReports,
-  setSimulationEndTime,
-  setSimulationPauseTime,
-  setSimulationRate,
-  setSimulationStartTime,
-  setSimulationStep,
-  setStop,
-  setTerminalStation,
-  setWaitForDepartureCommand,
-  startSimulation,
-  stepSimulation,
-  terminateApplication
+  ActivateTrainParameters,
+  AddTimetableEntryParameters,
+  AddTrainParameters,
+  CancelConnectionParameters,
+  CancelRouteParameters,
+  DeactivateTrainParameters,
+  EndSimulationParameters,
+  InfoPanelParameters,
+  OpenSimulationPanelParameters,
+  PauseSimulationParameters,
+  RemoveTrainParameters,
+  ResetMovementAuthorityParameters,
+  ResetRequestedDecelerationParameters,
+  ResetRequestedSpeedParameters,
+  ResetTimetableParameters,
+  SetArrivalTimeParameters,
+  SetConnectionParameters,
+  SetDelayScenarioParameters,
+  SetDepartureCommandParameters,
+  SetDepartureTimeParameters,
+  SetDwellTimeParameters,
+  SetEngineSwitchParameters,
+  SetMovementAuthorityParameters,
+  SetPassingTimeParameters,
+  SetPerformanceParameters,
+  SetPositionCoastingParameters,
+  SetPositionSpeedParameters,
+  SetPriorityOfStartItineraryParameters,
+  SetRequestedDecelerationParameters,
+  SetRequestedSpeedParameters,
+  SetRouteAllowedParameters,
+  SetRouteDisallowedParameters,
+  SetRouteReserveParameters,
+  SetSendPositionReportsParameters,
+  SetSimulationEndTimeParameters,
+  SetSimulationPauseTimeParameters,
+  SetSimulationRateParameters,
+  SetSimulationStartTimeParameters,
+  SetSimulationStepParameters,
+  SetStopParameters,
+  SetTerminalStationParameters,
+  SetWaitForDepartureCommandParameters,
+  StartSimulationParameters,
+  StepSimulationParameters,
+  TerminateApplicationParameters,
+  send
 } from "./requests";
 import { ResponseManager, EventCallback, EventPayloads } from "./responses";
 
@@ -105,230 +106,200 @@ export class OTAPI {
    * Requests
    */
 
-  public activateTrain(
-    ...rest: Parameters<typeof activateTrain>
-  ): ReturnType<typeof activateTrain> {
-    return activateTrain.apply(this.config, rest);
+  public activateTrain(parameters: ActivateTrainParameters): Promise<void> {
+    return send(this.config, "activateTrain", parameters);
   }
   public addTimetableEntry(
-    ...rest: Parameters<typeof addTimetableEntry>
-  ): ReturnType<typeof addTimetableEntry> {
-    return addTimetableEntry.apply(this.config, rest);
+    parameters: AddTimetableEntryParameters
+  ): Promise<void> {
+    return send(this.config, "addTimetableEntry", parameters);
   }
-  public addTrain(
-    ...rest: Parameters<typeof addTrain>
-  ): ReturnType<typeof addTrain> {
-    return addTrain.apply(this.config, rest);
+  public addTrain(parameters: AddTrainParameters): Promise<void> {
+    return send(this.config, "addTrain", parameters);
   }
   public cancelConnection(
-    ...rest: Parameters<typeof cancelConnection>
-  ): ReturnType<typeof cancelConnection> {
-    return cancelConnection.apply(this.config, rest);
+    parameters: CancelConnectionParameters
+  ): Promise<void> {
+    return send(this.config, "cancelConnection", parameters);
   }
-  public cancelRoute(
-    ...rest: Parameters<typeof cancelRoute>
-  ): ReturnType<typeof cancelRoute> {
-    return cancelRoute.apply(this.config, rest);
+  public cancelRoute(parameters: CancelRouteParameters): Promise<void> {
+    return send(this.config, "cancelRoute", parameters);
   }
-  public deactivateTrain(
-    ...rest: Parameters<typeof deactivateTrain>
-  ): ReturnType<typeof deactivateTrain> {
-    return deactivateTrain.apply(this.config, rest);
+  public deactivateTrain(parameters: DeactivateTrainParameters): Promise<void> {
+    return send(this.config, "deactivateTrain", parameters);
   }
   public endSimulation(
-    ...rest: Parameters<typeof endSimulation>
-  ): ReturnType<typeof endSimulation> {
-    return endSimulation.apply(this.config, rest);
+    parameters: EndSimulationParameters = {}
+  ): Promise<void> {
+    return send(this.config, "endSimulation", parameters);
   }
-  public infoPanel(
-    ...rest: Parameters<typeof infoPanel>
-  ): ReturnType<typeof infoPanel> {
-    return infoPanel.apply(this.config, rest);
+  public infoPanel(parameters: InfoPanelParameters = {}): Promise<void> {
+    return send(this.config, "infoPanel", parameters);
   }
   public openSimulationPanel(
-    ...rest: Parameters<typeof openSimulationPanel>
-  ): ReturnType<typeof openSimulationPanel> {
-    return openSimulationPanel.apply(this.config, rest);
+    parameters: OpenSimulationPanelParameters = {}
+  ): Promise<void> {
+    return send(this.config, "openSimulationPanel", parameters);
   }
   public pauseSimulation(
-    ...rest: Parameters<typeof pauseSimulation>
-  ): ReturnType<typeof pauseSimulation> {
-    return pauseSimulation.apply(this.config, rest);
+    parameters: PauseSimulationParameters = {}
+  ): Promise<void> {
+    return send(this.config, "pauseSimulation", parameters);
   }
-  public removeTrain(
-    ...rest: Parameters<typeof removeTrain>
-  ): ReturnType<typeof removeTrain> {
-    return removeTrain.apply(this.config, rest);
+  public removeTrain(parameters: RemoveTrainParameters): Promise<void> {
+    return send(this.config, "removeTrain", parameters);
   }
   public resetMovementAuthority(
-    ...rest: Parameters<typeof resetMovementAuthority>
-  ): ReturnType<typeof resetMovementAuthority> {
-    return resetMovementAuthority.apply(this.config, rest);
+    parameters: ResetMovementAuthorityParameters
+  ): Promise<void> {
+    return send(this.config, "resetMovementAuthority", parameters);
   }
   public resetRequestedDeceleration(
-    ...rest: Parameters<typeof resetRequestedDeceleration>
-  ): ReturnType<typeof resetRequestedDeceleration> {
-    return resetRequestedDeceleration.apply(this.config, rest);
+    parameters: ResetRequestedDecelerationParameters
+  ): Promise<void> {
+    return send(this.config, "resetRequestedDeceleration", parameters);
   }
   public resetRequestedSpeed(
-    ...rest: Parameters<typeof resetRequestedSpeed>
-  ): ReturnType<typeof resetRequestedSpeed> {
-    return resetRequestedSpeed.apply(this.config, rest);
+    parameters: ResetRequestedSpeedParameters
+  ): Promise<void> {
+    return send(this.config, "resetRequestedSpeed", parameters);
   }
   public resetTimetable(
-    ...rest: Parameters<typeof resetTimetable>
-  ): ReturnType<typeof resetTimetable> {
-    return resetTimetable.apply(this.config, rest);
+    parameters: ResetTimetableParameters = {}
+  ): Promise<void> {
+    return send(this.config, "resetTimetable", parameters);
   }
-  public setArrivalTime(
-    ...rest: Parameters<typeof setArrivalTime>
-  ): ReturnType<typeof setArrivalTime> {
-    return setArrivalTime.apply(this.config, rest);
+  public setArrivalTime(parameters: SetArrivalTimeParameters): Promise<void> {
+    return send(this.config, "setArrivalTime", parameters);
   }
-  public setConnection(
-    ...rest: Parameters<typeof setConnection>
-  ): ReturnType<typeof setConnection> {
-    return setConnection.apply(this.config, rest);
+  public setConnection(parameters: SetConnectionParameters): Promise<void> {
+    return send(this.config, "setConnection", parameters);
   }
   public setDelayScenario(
-    ...rest: Parameters<typeof setDelayScenario>
-  ): ReturnType<typeof setDelayScenario> {
-    return setDelayScenario.apply(this.config, rest);
+    parameters: SetDelayScenarioParameters
+  ): Promise<void> {
+    return send(this.config, "setDelayScenario", parameters);
   }
   public setDepartureCommand(
-    ...rest: Parameters<typeof setDepartureCommand>
-  ): ReturnType<typeof setDepartureCommand> {
-    return setDepartureCommand.apply(this.config, rest);
+    parameters: SetDepartureCommandParameters
+  ): Promise<void> {
+    return send(this.config, "setDepartureCommand", parameters);
   }
   public setDepartureTime(
-    ...rest: Parameters<typeof setDepartureTime>
-  ): ReturnType<typeof setDepartureTime> {
-    return setDepartureTime.apply(this.config, rest);
+    parameters: SetDepartureTimeParameters
+  ): Promise<void> {
+    return send(this.config, "setDepartureTime", parameters);
   }
-  public setDwellTime(
-    ...rest: Parameters<typeof setDwellTime>
-  ): ReturnType<typeof setDwellTime> {
-    return setDwellTime.apply(this.config, rest);
+  public setDwellTime(parameters: SetDwellTimeParameters): Promise<void> {
+    return send(this.config, "setDwellTime", parameters);
   }
-  public setEngineSwitch(
-    ...rest: Parameters<typeof setEngineSwitch>
-  ): ReturnType<typeof setEngineSwitch> {
-    return setEngineSwitch.apply(this.config, rest);
+  public setEngineSwitch(parameters: SetEngineSwitchParameters): Promise<void> {
+    return send(this.config, "setEngineSwitch", parameters);
   }
   public setMovementAuthority(
-    ...rest: Parameters<typeof setMovementAuthority>
-  ): ReturnType<typeof setMovementAuthority> {
-    return setMovementAuthority.apply(this.config, rest);
+    parameters: SetMovementAuthorityParameters
+  ): Promise<void> {
+    return send(this.config, "setMovementAuthority", parameters);
   }
-  public setPassingTime(
-    ...rest: Parameters<typeof setPassingTime>
-  ): ReturnType<typeof setPassingTime> {
-    return setPassingTime.apply(this.config, rest);
+  public setPassingTime(parameters: SetPassingTimeParameters): Promise<void> {
+    return send(this.config, "setPassingTime", parameters);
   }
-  public setPerformance(
-    ...rest: Parameters<typeof setPerformance>
-  ): ReturnType<typeof setPerformance> {
-    return setPerformance.apply(this.config, rest);
+  public setPerformance(parameters: SetPerformanceParameters): Promise<void> {
+    return send(this.config, "setPerformance", parameters);
   }
   public setPositionCoasting(
-    ...rest: Parameters<typeof setPositionCoasting>
-  ): ReturnType<typeof setPositionCoasting> {
-    return setPositionCoasting.apply(this.config, rest);
+    parameters: SetPositionCoastingParameters
+  ): Promise<void> {
+    return send(this.config, "setPositionCoasting", parameters);
   }
   public setPositionSpeed(
-    ...rest: Parameters<typeof setPositionSpeed>
-  ): ReturnType<typeof setPositionSpeed> {
-    return setPositionSpeed.apply(this.config, rest);
+    parameters: SetPositionSpeedParameters
+  ): Promise<void> {
+    return send(this.config, "setPositionSpeed", parameters);
   }
   public setPriorityOfStartItinerary(
-    ...rest: Parameters<typeof setPriorityOfStartItinerary>
-  ): ReturnType<typeof setPriorityOfStartItinerary> {
-    return setPriorityOfStartItinerary.apply(this.config, rest);
+    parameters: SetPriorityOfStartItineraryParameters
+  ): Promise<void> {
+    return send(this.config, "setPriorityOfStartItinerary", parameters);
   }
   public setRequestedDeceleration(
-    ...rest: Parameters<typeof setRequestedDeceleration>
-  ): ReturnType<typeof setRequestedDeceleration> {
-    return setRequestedDeceleration.apply(this.config, rest);
+    parameters: SetRequestedDecelerationParameters
+  ): Promise<void> {
+    return send(this.config, "setRequestedDeceleration", parameters);
   }
   public setRequestedSpeed(
-    ...rest: Parameters<typeof setRequestedSpeed>
-  ): ReturnType<typeof setRequestedSpeed> {
-    return setRequestedSpeed.apply(this.config, rest);
+    parameters: SetRequestedSpeedParameters
+  ): Promise<void> {
+    return send(this.config, "setRequestedSpeed", parameters);
   }
-  public setRouteAllowed(
-    ...rest: Parameters<typeof setRouteAllowed>
-  ): ReturnType<typeof setRouteAllowed> {
-    return setRouteAllowed.apply(this.config, rest);
+  public setRouteAllowed(parameters: SetRouteAllowedParameters): Promise<void> {
+    return send(this.config, "setRouteAllowed", parameters);
   }
   public setRouteDisallowed(
-    ...rest: Parameters<typeof setRouteDisallowed>
-  ): ReturnType<typeof setRouteDisallowed> {
-    return setRouteDisallowed.apply(this.config, rest);
+    parameters: SetRouteDisallowedParameters
+  ): Promise<void> {
+    return send(this.config, "setRouteDisallowed", parameters);
   }
-  public setRouteReserve(
-    ...rest: Parameters<typeof setRouteReserve>
-  ): ReturnType<typeof setRouteReserve> {
-    return setRouteReserve.apply(this.config, rest);
+  public setRouteReserve(parameters: SetRouteReserveParameters): Promise<void> {
+    return send(this.config, "setRouteReserve", parameters);
   }
   public setSendPositionReports(
-    ...rest: Parameters<typeof setSendPositionReports>
-  ): ReturnType<typeof setSendPositionReports> {
-    return setSendPositionReports.apply(this.config, rest);
+    parameters: SetSendPositionReportsParameters
+  ): Promise<void> {
+    return send(this.config, "setSendPositionReports", parameters);
   }
   public setSimulationEndTime(
-    ...rest: Parameters<typeof setSimulationEndTime>
-  ): ReturnType<typeof setSimulationEndTime> {
-    return setSimulationEndTime.apply(this.config, rest);
+    parameters: SetSimulationEndTimeParameters
+  ): Promise<void> {
+    return send(this.config, "setSimulationEndTime", parameters);
   }
   public setSimulationPauseTime(
-    ...rest: Parameters<typeof setSimulationPauseTime>
-  ): ReturnType<typeof setSimulationPauseTime> {
-    return setSimulationPauseTime.apply(this.config, rest);
+    parameters: SetSimulationPauseTimeParameters
+  ): Promise<void> {
+    return send(this.config, "setSimulationPauseTime", parameters);
   }
   public setSimulationRate(
-    ...rest: Parameters<typeof setSimulationRate>
-  ): ReturnType<typeof setSimulationRate> {
-    return setSimulationRate.apply(this.config, rest);
+    parameters: SetSimulationRateParameters
+  ): Promise<void> {
+    return send(this.config, "setSimulationRate", parameters);
   }
   public setSimulationStartTime(
-    ...rest: Parameters<typeof setSimulationStartTime>
-  ): ReturnType<typeof setSimulationStartTime> {
-    return setSimulationStartTime.apply(this.config, rest);
+    parameters: SetSimulationStartTimeParameters
+  ): Promise<void> {
+    return send(this.config, "setSimulationStartTime", parameters);
   }
   public setSimulationStep(
-    ...rest: Parameters<typeof setSimulationStep>
-  ): ReturnType<typeof setSimulationStep> {
-    return setSimulationStep.apply(this.config, rest);
+    parameters: SetSimulationStepParameters
+  ): Promise<void> {
+    return send(this.config, "setSimulationStep", parameters);
   }
-  public setStop(
-    ...rest: Parameters<typeof setStop>
-  ): ReturnType<typeof setStop> {
-    return setStop.apply(this.config, rest);
+  public setStop(parameters: SetStopParameters): Promise<void> {
+    return send(this.config, "setStop", parameters);
   }
   public setTerminalStation(
-    ...rest: Parameters<typeof setTerminalStation>
-  ): ReturnType<typeof setTerminalStation> {
-    return setTerminalStation.apply(this.config, rest);
+    parameters: SetTerminalStationParameters
+  ): Promise<void> {
+    return send(this.config, "setTerminalStation", parameters);
   }
   public setWaitForDepartureCommand(
-    ...rest: Parameters<typeof setWaitForDepartureCommand>
-  ): ReturnType<typeof setWaitForDepartureCommand> {
-    return setWaitForDepartureCommand.apply(this.config, rest);
+    parameters: SetWaitForDepartureCommandParameters
+  ): Promise<void> {
+    return send(this.config, "setWaitForDepartureCommand", parameters);
   }
   public startSimulation(
-    ...rest: Parameters<typeof startSimulation>
-  ): ReturnType<typeof startSimulation> {
-    return startSimulation.apply(this.config, rest);
+    parameters: StartSimulationParameters = {}
+  ): Promise<void> {
+    return send(this.config, "startSimulation", parameters);
   }
   public stepSimulation(
-    ...rest: Parameters<typeof stepSimulation>
-  ): ReturnType<typeof stepSimulation> {
-    return stepSimulation.apply(this.config, rest);
+    parameters: StepSimulationParameters = {}
+  ): Promise<void> {
+    return send(this.config, "stepSimulation", parameters);
   }
   public terminateApplication(
-    ...rest: Parameters<typeof terminateApplication>
-  ): ReturnType<typeof terminateApplication> {
-    return terminateApplication.apply(this.config, rest);
+    parameters: TerminateApplicationParameters = {}
+  ): Promise<void> {
+    return send(this.config, "terminateApplication", parameters);
   }
 
   /*
