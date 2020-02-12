@@ -130,15 +130,15 @@ function main({
   const cleanupCallbacks: (() => void)[] = [];
 
   async function overtakeTrain(
+    { exitRoute, station }: OvertakingItinerary,
     overtaking: Train,
-    waiting: Train,
-    { itinerary, station }: OvertakingItinerary
+    waiting: Train
   ): Promise<void> {
     blocking.block(station.stationID, overtaking.trainID, waiting);
 
     await otapi.setRouteDisallowed({
       trainID: waiting.trainID,
-      routeID: itinerary.routes[itinerary.routes.length - 1].routeID
+      routeID: exitRoute.routeID
     });
     await otapi.setStop({
       stationID: station.stationID,
@@ -153,7 +153,7 @@ function main({
   }
 
   async function releaseTrains(
-    station: Station,
+    { exitRoute, station }: OvertakingItinerary,
     overtaking: Train
   ): Promise<void> {
     const blockedByMe = blocking.getBlocked(
@@ -162,18 +162,23 @@ function main({
     );
     blocking.unblockAll(station.stationID, overtaking.trainID);
 
-    for (const waiting of blockedByMe.filter(
-      (train): boolean => !blocking.isBlocked(train)
-    )) {
-      for (const { routeID } of waiting.routes.values()) {
-        await otapi.setRouteAllowed({ routeID, trainID: waiting.trainID });
-      }
-      await otapi.setDepartureTime({
-        stationID: station.stationID,
-        time: 0, // TODO: The original time from the timetable should be used.
-        trainID: waiting.trainID
-      });
-    }
+    await Promise.all(
+      blockedByMe
+        .filter((train): boolean => !blocking.isBlocked(train))
+        .flatMap((waiting): Promise<void>[] => [
+          // Unblock exit route.
+          otapi.setRouteAllowed({
+            routeID: exitRoute.routeID,
+            trainID: waiting.trainID
+          }),
+          // Restore departure time.
+          otapi.setDepartureTime({
+            stationID: station.stationID,
+            time: 0, // TODO: The original time from the timetable should be used.
+            trainID: waiting.trainID
+          })
+        ])
+    );
   }
 
   async function setup(): Promise<void> {
@@ -204,9 +209,9 @@ function main({
                 trainsOnItinerary[1].train.maxSpeed
               ) {
                 await overtakeTrain(
+                  oi,
                   trainsOnItinerary[1].train,
-                  trainsOnItinerary[0].train,
-                  oi
+                  trainsOnItinerary[0].train
                 );
               }
             }
@@ -221,11 +226,11 @@ function main({
             throw new Error(`No train called ${trainID}.`);
           }
 
-          for (const oi of overtakingItiniraries.filter(
-            (oi): boolean => oi.exitRoute.routeID === routeID
-          )) {
-            releaseTrains(oi.station, train);
-          }
+          await Promise.all(
+            overtakingItiniraries
+              .filter((oi): boolean => oi.exitRoute.routeID === routeID)
+              .map((oi): Promise<void> => releaseTrains(oi, train))
+          );
         }
       ),
       otapi.on(
@@ -236,17 +241,12 @@ function main({
             throw new Error(`No train called ${trainID}.`);
           }
 
-          // TODO: Implement rate limiting in OTAPI.
-          // await Promise.all(
-          //   [...train.routes.values()].map(
-          //     ({ routeID }): Promise<void> =>
-          //       otapi.setRouteAllowed({ routeID, trainID })
-          //   )
-          // );
-
-          for (const { routeID } of train.routes.values()) {
-            await otapi.setRouteAllowed({ routeID, trainID });
-          }
+          await Promise.all(
+            [...train.routes.values()].map(
+              ({ routeID }): Promise<void> =>
+                otapi.setRouteAllowed({ routeID, trainID })
+            )
+          );
         }
       )
     ]);
