@@ -153,7 +153,11 @@ export function overtaking({
           // Restore departure time.
           otapi.setDepartureTime({
             stationID: station.stationID,
-            time: 0, // TODO: The original time from the timetable should be used.
+            time:
+              infrastructure.getTrainsDepartureFromStation(
+                waiting,
+                station.stationID
+              ) ?? 0,
             trainID: waiting.trainID
           })
         ])

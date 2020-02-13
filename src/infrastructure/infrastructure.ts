@@ -88,12 +88,12 @@ export class Infrastructure implements InfrastructureData {
     itinerary: Itinerary,
     routeID: string,
     offset: number
-  ): number | null {
+  ): number | undefined {
     const routeIndex = itinerary.routes.findIndex(
       (route): boolean => route.routeID === routeID
     );
     if (routeIndex === -1) {
-      return null;
+      return;
     }
 
     return itinerary.routes
@@ -101,5 +101,23 @@ export class Infrastructure implements InfrastructureData {
       .reduce((acc, route): number => {
         return acc + route.length;
       }, offset);
+  }
+
+  public getTrainsArrivalAtStation(
+    train: Train,
+    stationID: string
+  ): number | undefined {
+    return train.timetable.entries.find(
+      (entry): boolean => entry.station.stationID === stationID
+    )?.arrival;
+  }
+
+  public getTrainsDepartureFromStation(
+    train: Train,
+    stationID: string
+  ): number | undefined {
+    return train.timetable.entries.find(
+      (entry): boolean => entry.station.stationID === stationID
+    )?.departure;
   }
 }
