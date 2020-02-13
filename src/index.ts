@@ -1,5 +1,6 @@
 import waitPort from "wait-port";
 import { promisify } from "util";
+import { resolve } from "path";
 import {
   readFile as readFileCallback,
   writeFile as writeFileCallback
@@ -16,249 +17,12 @@ import { Deferred } from "./util";
 import { TrainTracker } from "./train-tracker";
 import { args } from "./cli";
 import { buildChunkLogger } from "./util";
-import {
-  infrastructureFactory,
-  Infrastructure,
-  Route,
-  Itinerary,
-  Train,
-  Station
-} from "./infrastructure";
+import { infrastructureFactory } from "./infrastructure";
+
+import { overtaking, OvertakingParams, DecisionModule } from "./overtaking";
 
 const readFile = promisify(readFileCallback);
 const writeFile = promisify(writeFileCallback);
-
-function ck(...rest: string[]): string {
-  return JSON.stringify(rest);
-}
-
-class MWD<K, V> extends Map<K, V> {
-  public gwd(key: K, defaultValue: V): V {
-    if (this.has(key)) {
-      return this.get(key)!;
-    } else {
-      this.set(key, defaultValue);
-      return defaultValue;
-    }
-  }
-}
-
-class Blocking<V> {
-  private _data = new MWD<string, Set<V>>();
-
-  public block(stationID: string, blockerID: string, blocked: V): this {
-    const key = ck(stationID, blockerID);
-    this._data.gwd(key, new Set()).add(blocked);
-
-    return this;
-  }
-
-  public unblock(stationID: string, blockerID: string, blocked: V): this {
-    const key = ck(stationID, blockerID);
-    this._data.gwd(key, new Set()).delete(blocked);
-
-    return this;
-  }
-
-  public unblockAll(stationID: string, blockerID: string): this {
-    const key = ck(stationID, blockerID);
-    this._data.delete(key);
-
-    return this;
-  }
-
-  public isBlocked(tested: V): boolean {
-    for (const set of this._data.values()) {
-      if (set.has(tested)) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  public getBlocked(stationID: string, blockerID: string): V[] {
-    const key = ck(stationID, blockerID);
-    return [...this._data.gwd(key, new Set()).values()];
-  }
-}
-
-interface OvertakingItinerary {
-  exitRoute: Route;
-  itinerary: Itinerary;
-  station: Station;
-}
-
-// TODO: Move this into separate file.
-function main({
-  infrastructure,
-  otapi
-}: {
-  infrastructure: Infrastructure;
-  otapi: OTAPI;
-}): {
-  setup: () => Promise<void>;
-  cleanup: () => Promise<void>;
-} {
-  const overtakingItiniraries = [...infrastructure.itineraries.values()]
-    .filter(({ args }): boolean => args.overtaking)
-    .filter(({ itineraryID, stations }): boolean => {
-      if (stations.length) {
-        return true;
-      } else {
-        throw new Error(
-          `No station to faciliate overtaking was found in ${itineraryID}.`
-        );
-      }
-    })
-    .map(
-      (itinerary): OvertakingItinerary => ({
-        exitRoute: itinerary.routes[itinerary.routes.length - 1],
-        itinerary,
-        station: itinerary.stations[itinerary.stations.length - 1]
-      })
-    );
-
-  const overtakingRouteIDs = overtakingItiniraries
-    .flatMap(({ itinerary: { routes } }): readonly Route[] => routes)
-    .reduce<Set<string>>(
-      (acc, route): Set<string> => acc.add(route.routeID),
-      new Set()
-    );
-
-  const blocking = new Blocking<Train>();
-  const cleanupCallbacks: (() => void)[] = [];
-
-  async function overtakeTrain(
-    { exitRoute, station }: OvertakingItinerary,
-    overtaking: Train,
-    waiting: Train
-  ): Promise<void> {
-    blocking.block(station.stationID, overtaking.trainID, waiting);
-
-    await otapi.setRouteDisallowed({
-      trainID: waiting.trainID,
-      routeID: exitRoute.routeID
-    });
-    await otapi.setStop({
-      stationID: station.stationID,
-      stopFlag: true,
-      trainID: waiting.trainID
-    });
-    await otapi.setDepartureTime({
-      stationID: station.stationID,
-      time: Number.MAX_SAFE_INTEGER,
-      trainID: waiting.trainID
-    });
-  }
-
-  async function releaseTrains(
-    { exitRoute, station }: OvertakingItinerary,
-    overtaking: Train
-  ): Promise<void> {
-    const blockedByMe = blocking.getBlocked(
-      station.stationID,
-      overtaking.trainID
-    );
-    blocking.unblockAll(station.stationID, overtaking.trainID);
-
-    await Promise.all(
-      blockedByMe
-        .filter((train): boolean => !blocking.isBlocked(train))
-        .flatMap((waiting): Promise<void>[] => [
-          // Unblock exit route.
-          otapi.setRouteAllowed({
-            routeID: exitRoute.routeID,
-            trainID: waiting.trainID
-          }),
-          // Restore departure time.
-          otapi.setDepartureTime({
-            stationID: station.stationID,
-            time: 0, // TODO: The original time from the timetable should be used.
-            trainID: waiting.trainID
-          })
-        ])
-    );
-  }
-
-  async function setup(): Promise<void> {
-    const tracker = new TrainTracker(otapi, infrastructure).startTracking(1);
-    cleanupCallbacks.push(tracker.stopTraking.bind(tracker));
-
-    const removeListeners = await Promise.all([
-      otapi.on(
-        "routeEntry",
-        async (_, { routeID, trainID }): Promise<void> => {
-          const train = infrastructure.trains.get(trainID);
-          if (train == null) {
-            throw new Error(`No train called ${trainID}.`);
-          }
-
-          if (overtakingRouteIDs.has(routeID)) {
-            for (const oi of overtakingItiniraries) {
-              const trainsOnItinerary = tracker.getTrainsOnItineraryInOrder(
-                oi.itinerary.itineraryID
-              );
-
-              if (trainsOnItinerary.length < 2) {
-                continue;
-              }
-
-              if (
-                trainsOnItinerary[0].train.maxSpeed <
-                trainsOnItinerary[1].train.maxSpeed
-              ) {
-                await overtakeTrain(
-                  oi,
-                  trainsOnItinerary[1].train,
-                  trainsOnItinerary[0].train
-                );
-              }
-            }
-          }
-        }
-      ),
-      otapi.on(
-        "routeExit",
-        async (_, { routeID, trainID }): Promise<void> => {
-          const train = infrastructure.trains.get(trainID);
-          if (train == null) {
-            throw new Error(`No train called ${trainID}.`);
-          }
-
-          await Promise.all(
-            overtakingItiniraries
-              .filter((oi): boolean => oi.exitRoute.routeID === routeID)
-              .map((oi): Promise<void> => releaseTrains(oi, train))
-          );
-        }
-      ),
-      otapi.on(
-        "trainCreated",
-        async (_, { trainID }): Promise<void> => {
-          const train = infrastructure.trains.get(trainID);
-          if (train == null) {
-            throw new Error(`No train called ${trainID}.`);
-          }
-
-          await Promise.all(
-            [...train.routes.values()].map(
-              ({ routeID }): Promise<void> =>
-                otapi.setRouteAllowed({ routeID, trainID })
-            )
-          );
-        }
-      )
-    ]);
-    cleanupCallbacks.push(...removeListeners);
-  }
-
-  async function cleanup(): Promise<void> {
-    cleanupCallbacks.splice(0).forEach((callback): void => void callback());
-  }
-
-  return { setup, cleanup };
-}
 
 function spawnAndLog(
   binaryPath: string,
@@ -405,6 +169,20 @@ async function startOpenTrack(otapi: OTAPI): Promise<{ command: any }> {
   const otapi = new OTAPI({ portApp, portOT });
   const trainTracker = new TrainTracker(otapi, infrastructure);
 
+  const overtakingModules = await Promise.all(
+    (args["overtaking-modules"] ?? []).map(
+      async (path): Promise<DecisionModule> => {
+        return (await import(resolve(process.cwd(), path))).decisionModule;
+      }
+    )
+  );
+  const overtakingParams: OvertakingParams = {
+    defaultModule: args["overtaking-default-module"],
+    infrastructure,
+    modules: overtakingModules,
+    otapi
+  };
+
   try {
     trainTracker.startTracking(1);
     await otapi.start();
@@ -434,7 +212,7 @@ async function startOpenTrack(otapi: OTAPI): Promise<{ command: any }> {
         }
       );
 
-      const { cleanup, setup } = main({ otapi, infrastructure });
+      const { cleanup, setup } = overtaking(overtakingParams);
       await setup();
 
       const simulationEnd = otapi.once("simStopped");
@@ -460,7 +238,7 @@ async function startOpenTrack(otapi: OTAPI): Promise<{ command: any }> {
       await waitPort({ port: portOT, output: "silent" });
 
       for (;;) {
-        const { setup, cleanup } = main({ otapi, infrastructure });
+        const { setup, cleanup } = overtaking(overtakingParams);
         await setup();
 
         const simulationStart = otapi.once("simStarted");

@@ -1,5 +1,5 @@
 import { EventPayloads, OTAPI } from "../otapi";
-import { Infrastructure, Train } from "../infrastructure";
+import { Infrastructure, Train, Itinerary } from "../infrastructure";
 
 export type Report = EventPayloads["trainPositionReport"];
 
@@ -34,14 +34,8 @@ export class TrainTracker {
    * itinerary is first.
    */
   public getTrainsOnItineraryInOrder(
-    itineraryID: string
+    itinerary: Itinerary
   ): TrainPositionOnItinerary[] {
-    const itinerary = this._infrastructure.itineraries.get(itineraryID);
-
-    if (itinerary == null) {
-      throw new Error(`There's no itinerary called ${itineraryID}.`);
-    }
-
     const routes = new Set(
       itinerary.routes.map((route): string => route.routeID)
     );
@@ -70,13 +64,7 @@ export class TrainTracker {
       .sort((a, b): number => b.position - a.position);
   }
 
-  public getTrainsOnItinerary(itineraryID: string): string[] {
-    const itinerary = this._infrastructure.itineraries.get(itineraryID);
-
-    if (itinerary == null) {
-      throw new Error(`There's no itinerary called ${itineraryID}.`);
-    }
-
+  public getTrainsOnItinerary(itinerary: Itinerary): string[] {
     const routes = new Set(
       itinerary.routes.map((route): string => route.routeID)
     );

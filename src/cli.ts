@@ -7,6 +7,20 @@ const y = yargs
   .config()
   .help()
 
+  .option("overtaking-modules", {
+    array: true,
+    describe: "Decision modules for overtaking",
+    required: false,
+    type: "string"
+  })
+  .option("overtaking-default-module", {
+    default: "max-speed",
+    describe:
+      "The decision module that will be used unless specified otherwise",
+    required: false,
+    type: "string"
+  })
+
   .option("ot-binary", {
     describe: "!",
     required: true,
