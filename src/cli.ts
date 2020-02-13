@@ -22,37 +22,43 @@ const y = yargs
   })
 
   .option("ot-binary", {
-    describe: "!",
+    describe: "OpenTrack executable file.",
     required: true,
     type: "string"
   })
   .option("ot-export-courses", {
-    describe: "!",
+    describe:
+      "OpenTrack -> Functions -> Exchange Timetable Data -> Export Courses (trafIT-Format).",
     required: true,
     type: "string"
   })
   .option("ot-export-infrastructure", {
-    describe: "!",
+    describe:
+      "OpenTrack -> Functions -> Exchange Infrastructure Data -> Export Infrastructure Data (trafIT-Format).",
     required: true,
     type: "string"
   })
   .option("ot-export-rolling-stock", {
-    describe: "!",
+    describe:
+      "OpenTrack -> Functions -> Exchange Rolling Stock Data -> Export Rolling Stock (railML-Format) Version 2.2.",
     required: true,
     type: "string"
   })
-  .option("ot-export-timetables", {
-    describe: "!",
+  .option("ot-export-timetable", {
+    describe:
+      "OpenTrack -> Functions -> Exchange Timetable Data -> Export Timetable (railML-Format) Version 2.2.",
     required: true,
     type: "string"
   })
   .option("ot-log", {
-    describe: "!",
+    describe:
+      "The file into which the stdout and stderr from OpenTrack will be written.",
     required: true,
     type: "string"
   })
   .option("ot-runfile", {
-    describe: "!",
+    describe:
+      "The location of the runfile that will be used by both this app and OpenTrack.",
     required: true,
     type: "string"
   })

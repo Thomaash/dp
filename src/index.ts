@@ -137,7 +137,7 @@ async function startOpenTrack(otapi: OTAPI): Promise<{ command: any }> {
     courses: args["ot-export-courses"],
     infrastructure: args["ot-export-infrastructure"],
     rollingStock: args["ot-export-rolling-stock"],
-    timetables: args["ot-export-timetables"]
+    timetables: args["ot-export-timetable"]
   });
 
   console.info(
