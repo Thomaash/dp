@@ -372,7 +372,8 @@ async function startOpenTrack(otapi: OTAPI): Promise<{ command: any }> {
   const infrastructure = await infrastructureFactory.buildFromFiles({
     courses: args["ot-export-courses"],
     infrastructure: args["ot-export-infrastructure"],
-    rollingStock: args["ot-export-rolling-stock"]
+    rollingStock: args["ot-export-rolling-stock"],
+    timetables: args["ot-export-timetables"]
   });
 
   console.info(
@@ -391,7 +392,9 @@ async function startOpenTrack(otapi: OTAPI): Promise<{ command: any }> {
       `  ${infrastructure.routes.size} routes ` +
         `(${infrastructure.routesLength / 1000} km).`,
 
-      `  ${infrastructure.stations.size} stations `,
+      `  ${infrastructure.stations.size} stations,`,
+
+      `  ${infrastructure.timetables.size} timetables.`,
 
       "",
       ""

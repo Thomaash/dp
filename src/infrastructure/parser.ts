@@ -1,34 +1,54 @@
 import xml2js from "xml2js";
 import { expect } from "chai";
 
-import { ck, filterChildren, idFromXML, xmlVertexCK } from "./common";
+import { ck, filterChildren, idFromXML, xmlVertexCK, OTDate } from "./common";
 import {
   InfrastructureData,
   Itinerary,
   Path,
   Route,
   Train,
-  Station
+  Station,
+  Timetable,
+  TimetableEntry
 } from "./types";
 import { parseItineraryArgs } from "./args";
 
-export async function parseInfrastructure(xml: {
+export interface ParseInfrastructureXML {
   courses: string;
   infrastructure: string;
   rollingStock: string;
-}): Promise<InfrastructureData> {
-  const xmlCoursesDocument = await new xml2js.Parser({
+  timetables: string;
+}
+
+interface StationsReduceAcc {
+  stations: Map<string, Station>;
+  stationsByOCPID: Map<string, Station>;
+}
+
+export async function parseInfrastructure(
+  xml: ParseInfrastructureXML
+): Promise<InfrastructureData> {
+  const xmlParser = new xml2js.Parser({
     explicitChildren: true,
     preserveChildrenOrder: true
-  }).parseStringPromise(xml.courses);
-  const xmlInfrastructureDocument = await new xml2js.Parser({
-    explicitChildren: true,
-    preserveChildrenOrder: true
-  }).parseStringPromise(xml.infrastructure);
-  const xmlRollingStockDocument = await new xml2js.Parser({
-    explicitChildren: true,
-    preserveChildrenOrder: true
-  }).parseStringPromise(xml.rollingStock);
+  });
+
+  // XML Documents {{{
+
+  const xmlCoursesDocument = await xmlParser.parseStringPromise(xml.courses);
+  const xmlInfrastructureDocument = await xmlParser.parseStringPromise(
+    xml.infrastructure
+  );
+  const xmlRollingStockDocument = await xmlParser.parseStringPromise(
+    xml.rollingStock
+  );
+  const xmlTimetablesDocument = await xmlParser.parseStringPromise(
+    xml.timetables
+  );
+
+  // }}}
+  // Vehicle max speeds {{{
 
   const xmlVehicles: any[] =
     xmlRollingStockDocument["railml"]["rollingstock"][0]["vehicles"][0][
@@ -41,6 +61,9 @@ export async function parseInfrastructure(xml: {
     },
     new Map()
   );
+
+  // }}}
+  // Formation max speeds {{{
 
   const xmlFormations: any[] =
     xmlRollingStockDocument["railml"]["rollingstock"][0]["formations"][0][
@@ -67,6 +90,9 @@ export async function parseInfrastructure(xml: {
     new Map()
   );
 
+  // }}}
+  // Neighbor compound keys {{{
+
   const xmlVertexes: any[] = filterChildren(
     xmlInfrastructureDocument["trafIT"]["vertices"][0],
     "vertex",
@@ -87,12 +113,15 @@ export async function parseInfrastructure(xml: {
   );
   expect(
     vertexNeighborCK,
-    "There should be a neighbor for each vertex."
+    "There should be a neighbor for each vertex"
   ).to.have.lengthOf(xmlVertexes.length);
+
+  // }}}
+  // Vertex to vertex distances {{{
 
   const xmlEdges: any[] =
     xmlInfrastructureDocument["trafIT"]["edges"][0]["edge"];
-  const vertexToVertexDistance = xmlEdges.reduce<Map<string, number>>(
+  const vertexToVertexDistances = xmlEdges.reduce<Map<string, number>>(
     (acc, xmlEdge): Map<string, number> => {
       const id1 = ck(xmlEdge.$.documentname, xmlEdge.$.vertex1);
       const id2 = ck(xmlEdge.$.documentname, xmlEdge.$.vertex2);
@@ -106,34 +135,98 @@ export async function parseInfrastructure(xml: {
     new Map<string, number>()
   );
   expect(
-    vertexToVertexDistance,
-    "Each edge has to have and entry in both directions."
+    vertexToVertexDistances,
+    "Each edge has to have and entry in both directions"
   ).to.have.lengthOf(xmlEdges.length * 2);
 
-  /*
-   * Stations.
-   */
-  const xmlStationVertexes: any[] = filterChildren(
-    xmlInfrastructureDocument["trafIT"]["vertices"][0],
-    "stationvertex"
+  // }}}
+  // Stations {{{
+
+  const xmlOperationControlPoints: any[] = filterChildren(
+    xmlTimetablesDocument["railml"]["infrastructure"][0][
+      "operationControlPoints"
+    ][0],
+    "ocp"
   );
-  const stations = xmlStationVertexes.reduce<Map<string, Station>>(
-    (acc, xmlStationVertex): Map<string, Station> => {
-      const stationID = xmlStationVertex.$.station;
-      return acc.set(stationID, Object.freeze({ stationID }));
+  const { stations, stationsByOCPID } = xmlOperationControlPoints.reduce<
+    StationsReduceAcc
+  >(
+    (acc, xmlOCP): StationsReduceAcc => {
+      const stationID = xmlOCP.$.code;
+      const ocpID = xmlOCP.$.id;
+      const name = xmlOCP.$.name;
+
+      const station = Object.freeze({ name, stationID });
+
+      acc.stations.set(stationID, station);
+      acc.stationsByOCPID.set(ocpID, station);
+
+      return acc;
+    },
+    { stations: new Map(), stationsByOCPID: new Map() }
+  );
+
+  // }}}
+  // Timetables {{{
+
+  const xmlTrainParts: any[] = filterChildren(
+    xmlTimetablesDocument["railml"]["timetable"][0]["trainParts"][0],
+    "trainPart"
+  );
+  const timetables = xmlTrainParts.reduce<Map<string, Timetable>>(
+    (acc, xmlTrainPart): Map<string, Timetable> => {
+      const trainID = xmlTrainPart.$.trainNumber;
+
+      const entries = (xmlTrainPart["ocpsTT"][0]["ocpTT"] as any[]).map(
+        (xmlOCPTT): TimetableEntry => {
+          const ocpRef = xmlOCPTT.$.ocpRef;
+
+          const type: "pass" | "stop" = xmlOCPTT.$.ocpType;
+          expect(type, "Unknown timetable entry type").to.match(
+            /^(pass|stop)$/
+          );
+
+          const scheduled = (xmlOCPTT["times"] as any[]).filter(
+            ({ $ }): boolean => $.scope === "scheduled"
+          )[0];
+          const calculated = (xmlOCPTT["times"] as any[]).filter(
+            ({ $ }): boolean => $.scope === "calculated"
+          )[0];
+
+          const xmlTimes = scheduled ?? calculated ?? { $: {} };
+
+          const arrival = xmlTimes.$.arrival
+            ? new OTDate(xmlTimes.$.arrivalDay, xmlTimes.$.arrival).time
+            : undefined;
+          const departure = xmlTimes.$.departure
+            ? new OTDate(xmlTimes.$.departureDay, xmlTimes.$.departure).time
+            : undefined;
+
+          const station = stationsByOCPID.get(ocpRef);
+          if (station == null) {
+            throw new Error(
+              `Can't find any station by ${ocpRef} id referenced by the timetable for ${trainID}.`
+            );
+          }
+
+          return Object.freeze({ arrival, departure, station, type });
+        }
+      );
+
+      return acc.set(trainID, Object.freeze({ entries, trainID }));
     },
     new Map()
   );
 
-  /*
-   * Routes.
-   */
+  // }}}
+  // Routes {{{
+
   const xmlRoutes: any[] =
     xmlInfrastructureDocument["trafIT"]["routes"][0]["route"];
   const routeNames = new Set(
     xmlRoutes.map((xmlRoute): string => idFromXML(xmlRoute))
   );
-  expect(routeNames, "All route names have to be unique.").have.lengthOf(
+  expect(routeNames, "All route names have to be unique").have.lengthOf(
     xmlRoutes.length
   );
   const routes = xmlRoutes.reduce<Map<string, Route>>((acc, xmlRoute): Map<
@@ -158,7 +251,7 @@ export async function parseInfrastructure(xml: {
             throw new Error(`Can't find neighbor vertex of ${id1}.`);
           }
 
-          const distance = vertexToVertexDistance.get(ck(id1, id2));
+          const distance = vertexToVertexDistances.get(ck(id1, id2));
           if (distance == null) {
             throw new Error(
               `Can't find distance between vertexes ${id1} and ${id2}.`
@@ -191,15 +284,15 @@ export async function parseInfrastructure(xml: {
     0
   );
 
-  /*
-   * Paths.
-   */
+  // }}}
+  // Paths {{{
+
   const xmlPaths: any[] =
     xmlInfrastructureDocument["trafIT"]["paths"][0]["path"];
   const pathNames = new Set(
     xmlPaths.map((xmlPath): string => idFromXML(xmlPath))
   );
-  expect(pathNames, "All path names have to be unique.").have.lengthOf(
+  expect(pathNames, "All path names have to be unique").have.lengthOf(
     xmlPaths.length
   );
   const paths = xmlPaths.reduce<Map<string, Path>>((acc, xmlPath): Map<
@@ -246,9 +339,9 @@ export async function parseInfrastructure(xml: {
     0
   );
 
-  /*
-   * Itineraries.
-   */
+  // }}}
+  // Itineraries {{{
+
   const xmlItineraries: any[] =
     xmlInfrastructureDocument["trafIT"]["itineraries"][0]["itinerary"];
   const itineraries = xmlItineraries.reduce<Map<string, Itinerary>>(
@@ -304,9 +397,9 @@ export async function parseInfrastructure(xml: {
     0
   );
 
-  /*
-   * Trains.
-   */
+  // }}}
+  // Trains {{{
+
   const xmlCourses: any[] =
     xmlCoursesDocument["trafIT"]["courses"][0]["course"];
   const trains = xmlCourses.reduce<Map<string, Train>>((acc, xmlCourse): Map<
@@ -353,6 +446,14 @@ export async function parseInfrastructure(xml: {
       throw new Error(`Can't find max speed for train ${trainID}.`);
     }
 
+    if (!timetables.has(trainID)) {
+      console.warn(
+        `Can't find any timetable for train ${trainID}. Empty one was created.`
+      );
+      timetables.set(trainID, Object.freeze({ entries: [], trainID }));
+    }
+    const timetable = timetables.get(trainID)!;
+
     acc.set(
       trainID,
       Object.freeze({
@@ -361,6 +462,7 @@ export async function parseInfrastructure(xml: {
         maxSpeed,
         paths: trainPaths,
         routes: trainRoutes,
+        timetable,
         trainID
       })
     );
@@ -368,12 +470,11 @@ export async function parseInfrastructure(xml: {
     return acc;
   }, new Map());
 
-  /*
-   * Main itineraries.
-   */
   const mainItineraries = new Set<Itinerary>(
     [...trains.values()].map((train): Itinerary => train.mainItinerary)
   );
+
+  // }}}
 
   return Object.freeze({
     itineraries,
@@ -384,6 +485,9 @@ export async function parseInfrastructure(xml: {
     routes,
     routesLength,
     stations,
+    timetables,
     trains
   });
 }
+
+// vim:fdm=marker

@@ -5,6 +5,7 @@
   "ot-export-courses": "C:/Users/st46664/Documents/Model/Exports/courses.zee.oneway.xml",
   "ot-export-infrastructure": "C:/Users/st46664/Documents/Model/Exports/infrastructure.xml",
   "ot-export-rolling-stock": "C:/Users/st46664/Documents/Model/Exports/rolling-stock.railml",
+  "ot-export-timetables": "C:/Users/st46664/Documents/Model/Exports/timetables.zee.railml",
   "ot-log": "C:/Users/st46664/Documents/Model/OpenTrack.log",
   "ot-runfile": "C:/Users/st46664/Documents/Model/runfile.txt",
   "randomize-ports": true

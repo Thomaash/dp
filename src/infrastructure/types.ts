@@ -2,6 +2,18 @@ export interface ItineraryArgs {
   overtaking: boolean;
 }
 
+export interface TimetableEntry {
+  arrival?: number;
+  departure?: number;
+  station: Station;
+  type: "pass" | "stop";
+}
+
+export interface Timetable {
+  readonly trainID: string;
+  readonly entries: TimetableEntry[];
+}
+
 export interface Station {
   readonly stationID: string;
 }
@@ -34,6 +46,7 @@ export interface Train {
   readonly maxSpeed: number;
   readonly paths: ReadonlySet<Path>;
   readonly routes: ReadonlySet<Route>;
+  readonly timetable: Timetable;
   readonly trainID: string;
 }
 
@@ -46,5 +59,6 @@ export interface InfrastructureData {
   readonly routes: ReadonlyMap<string, Route>;
   readonly routesLength: number;
   readonly stations: ReadonlyMap<string, Station>;
+  readonly timetables: ReadonlyMap<string, Timetable>;
   readonly trains: ReadonlyMap<string, Train>;
 }

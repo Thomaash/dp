@@ -7,14 +7,13 @@ import {
   Path,
   Route,
   Station,
-  Train
+  Train,
+  Timetable
 } from "./types";
 
-import { parseInfrastructure } from "./parser";
+import { parseInfrastructure, ParseInfrastructureXML } from "./parser";
 
 const readFile = promisify(readFileCallback);
-
-export interface InfrastructureFactory {}
 
 export const infrastructureFactory = {
   async buildFromFiles(
@@ -23,27 +22,31 @@ export const infrastructureFactory = {
       courses: string;
       infrastructure: string;
       rollingStock: string;
+      timetables: string;
     }
   ): Promise<Infrastructure> {
-    const [courses, infrastructure, rollingStock] = await Promise.all([
+    const [
+      courses,
+      infrastructure,
+      rollingStock,
+      timetables
+    ] = await Promise.all([
       readFile(paths.courses, "utf-8"),
       readFile(paths.infrastructure, "utf-8"),
-      readFile(paths.rollingStock, "utf-8")
+      readFile(paths.rollingStock, "utf-8"),
+      readFile(paths.timetables, "utf-8")
     ]);
 
     return infrastructureFactory.buildFromText({
       courses,
       infrastructure,
-      rollingStock
+      rollingStock,
+      timetables
     });
   },
   async buildFromText(
     this: unknown,
-    xml: {
-      courses: string;
-      infrastructure: string;
-      rollingStock: string;
-    }
+    xml: ParseInfrastructureXML
   ): Promise<Infrastructure> {
     const data = await parseInfrastructure(xml);
     return new Infrastructure(
@@ -55,6 +58,7 @@ export const infrastructureFactory = {
       data.routes,
       data.routesLength,
       data.stations,
+      data.timetables,
       data.trains
     );
   }
@@ -70,6 +74,7 @@ export class Infrastructure implements InfrastructureData {
     public readonly routes: ReadonlyMap<string, Route>,
     public readonly routesLength: number,
     public readonly stations: ReadonlyMap<string, Station>,
+    public readonly timetables: ReadonlyMap<string, Timetable>,
     public readonly trains: ReadonlyMap<string, Train>
   ) {}
 

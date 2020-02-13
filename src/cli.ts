@@ -27,6 +27,11 @@ const y = yargs
     required: true,
     type: "string"
   })
+  .option("ot-export-timetables", {
+    describe: "!",
+    required: true,
+    type: "string"
+  })
   .option("ot-log", {
     describe: "!",
     required: true,
