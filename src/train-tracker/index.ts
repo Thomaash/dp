@@ -29,6 +29,10 @@ export class TrainTracker {
     return this._reports.get(trainID);
   }
 
+  public getDelay(trainID: string): number {
+    return this.getReport(trainID)?.delay ?? 0;
+  }
+
   /**
    * The trains are sorted so that the train that is closes to the end of the
    * itinerary is first.

@@ -1,8 +1,9 @@
 import { expect } from "chai";
-import { Train, Route, Itinerary, Station } from "../infrastructure";
+import { Itinerary, Route, Station, Train } from "../infrastructure";
 
 export interface DecisionModuleAPI {
   getTrain(trainID: string): Train;
+  getTrainsDelayedArrivalAtStation(train: Train, station: Station): number;
   getTrainsOnItinerary(
     itinerary: string | Itinerary
   ): { train: Train; position: number }[];

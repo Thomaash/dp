@@ -88,6 +88,26 @@ function getDecisionModuleAPI(
 
       return train;
     },
+    getTrainsDelayedArrivalAtStation(train, station): number {
+      const entry = train.timetable.entries.find(
+        (entry): boolean => entry.station === station
+      );
+
+      if (entry == null) {
+        throw new Error(
+          `Train ${train.trainID} doesn't go through ${station.stationID}.`
+        );
+      }
+
+      const plannedArrival =
+        (entry.type === "pass"
+          ? entry.arrival ?? entry.departure
+          : entry.arrival) ?? Number.POSITIVE_INFINITY;
+
+      const delayedArrival = plannedArrival + tracker.getDelay(train.trainID);
+
+      return delayedArrival;
+    },
     getTrainsOnItinerary(
       itineraryInput
     ): ReturnType<DecisionModuleAPI["getTrainsOnItinerary"]> {
