@@ -251,8 +251,8 @@ export function overtaking({
 
           await Promise.all(
             overtakingAreas
-              .filter((oi): boolean => oi.exitRoute.routeID === routeID)
-              .map((oi): Promise<void> => releaseTrains(oi, train))
+              .filter((oa): boolean => oa.exitRoute.routeID === routeID)
+              .map((oa): Promise<void> => releaseTrains(oa, train))
           );
         }
       ),
