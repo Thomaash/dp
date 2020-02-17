@@ -1,12 +1,12 @@
 export interface ItineraryArgs {
-  overtaking: boolean;
+  readonly overtaking: boolean;
 }
 
 export interface TimetableEntry {
-  arrival?: number;
-  departure?: number;
-  station: Station;
-  type: "pass" | "stop";
+  readonly arrival?: number;
+  readonly departure?: number;
+  readonly station: Station;
+  readonly type: "pass" | "stop";
 }
 
 export interface Timetable {
