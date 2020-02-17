@@ -90,12 +90,14 @@ export function overtaking({
   cleanup: () => Promise<void>;
 } {
   const modules = [maxSpeedDecisionModule, ...customModules];
-  const defaultModule = modules.find(
+
+  const requestedDefaultModule = modules.find(
     (module): boolean => module.name === defaultModuleName
   );
-  if (defaultModule == null) {
+  if (requestedDefaultModule == null) {
     throw new Error(`There is no decision module named ${defaultModuleName}.`);
   }
+  const defaultModule: DecisionModule = requestedDefaultModule;
 
   const blocking = new Blocking<Train>();
   const cleanupCallbacks: (() => void)[] = [];
@@ -115,20 +117,22 @@ export function overtaking({
   ): Promise<void> {
     blocking.block(station.stationID, overtaking.trainID, waiting);
 
-    await otapi.setRouteDisallowed({
-      trainID: waiting.trainID,
-      routeID: exitRoute.routeID
-    });
-    await otapi.setStop({
-      stationID: station.stationID,
-      stopFlag: true,
-      trainID: waiting.trainID
-    });
-    await otapi.setDepartureTime({
-      stationID: station.stationID,
-      time: Number.MAX_SAFE_INTEGER,
-      trainID: waiting.trainID
-    });
+    await Promise.all([
+      otapi.setRouteDisallowed({
+        trainID: waiting.trainID,
+        routeID: exitRoute.routeID
+      }),
+      otapi.setStop({
+        stationID: station.stationID,
+        stopFlag: true,
+        trainID: waiting.trainID
+      }),
+      otapi.setDepartureTime({
+        stationID: station.stationID,
+        time: Number.MAX_SAFE_INTEGER,
+        trainID: waiting.trainID
+      })
+    ]);
   }
 
   async function releaseTrains(
