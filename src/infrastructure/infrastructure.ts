@@ -8,7 +8,8 @@ import {
   Route,
   Station,
   Train,
-  Timetable
+  Timetable,
+  Vertex
 } from "./types";
 
 import { parseInfrastructure, ParseInfrastructureXML } from "./parser";
@@ -59,7 +60,8 @@ export const infrastructureFactory = {
       data.routesLength,
       data.stations,
       data.timetables,
-      data.trains
+      data.trains,
+      data.vertexes
     );
   }
 };
@@ -75,7 +77,8 @@ export class Infrastructure implements InfrastructureData {
     public readonly routesLength: number,
     public readonly stations: ReadonlyMap<string, Station>,
     public readonly timetables: ReadonlyMap<string, Timetable>,
-    public readonly trains: ReadonlyMap<string, Train>
+    public readonly trains: ReadonlyMap<string, Train>,
+    public readonly vertexes: ReadonlyMap<string, Vertex>
   ) {}
 
   public getFastest(...trains: Train[]): Train {

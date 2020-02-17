@@ -18,10 +18,17 @@ export interface Station {
   readonly stationID: string;
 }
 
+export interface Vertex {
+  readonly name: string;
+  readonly neighborVertex: Vertex;
+  readonly vertexID: string;
+}
+
 export interface Route {
   readonly length: number;
   readonly routeID: string;
   readonly stations: readonly Station[];
+  readonly vertexes: Vertex[];
 }
 
 export interface Path {
@@ -29,6 +36,7 @@ export interface Path {
   readonly pathID: string;
   readonly routes: readonly Route[];
   readonly stations: readonly Station[];
+  readonly vertexes: Vertex[];
 }
 
 export interface Itinerary {
@@ -38,6 +46,7 @@ export interface Itinerary {
   readonly paths: readonly Path[];
   readonly routes: readonly Route[];
   readonly stations: readonly Station[];
+  readonly vertexes: Vertex[];
 }
 
 export interface Train {
@@ -48,6 +57,7 @@ export interface Train {
   readonly routes: ReadonlySet<Route>;
   readonly timetable: Timetable;
   readonly trainID: string;
+  readonly vertexes: ReadonlySet<Vertex>;
 }
 
 export interface InfrastructureData {
@@ -61,4 +71,5 @@ export interface InfrastructureData {
   readonly stations: ReadonlyMap<string, Station>;
   readonly timetables: ReadonlyMap<string, Timetable>;
   readonly trains: ReadonlyMap<string, Train>;
+  readonly vertexes: ReadonlyMap<string, Vertex>;
 }

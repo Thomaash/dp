@@ -7,10 +7,11 @@ import {
   Itinerary,
   Path,
   Route,
-  Train,
   Station,
   Timetable,
-  TimetableEntry
+  TimetableEntry,
+  Train,
+  Vertex
 } from "./types";
 import { parseItineraryArgs } from "./args";
 
@@ -24,6 +25,12 @@ export interface ParseInfrastructureXML {
 interface StationsReduceAcc {
   stations: Map<string, Station>;
   stationsByOCPID: Map<string, Station>;
+}
+
+export interface TempVertex {
+  readonly name: string;
+  readonly neighborVertexID: string;
+  readonly vertexID: string;
 }
 
 export async function parseInfrastructure(
@@ -91,13 +98,58 @@ export async function parseInfrastructure(
   );
 
   // }}}
-  // Neighbor compound keys {{{
+  // Vertexes {{{
 
   const xmlVertexes: any[] = filterChildren(
     xmlInfrastructureDocument["trafIT"]["vertices"][0],
     "vertex",
     "stationvertex"
   );
+  const tempVertexes = xmlVertexes.reduce<Map<string, TempVertex>>(
+    (acc, xmlVertex): Map<string, TempVertex> => {
+      const vertexID = ck(xmlVertex.$.documentname, xmlVertex.$.id);
+      const neighborVertexID = ck(
+        xmlVertex.$.neighbourdocumentname ?? xmlVertex.$.documentname,
+        xmlVertex.$.neighbourid
+      );
+      const name = xmlVertex.$.name;
+
+      return acc.set(vertexID, {
+        name,
+        neighborVertexID,
+        vertexID
+      });
+    },
+    new Map()
+  );
+  const vertexes = new Map<
+    string,
+    { -readonly [Key in keyof Vertex]: Vertex[Key] }
+  >();
+  for (const tempVertex of tempVertexes.values()) {
+    vertexes.set(tempVertex.vertexID, {
+      name: tempVertex.name,
+      neighborVertex: null as any,
+      vertexID: tempVertex.vertexID
+    });
+  }
+  for (const tempVertex of tempVertexes.values()) {
+    const vertex = vertexes.get(tempVertex.vertexID);
+    const neighborVertex = vertexes.get(tempVertex.neighborVertexID);
+
+    if (vertex == null || neighborVertex == null) {
+      throw new Error(
+        `Cannot create a vertex pair for ${tempVertex.vertexID} and ${tempVertex.neighborVertexID}.`
+      );
+    }
+
+    vertex.neighborVertex = neighborVertex;
+    Object.freeze(vertex);
+  }
+
+  // }}}
+  // Neighbor compound keys {{{
+
   const vertexNeighborCK = xmlVertexes.reduce<Map<string, string>>(
     (acc, xmlVertex): Map<string, string> => {
       acc.set(
@@ -235,26 +287,39 @@ export async function parseInfrastructure(
   > => {
     const routeID = idFromXML(xmlRoute);
 
+    const routeVertexes = filterChildren(
+      xmlRoute,
+      "vertex",
+      "stationvertex"
+    ).map(
+      (xmlVertex): Vertex => {
+        const vertexID = xmlVertexCK(xmlVertex);
+        const vertex = vertexes.get(vertexID);
+        if (vertex == null) {
+          throw new Error(`Can't find a vertex called ${vertexID}.`);
+        }
+
+        return vertex;
+      }
+    );
+
     acc.set(
       routeID,
       Object.freeze({
-        length: filterChildren(xmlRoute, "vertex", "stationvertex").reduce<
-          number
-        >((acc, vertex2, i, arr): number => {
+        vertexes: routeVertexes,
+        length: routeVertexes.reduce<number>((acc, vertex2, i, arr): number => {
           if (i === 0) {
             return acc;
           }
 
-          const id1 = xmlVertexCK(vertex2);
-          const id2 = vertexNeighborCK.get(xmlVertexCK(arr[i - 1]));
-          if (id2 == null) {
-            throw new Error(`Can't find neighbor vertex of ${id1}.`);
-          }
+          const vertex1 = arr[i - 1];
 
-          const distance = vertexToVertexDistances.get(ck(id1, id2));
+          const distance = vertexToVertexDistances.get(
+            ck(vertex2.vertexID, vertex1.neighborVertex.vertexID)
+          );
           if (distance == null) {
             throw new Error(
-              `Can't find distance between vertexes ${id1} and ${id2}.`
+              `Can't find distance between vertexes ${vertex2.vertexID} and ${vertex1.neighborVertex.vertexID}.`
             );
           }
 
@@ -327,6 +392,9 @@ export async function parseInfrastructure(
         routes: pathRoutes,
         stations: pathRoutes.flatMap(
           (route): readonly Station[] => route.stations
+        ),
+        vertexes: pathRoutes.flatMap(
+          (route): readonly Vertex[] => route.vertexes
         )
       })
     );
@@ -383,6 +451,9 @@ export async function parseInfrastructure(
           routes: itineraryRoutes,
           stations: itineraryPaths.flatMap(
             (path): readonly Station[] => path.stations
+          ),
+          vertexes: itineraryPaths.flatMap(
+            (route): readonly Vertex[] => route.vertexes
           )
         })
       );
@@ -441,6 +512,13 @@ export async function parseInfrastructure(
         new Set()
       );
 
+    const trainVertexes = trainItineraries
+      .flatMap((itinerary): readonly Vertex[] => itinerary.vertexes)
+      .reduce<Set<Vertex>>(
+        (acc, vertex): Set<Vertex> => acc.add(vertex),
+        new Set()
+      );
+
     const maxSpeed = formationMaxSpeeds.get(xmlCourse.$.train);
     if (maxSpeed == null) {
       throw new Error(`Can't find max speed for train ${trainID}.`);
@@ -463,7 +541,8 @@ export async function parseInfrastructure(
         paths: trainPaths,
         routes: trainRoutes,
         timetable,
-        trainID
+        trainID,
+        vertexes: trainVertexes
       })
     );
 
@@ -486,7 +565,8 @@ export async function parseInfrastructure(
     routesLength,
     stations,
     timetables,
-    trains
+    trains,
+    vertexes
   });
 }
 
