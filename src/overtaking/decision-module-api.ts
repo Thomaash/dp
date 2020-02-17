@@ -11,6 +11,8 @@ export interface DecisionModuleAPI {
 export interface OvertakingArea {
   exitRoute: Route;
   itinerary: Itinerary;
+  next: OvertakingArea[];
+  previous: OvertakingArea[];
   station: Station;
 }
 
