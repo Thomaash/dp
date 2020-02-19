@@ -1,5 +1,5 @@
 import { EventPayloads, OTAPI } from "../otapi";
-import { Infrastructure, Train, Itinerary } from "../infrastructure";
+import { Infrastructure, Itinerary, Station, Train } from "../infrastructure";
 
 export type Report = EventPayloads["trainPositionReport"];
 
@@ -11,6 +11,7 @@ export interface TrainPositionOnItinerary {
 export class TrainTracker {
   private readonly _cleanupCallbacks: (() => void)[] = [];
   private readonly _reports = new Map<string, Report>();
+  private readonly _lastStations = new Map<string, Station>();
 
   public get size(): number {
     return this._reports.size;
@@ -27,6 +28,10 @@ export class TrainTracker {
 
   public getReport(trainID: string): Report | undefined {
     return this._reports.get(trainID);
+  }
+
+  public getTrainsLastStation(trainID: string): Station | undefined {
+    return this._lastStations.get(trainID);
   }
 
   public getDelay(trainID: string): number {
@@ -78,10 +83,10 @@ export class TrainTracker {
   }
 
   /**
-   * @returns The distance in meters from the start of the itinerary or null if
-   * the train is not on it's main itinerary.
+   * @returns The distance in meters from the start of the itinerary or
+   * undefined if the train is not on it's main itinerary.
    */
-  public getTrainPositionOnMainItinerary(trainID: string): number | null {
+  public getTrainPositionOnMainItinerary(trainID: string): number | undefined {
     const train = this._infrastructure.trains.get(trainID);
     if (train == null) {
       throw new Error(`There's no train with ${trainID} id.`);
@@ -149,6 +154,9 @@ export class TrainTracker {
         "trainPositionReport",
         this._handleTrainPositionReport.bind(this)
       ),
+      this._otapi.on("trainArrival", this._handleTrainPass.bind(this)),
+      this._otapi.on("trainDeparture", this._handleTrainPass.bind(this)),
+      this._otapi.on("trainPass", this._handleTrainPass.bind(this)),
       this._otapi.on("trainDeleted", this._handleTrainDeleted.bind(this))
     );
 
@@ -178,6 +186,22 @@ export class TrainTracker {
       );
   }
 
+  private _handleTrainPass(
+    _name: string,
+    report:
+      | EventPayloads["trainArrival"]
+      | EventPayloads["trainDeparture"]
+      | EventPayloads["trainPass"]
+  ): void {
+    const station = this._infrastructure.stations.get(report.stationID);
+
+    if (station == null) {
+      console.error(`Unknown station ${report.stationID} reported.`);
+    } else {
+      this._lastStations.set(report.trainID, station);
+    }
+  }
+
   private _handleTrainPositionReport(
     _name: string,
     report: EventPayloads["trainPositionReport"]
@@ -190,5 +214,6 @@ export class TrainTracker {
     { trainID }: EventPayloads["trainDeleted"]
   ): void {
     this._reports.delete(trainID);
+    this._lastStations.delete(trainID);
   }
 }
