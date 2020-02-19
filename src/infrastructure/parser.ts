@@ -304,6 +304,13 @@ export async function parseInfrastructure(
               ?.minimalTime ?? "PT0S"
           );
 
+          const plannedDwellTime = Math.max(
+            minimalDwellTime,
+            typeof arrival !== "undefined" && typeof departure !== "undefined"
+              ? departure - arrival
+              : 0
+          );
+
           const station = stationsByOCPID.get(ocpRef);
           if (station == null) {
             throw new Error(
@@ -315,6 +322,7 @@ export async function parseInfrastructure(
             arrival,
             departure,
             minimalDwellTime,
+            plannedDwellTime,
             station,
             type
           });
