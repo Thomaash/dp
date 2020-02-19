@@ -5,6 +5,7 @@ import { ck, filterChildren, idFromXML, xmlVertexCK, OTDate } from "./common";
 import {
   InfrastructureData,
   Itinerary,
+  ItineraryArgs,
   Path,
   Route,
   Station,
@@ -252,7 +253,7 @@ export async function parseInfrastructure(
       const ocpID = xmlOCP.$.id;
       const name = xmlOCP.$.name;
 
-      const station = Object.freeze({ name, stationID });
+      const station = Object.freeze<Station>({ name, stationID });
 
       acc.stations.set(stationID, station);
       acc.stationsByOCPID.set(ocpID, station);
@@ -310,7 +311,7 @@ export async function parseInfrastructure(
             );
           }
 
-          return Object.freeze({
+          return Object.freeze<TimetableEntry>({
             arrival,
             departure,
             minimalDwellTime,
@@ -320,7 +321,10 @@ export async function parseInfrastructure(
         }
       );
 
-      return acc.set(trainID, Object.freeze({ entries, trainID }));
+      return acc.set(
+        trainID,
+        Object.freeze<Timetable>({ entries, trainID })
+      );
     },
     new Map()
   );
@@ -360,7 +364,7 @@ export async function parseInfrastructure(
 
     acc.set(
       routeID,
-      Object.freeze({
+      Object.freeze<Route>({
         vertexes: routeVertexes,
         length: routeVertexes.reduce<number>((acc, vertex2, i, arr): number => {
           if (i === 0) {
@@ -421,7 +425,7 @@ export async function parseInfrastructure(
   > => {
     const pathID = idFromXML(xmlPath);
 
-    const pathRoutes = Object.freeze(
+    const pathRoutes = Object.freeze<Route[]>(
       (xmlPath["route"] as any[]).map(
         (xmlRoute): Route => {
           const routeID = idFromXML(xmlRoute);
@@ -438,7 +442,7 @@ export async function parseInfrastructure(
 
     acc.set(
       pathID,
-      Object.freeze({
+      Object.freeze<Path>({
         length: pathRoutes.reduce<number>(
           (acc, route): number => acc + route.length,
           0
@@ -471,7 +475,7 @@ export async function parseInfrastructure(
     (acc, xmlItinerary): Map<string, Itinerary> => {
       const itineraryID = xmlItinerary.$.name;
 
-      const itineraryPaths = Object.freeze(
+      const itineraryPaths = Object.freeze<Path[]>(
         filterChildren(xmlItinerary, "path").map(
           (xmlPath): Path => {
             const pathID = idFromXML(xmlPath);
@@ -487,18 +491,20 @@ export async function parseInfrastructure(
           }
         )
       );
-      const itineraryRoutes = Object.freeze(
+      const itineraryRoutes = Object.freeze<Route[]>(
         itineraryPaths.flatMap((path): readonly Route[] => path.routes)
       );
       const length = itineraryPaths.reduce((acc, path): number => {
         return acc + path.length;
       }, 0);
 
-      const args = Object.freeze(parseItineraryArgs(itineraryID));
+      const args = Object.freeze<ItineraryArgs>(
+        parseItineraryArgs(itineraryID)
+      );
 
       acc.set(
         itineraryID,
-        Object.freeze({
+        Object.freeze<Itinerary>({
           args,
           itineraryID,
           length,
@@ -534,7 +540,7 @@ export async function parseInfrastructure(
   > => {
     const trainID = xmlCourse.$.courseID;
 
-    const trainItineraries = Object.freeze(
+    const trainItineraries = Object.freeze<Itinerary[]>(
       filterChildren(xmlCourse, "itinerary")
         .sort(
           (xmlItineraryA, xmlItineraryB): number =>
@@ -583,13 +589,16 @@ export async function parseInfrastructure(
       console.warn(
         `Can't find any timetable for train ${trainID}. Empty one was created.`
       );
-      timetables.set(trainID, Object.freeze({ entries: [], trainID }));
+      timetables.set(
+        trainID,
+        Object.freeze<Timetable>({ entries: [], trainID })
+      );
     }
     const timetable = timetables.get(trainID)!;
 
     acc.set(
       trainID,
-      Object.freeze({
+      Object.freeze<Train>({
         itineraries: trainItineraries,
         mainItinerary: trainItineraries[0],
         maxSpeed,
@@ -610,7 +619,7 @@ export async function parseInfrastructure(
 
   // }}}
 
-  return Object.freeze({
+  return Object.freeze<InfrastructureData>({
     itineraries,
     itinerariesLength,
     mainItineraries,

@@ -16,6 +16,7 @@ export interface Timetable {
 }
 
 export interface Station {
+  readonly name: string;
   readonly stationID: string;
 }
 
