@@ -1,4 +1,4 @@
-import { Infrastructure, Route, Train } from "../infrastructure";
+import { Infrastructure, Route, Train, Station } from "../infrastructure";
 import { OTAPI } from "../otapi";
 import { TrainTracker } from "../train-tracker";
 
@@ -79,7 +79,7 @@ function getDecisionModuleAPI(
   infrastructure: Infrastructure,
   tracker: TrainTracker
 ): DecisionModuleAPI {
-  return Object.freeze({
+  const api: DecisionModuleAPI = {
     getTrain(trainID): ReturnType<DecisionModuleAPI["getTrain"]> {
       const train = infrastructure.trains.get(trainID);
       if (train == null) {
@@ -88,7 +88,10 @@ function getDecisionModuleAPI(
 
       return train;
     },
-    getTrainsDelayedArrivalAtStation(train, station): number {
+    getTrainsDelayedArrivalAtStation(
+      train,
+      station
+    ): ReturnType<DecisionModuleAPI["getTrainsDelayedArrivalAtStation"]> {
       const entry = train.timetable.entries.find(
         (entry): boolean => entry.station === station
       );
@@ -104,9 +107,55 @@ function getDecisionModuleAPI(
           ? entry.arrival ?? entry.departure
           : entry.arrival) ?? Number.POSITIVE_INFINITY;
 
-      const delayedArrival = plannedArrival + tracker.getDelay(train.trainID);
+      const lastStation = tracker.getTrainsLastStation(train.trainID);
+      const reserve = lastStation
+        ? // If the train already passed some stations skip them.
+          infrastructure.getTimetableReserve(
+            train.timetable,
+            lastStation,
+            station
+          ) ?? 0
+        : train.timetable.entries.length
+        ? // If the train didn't pass any stations but there are some use all.
+          infrastructure.getTimetableReserve(
+            train.timetable,
+            train.timetable.entries[0].station,
+            station
+          ) ?? 0
+        : // No stations no reserve.
+          0;
+
+      const delay = tracker.getDelay(train.trainID);
+
+      const delayedArrival = plannedArrival + Math.max(0, delay - reserve);
 
       return delayedArrival;
+    },
+    getTrainsLastStation(
+      train: Train
+    ): ReturnType<DecisionModuleAPI["getTrainsLastStation"]> {
+      return tracker.getTrainsLastStation(train.trainID);
+    },
+    getTrainsTimetableReserve(
+      train: Train,
+      fromStation: Station,
+      toStation: Station,
+      inclusive = false
+    ): ReturnType<DecisionModuleAPI["getTrainsTimetableReserve"]> {
+      const reserve = infrastructure.getTimetableReserve(
+        train.timetable,
+        fromStation,
+        toStation,
+        inclusive
+      );
+
+      if (reserve == null) {
+        throw new Error(
+          `Train ${train.trainID} doesn't go between ${toStation.stationID} and ${fromStation.stationID}.`
+        );
+      } else {
+        return reserve;
+      }
     },
     getTrainsOnItinerary(
       itineraryInput
@@ -121,7 +170,9 @@ function getDecisionModuleAPI(
 
       return tracker.getTrainsOnItineraryInOrder(itinerary);
     }
-  });
+  };
+
+  return Object.freeze(api);
 }
 
 export function overtaking({

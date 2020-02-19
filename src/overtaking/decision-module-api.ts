@@ -4,9 +4,16 @@ import { Itinerary, Route, Station, Train } from "../infrastructure";
 export interface DecisionModuleAPI {
   getTrain(trainID: string): Train;
   getTrainsDelayedArrivalAtStation(train: Train, station: Station): number;
+  getTrainsLastStation(train: Train): Station | undefined;
   getTrainsOnItinerary(
     itinerary: string | Itinerary
   ): { train: Train; position: number }[];
+  getTrainsTimetableReserve(
+    train: Train,
+    fromStation: Station,
+    toStation: Station,
+    inclusive?: boolean
+  ): number;
 }
 
 export interface OvertakingArea {
