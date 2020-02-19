@@ -1,4 +1,4 @@
-import { DecisionModule, OvertakingDecision } from "../decision-module-api";
+import { DecisionModule, OvertakingDecision } from "../";
 
 export const decisionModule: DecisionModule = {
   name: "max-speed",

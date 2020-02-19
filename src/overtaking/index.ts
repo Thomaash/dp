@@ -1,2 +1,2 @@
-export * from "./decision-module-api";
+export * from "./api-public";
 export * from "./main";
