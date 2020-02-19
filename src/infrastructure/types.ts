@@ -5,6 +5,7 @@ export interface ItineraryArgs {
 export interface TimetableEntry {
   readonly arrival?: number;
   readonly departure?: number;
+  readonly minimalDwellTime: number;
   readonly station: Station;
   readonly type: "pass" | "stop";
 }

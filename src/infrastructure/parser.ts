@@ -33,6 +33,50 @@ export interface TempVertex {
   readonly vertexID: string;
 }
 
+const units = {
+  second: 1,
+  minute: 60,
+  hour: 60 * 60,
+  day: 60 * 60 * 24,
+  month: 60 * 60 * 24 * (365.2425 / 12),
+  year: 60 * 60 * 24 * 365.2425
+};
+function parseDuration(dwellTime: string): number {
+  const [
+    ,
+    ,
+    years = 0,
+    ,
+    months = 0,
+    ,
+    days = 0,
+    ,
+    hours = 0,
+    ,
+    minutes = 0,
+    ,
+    seconds = 0
+  ] =
+    /^P((\d+)Y)?((\d+)M)?((\d+)D)?T((\d+)H)?((\d+)M)?((\d+|\d*\.\d+)S)?$/i.exec(
+      dwellTime
+    ) ?? [];
+
+  if (years !== 0 || months !== 0) {
+    console.warn(
+      "The implementation of years and months for time durations is most likely wrong."
+    );
+  }
+
+  return (
+    +seconds +
+    +minutes * units.minute +
+    +hours * units.hour +
+    +days * units.day +
+    +months * units.month +
+    +years * units.year
+  );
+}
+
 export async function parseInfrastructure(
   xml: ParseInfrastructureXML
 ): Promise<InfrastructureData> {
@@ -254,6 +298,11 @@ export async function parseInfrastructure(
             ? new OTDate(xmlTimes.$.departureDay, xmlTimes.$.departure).time
             : undefined;
 
+          const minimalDwellTime = parseDuration(
+            xmlOCPTT?.["stopDescription"]?.[0]?.["stopTimes"]?.[0]?.$
+              ?.minimalTime ?? "PT0S"
+          );
+
           const station = stationsByOCPID.get(ocpRef);
           if (station == null) {
             throw new Error(
@@ -261,7 +310,13 @@ export async function parseInfrastructure(
             );
           }
 
-          return Object.freeze({ arrival, departure, station, type });
+          return Object.freeze({
+            arrival,
+            departure,
+            minimalDwellTime,
+            station,
+            type
+          });
         }
       );
 
