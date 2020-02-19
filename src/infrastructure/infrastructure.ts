@@ -81,6 +81,60 @@ export class Infrastructure implements InfrastructureData {
     public readonly vertexes: ReadonlyMap<string, Vertex>
   ) {}
 
+  public getTimetableDuration(
+    train: Train,
+    fromStation: Station,
+    toStation: Station
+  ): number | undefined {
+    const fromStationEntry = train.timetable.entries.find(
+      (entry): boolean => entry.station === fromStation
+    );
+    const toStationEntry = train.timetable.entries.find(
+      (entry): boolean => entry.station === toStation
+    );
+
+    const departure = fromStationEntry?.departure ?? fromStationEntry?.arrival;
+    const arrival = toStationEntry?.departure ?? toStationEntry?.arrival;
+
+    if (typeof departure === "number" && typeof arrival === "number") {
+      return arrival - departure;
+    } else {
+      return;
+    }
+  }
+
+  public getTimetableReserve(
+    timetable: Timetable,
+    fromStation: Station,
+    toStation: Station,
+    inclusive = false
+  ): number | undefined {
+    const fromStationEntryIndex = timetable.entries.findIndex(
+      (entry): boolean => entry.station === fromStation
+    );
+    const toStationEntryIndex = timetable.entries.findIndex(
+      (entry): boolean => entry.station === toStation
+    );
+
+    if (fromStationEntryIndex === -1 || toStationEntryIndex === -1) {
+      return;
+    }
+
+    const entries = inclusive
+      ? timetable.entries.slice(
+          fromStationEntryIndex, // Include first.
+          toStationEntryIndex + 1 // Include last.
+        )
+      : timetable.entries.slice(
+          fromStationEntryIndex + 1, // Exclude first.
+          toStationEntryIndex // Exclude last.
+        );
+
+    return entries.reduce((acc, entry): number => {
+      return acc + entry.plannedDwellTime - entry.minimalDwellTime;
+    }, 0);
+  }
+
   public getFastest(...trains: Train[]): Train {
     return trains.reduce((acc, train): Train => {
       return train.maxSpeed > acc.maxSpeed ? train : acc;
