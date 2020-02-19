@@ -8,7 +8,9 @@ import {
   DecisionModuleAPI,
   DecisionModule
 } from "./decision-module-api";
-import { decisionModule as maxSpeedDecisionModule } from "./modules/max-speed";
+
+import { decisionModule as maxSpeedDM } from "./modules/max-speed";
+import { decisionModule as timetableGuessDM } from "./modules/timetable-guess";
 
 export interface OvertakingParams {
   defaultModule: string;
@@ -184,7 +186,7 @@ export function overtaking({
   setup: () => Promise<void>;
   cleanup: () => Promise<void>;
 } {
-  const modules = [maxSpeedDecisionModule, ...customModules];
+  const modules = [maxSpeedDM, timetableGuessDM, ...customModules];
 
   const requestedDefaultModule = modules.find(
     (module): boolean => module.name === defaultModuleName
