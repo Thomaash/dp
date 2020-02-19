@@ -1,45 +1,124 @@
-export function ck(...rest: string[]): string {
+export type Key = string | number | boolean | null;
+
+export function ck(...rest: Key[]): string {
   return JSON.stringify(rest);
 }
 
-export class MWD<K, V> extends Map<K, V> {
-  public gwd(key: K, defaultValue: V): V {
-    if (this.has(key)) {
-      return this.get(key)!;
-    } else {
-      this.set(key, defaultValue);
-      return defaultValue;
-    }
+class MWD<K, V> extends Map<K, V> {
+  public constructor(private readonly _default: V) {
+    super();
+  }
+
+  public get(key: K): V {
+    return this.has(key) ? super.get(key)! : this._default;
   }
 }
 
-export class Blocking<V> {
-  private _data = new MWD<string, Set<V>>();
+export interface BlockingEntry<
+  Place extends Key = Key,
+  Blocker extends Key = Key,
+  Blocked extends Key = Key
+> {
+  place: Place;
+  blocker: Blocker;
+  blocked: Blocked;
+}
 
-  public block(stationID: string, blockerID: string, blocked: V): this {
-    const key = ck(stationID, blockerID);
-    this._data.gwd(key, new Set()).add(blocked);
+export interface BlockingQuery<
+  Place extends Key = Key,
+  Blocker extends Key = Key,
+  Blocked extends Key = Key
+> {
+  place?: Place;
+  blocker?: Blocker;
+  blocked?: Blocked;
+}
+
+export class Blocking<
+  Place extends Key = Key,
+  Blocker extends Key = Key,
+  Blocked extends Key = Key
+> {
+  private _entries = new Map<string, BlockingEntry<Place, Blocker, Blocked>>();
+  private _blockedBy = new MWD<Blocked, number>(0);
+
+  private _queryEntries(
+    query: BlockingQuery<Place, Blocker, Blocked>
+  ): BlockingEntry<Place, Blocker, Blocked>[] {
+    return [...this._entries.values()].filter(
+      (entry): boolean =>
+        (query.place == null || entry.place === query.place) &&
+        (query.blocker == null || entry.blocker === query.blocker) &&
+        (query.blocked == null || entry.blocked === query.blocked)
+    );
+  }
+
+  public block(place: Place, blocker: Blocker, blocked: Blocked): this {
+    const key = ck(place, blocker, blocked);
+
+    // Do not register the same blocking multiple times.
+    if (!this._entries.has(key)) {
+      this._entries.set(key, Object.freeze({ place, blocker, blocked }));
+      this._blockedBy.set(blocked, this._blockedBy.get(blocked) + 1);
+    }
 
     return this;
   }
 
-  public unblock(stationID: string, blockerID: string, blocked: V): this {
-    const key = ck(stationID, blockerID);
-    this._data.gwd(key, new Set()).delete(blocked);
+  public unblock(place: Place, blocker: Blocker, blocked: Blocked): this {
+    const key = ck(place, blocker, blocked);
+
+    // Do not unregister nonexistent blocking.
+    if (this._entries.has(key)) {
+      this._entries.delete(key);
+
+      const blockedBy = this._blockedBy.get(blocked);
+      if (blockedBy > 1) {
+        this._blockedBy.set(blocked, this._blockedBy.get(blocked) - 1);
+      } else {
+        this._blockedBy.delete(blocked);
+      }
+    }
 
     return this;
   }
 
-  public unblockAll(stationID: string, blockerID: string): this {
-    const key = ck(stationID, blockerID);
-    this._data.delete(key);
-
-    return this;
+  public unblockAll(
+    query: BlockingQuery<Place, Blocker, Blocked>
+  ): BlockingEntry<Place, Blocker, Blocked>[] {
+    return this._queryEntries(query).map(
+      (blockingEntry): BlockingEntry<Place, Blocker, Blocked> => {
+        this.unblock(
+          blockingEntry.place,
+          blockingEntry.blocker,
+          blockingEntry.blocked
+        );
+        return blockingEntry;
+      }
+    );
   }
 
-  public isBlocked(tested: V): boolean {
-    for (const set of this._data.values()) {
-      if (set.has(tested)) {
+  public isBlocked(blocked: Blocked): boolean;
+  public isBlocked(place: Place, blocker: Blocker, blocked: Blocked): boolean;
+  public isBlocked(...rest: [Blocked] | [Place, Blocker, Blocked]): boolean {
+    if (rest.length === 1) {
+      const [blocked] = rest;
+      return this._blockedBy.get(blocked) > 0;
+    } else {
+      const [place, blocker, blocked] = rest;
+      return this._entries.has(ck(place, blocker, blocked));
+    }
+  }
+
+  public isBlockedQuery(
+    query: BlockingQuery<Place, Blocker, Blocked>
+  ): boolean {
+    for (const entry of this._entries.values()) {
+      if (
+        (query.place == null || entry.place === query.place) &&
+        (query.blocker == null || entry.blocker === query.blocker) &&
+        (query.blocked == null || entry.blocked === query.blocked)
+      ) {
         return true;
       }
     }
@@ -47,8 +126,9 @@ export class Blocking<V> {
     return false;
   }
 
-  public getBlocked(stationID: string, blockerID: string): V[] {
-    const key = ck(stationID, blockerID);
-    return [...this._data.gwd(key, new Set()).values()];
+  public getBlocked(
+    query: BlockingQuery<Place, Blocker, Blocked>
+  ): BlockingEntry<Place, Blocker, Blocked>[] {
+    return this._queryEntries(query);
   }
 }

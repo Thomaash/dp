@@ -1,6 +1,9 @@
 import { Itinerary, Route, Station, Train } from "../infrastructure";
 
 export interface DecisionModuleAPI {
+  cancelOvertaking(overtaking: Train, waiting: Train): Promise<void>;
+  planOvertaking(overtaking: Train, waiting: Train): Promise<void>;
+
   getTrain(trainID: string): Train;
   getTrainsDelayedArrivalAtStation(train: Train, station: Station): number;
   getTrainsLastStation(train: Train): Station | undefined;
@@ -44,5 +47,9 @@ export interface DecisionModule {
   newTrainEnteredOvertakingArea(
     api: DecisionModuleAPI,
     params: NewTrainEntedOvertakingAreaParams
-  ): Promise<OvertakingDecision[]> | OvertakingDecision[];
+  ):
+    | Promise<OvertakingDecision[]>
+    | OvertakingDecision[]
+    | Promise<void>
+    | void;
 }

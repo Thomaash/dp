@@ -1,22 +1,22 @@
-import { DecisionModule, OvertakingDecision } from "../";
+import { DecisionModule } from "../";
 
 export const decisionModule: DecisionModule = {
   name: "timetable-guess",
   newTrainEnteredOvertakingArea(
-    { getTrainsDelayedArrivalAtStation, getTrainsOnItinerary },
+    { getTrainsDelayedArrivalAtStation, getTrainsOnItinerary, planOvertaking },
     { overtakingArea: { itinerary, next } }
-  ): OvertakingDecision[] {
+  ): void {
     const trainsOnItinerary = getTrainsOnItinerary(itinerary);
 
     if (trainsOnItinerary.length < 2) {
-      return [];
+      return;
     }
 
     if (next.length === 0) {
-      return [];
+      return;
     } else if (next.length > 1) {
       console.error("TODO");
-      return [];
+      return;
     }
 
     const nextStation = next[0].station;
@@ -32,14 +32,9 @@ export const decisionModule: DecisionModule = {
     );
 
     if (train1DelayedArrival > train2DelayedArrival) {
-      return [
-        {
-          overtaking: train2,
-          waiting: train1
-        }
-      ];
+      planOvertaking(train2, train1).catch((error): void => {
+        console.error("Can't plan overtaking:", error);
+      });
     }
-
-    return [];
   }
 };

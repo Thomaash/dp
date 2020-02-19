@@ -1,10 +1,10 @@
-import { Infrastructure, Train } from "../infrastructure";
+import { Infrastructure } from "../infrastructure";
 import { OTAPI } from "../otapi";
 import { TrainTracker } from "../train-tracker";
 
-import { Blocking } from "./util";
-import { OvertakingArea, DecisionModule } from "./api-public";
-import { getDecisionModuleAPI, getOvertakingData } from "./api";
+import { DecisionModule } from "./api-public";
+import { DecisionModuleAPIFactory, getOvertakingData } from "./api";
+import { TrainOvertaking } from "./train-overtaking";
 
 import { decisionModule as maxSpeedDM } from "./modules/max-speed";
 import { decisionModule as timetableGuessDM } from "./modules/timetable-guess";
@@ -35,7 +35,7 @@ export function overtaking({
   }
   const defaultModule: DecisionModule = requestedDefaultModule;
 
-  const blocking = new Blocking<Train>();
+  const trainOvertaking = new TrainOvertaking(infrastructure, otapi);
   const cleanupCallbacks: (() => void)[] = [];
 
   const tracker = new TrainTracker(otapi, infrastructure).startTracking(1);
@@ -44,65 +44,11 @@ export function overtaking({
   const { overtakingAreas, overtakingRouteIDs } = getOvertakingData(
     infrastructure
   );
-  const decisionModuleAPI = getDecisionModuleAPI(infrastructure, tracker);
-
-  async function overtakeTrain(
-    { exitRoute, station }: OvertakingArea,
-    overtaking: Train,
-    waiting: Train
-  ): Promise<void> {
-    blocking.block(station.stationID, overtaking.trainID, waiting);
-
-    await Promise.all([
-      otapi.setRouteDisallowed({
-        trainID: waiting.trainID,
-        routeID: exitRoute.routeID
-      }),
-      otapi.setStop({
-        stationID: station.stationID,
-        stopFlag: true,
-        trainID: waiting.trainID
-      }),
-      otapi.setDepartureTime({
-        stationID: station.stationID,
-        time: Number.MAX_SAFE_INTEGER,
-        trainID: waiting.trainID
-      })
-    ]);
-  }
-
-  async function releaseTrains(
-    { exitRoute, station }: OvertakingArea,
-    overtaking: Train
-  ): Promise<void> {
-    const blockedByMe = blocking.getBlocked(
-      station.stationID,
-      overtaking.trainID
-    );
-    blocking.unblockAll(station.stationID, overtaking.trainID);
-
-    await Promise.all(
-      blockedByMe
-        .filter((train): boolean => !blocking.isBlocked(train))
-        .flatMap((waiting): Promise<void>[] => [
-          // Unblock exit route.
-          otapi.setRouteAllowed({
-            routeID: exitRoute.routeID,
-            trainID: waiting.trainID
-          }),
-          // Restore departure time.
-          otapi.setDepartureTime({
-            stationID: station.stationID,
-            time:
-              infrastructure.getTrainsDepartureFromStation(
-                waiting,
-                station.stationID
-              ) ?? 0,
-            trainID: waiting.trainID
-          })
-        ])
-    );
-  }
+  const decisionModuleAPIFactory = new DecisionModuleAPIFactory(
+    infrastructure,
+    tracker,
+    trainOvertaking
+  );
 
   async function setup(): Promise<void> {
     const removeListeners = await Promise.all([
@@ -114,33 +60,37 @@ export function overtaking({
             throw new Error(`No train called ${trainID}.`);
           }
 
-          if (overtakingRouteIDs.has(routeID)) {
-            const route = infrastructure.routes.get(routeID);
-            if (route == null) {
-              throw new Error(`No route called ${routeID}.`);
-            }
+          if (!overtakingRouteIDs.has(routeID)) {
+            return;
+          }
 
-            await Promise.all(
-              overtakingAreas
-                .filter(({ itinerary: { routes } }): boolean =>
-                  routes.includes(route)
-                )
-                .map(
-                  async (overtakingArea): Promise<void> => {
-                    const decisions = await defaultModule.newTrainEnteredOvertakingArea(
-                      decisionModuleAPI,
-                      Object.freeze({
-                        entryRoute: route,
-                        newTrain: train,
-                        overtakingArea,
-                        time
-                      })
-                    );
+          const route = infrastructure.routes.get(routeID);
+          if (route == null) {
+            throw new Error(`No route called ${routeID}.`);
+          }
 
+          await Promise.all(
+            overtakingAreas
+              .filter(({ itinerary: { routes } }): boolean =>
+                routes.includes(route)
+              )
+              .map(
+                async (overtakingArea): Promise<void> => {
+                  const decisions = await defaultModule.newTrainEnteredOvertakingArea(
+                    decisionModuleAPIFactory.get(overtakingArea),
+                    Object.freeze({
+                      entryRoute: route,
+                      newTrain: train,
+                      overtakingArea,
+                      time
+                    })
+                  );
+
+                  if (decisions) {
                     await Promise.all(
                       decisions.map(
                         (decision): Promise<void> =>
-                          overtakeTrain(
+                          trainOvertaking.planOvertaking(
                             overtakingArea,
                             decision.overtaking,
                             decision.waiting
@@ -148,9 +98,9 @@ export function overtaking({
                       )
                     );
                   }
-                )
-            );
-          }
+                }
+              )
+          );
         }
       ),
       otapi.on(
@@ -164,7 +114,9 @@ export function overtaking({
           await Promise.all(
             overtakingAreas
               .filter((oa): boolean => oa.exitRoute.routeID === routeID)
-              .map((oa): Promise<void> => releaseTrains(oa, train))
+              .map(
+                (oa): Promise<void> => trainOvertaking.releaseTrains(oa, train)
+              )
           );
         }
       ),
@@ -189,7 +141,10 @@ export function overtaking({
   }
 
   async function cleanup(): Promise<void> {
-    cleanupCallbacks.splice(0).forEach((callback): void => void callback());
+    cleanupCallbacks
+      .splice(0)
+      .reverse()
+      .forEach((callback): void => void callback());
   }
 
   return { setup, cleanup };
