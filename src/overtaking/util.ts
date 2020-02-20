@@ -1,17 +1,11 @@
+export { MapWithDefaultValue, MapWithDefaultValueFactory } from "../util";
+
+import { MapWithDefaultValue } from "../util";
+
 export type Key = string | number | boolean | null;
 
 export function ck(...rest: Key[]): string {
   return JSON.stringify(rest);
-}
-
-class MWD<K, V> extends Map<K, V> {
-  public constructor(private readonly _default: V) {
-    super();
-  }
-
-  public get(key: K): V {
-    return this.has(key) ? super.get(key)! : this._default;
-  }
 }
 
 export interface BlockingEntry<
@@ -40,7 +34,7 @@ export class Blocking<
   Blocked extends Key = Key
 > {
   private _entries = new Map<string, BlockingEntry<Place, Blocker, Blocked>>();
-  private _blockedBy = new MWD<Blocked, number>(0);
+  private _blockedBy = new MapWithDefaultValue<Blocked, number>(0);
 
   private _queryEntries(
     query: BlockingQuery<Place, Blocker, Blocked>

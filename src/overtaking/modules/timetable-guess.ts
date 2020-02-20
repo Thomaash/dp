@@ -4,9 +4,19 @@ export const decisionModule: DecisionModule = {
   name: "timetable-guess",
   newTrainEnteredOvertakingArea(
     { getTrainsDelayedArrivalAtStation, getTrainsOnItinerary, planOvertaking },
-    { overtakingArea: { itinerary, next } }
+    { overtakingArea: { itinerary, next }, newTrain }
   ): void {
+    console.log();
+
     const trainsOnItinerary = getTrainsOnItinerary(itinerary);
+
+    console.log(
+      "New train " + newTrain.trainID + " on " + itinerary.itineraryID + "."
+    );
+    console.log(
+      "Considering:",
+      trainsOnItinerary.map((value): string => value.train.trainID)
+    );
 
     if (trainsOnItinerary.length < 2) {
       return;
@@ -32,9 +42,12 @@ export const decisionModule: DecisionModule = {
     );
 
     if (train1DelayedArrival > train2DelayedArrival) {
+      console.log("Overtake " + train1.trainID + " by " + train2.trainID + ".");
       planOvertaking(train2, train1).catch((error): void => {
         console.error("Can't plan overtaking:", error);
       });
     }
+
+    console.log();
   }
 };

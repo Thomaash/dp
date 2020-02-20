@@ -1,7 +1,7 @@
 module.exports.decisionModule = {
   name: "example-decision-module",
   newTrainEnteredOvertakingArea(
-    { getTrainsOnItinerary },
+    { getTrainsOnItinerary, planOvertaking },
     { overtakingArea: { itinerary } }
   ) {
     const trainsOnItinerary = getTrainsOnItinerary(itinerary);
@@ -15,12 +15,11 @@ module.exports.decisionModule = {
       console.log(
         `Hi there, I'm example decision module and I say that ${overtaking.trainID} should overtake ${waiting.trainID}.`
       );
-      return [{ overtaking, waiting }];
+      planOvertaking(overtaking, waiting);
     } else {
       console.log(
         "Hi there, I'm example decision module and I see no reason for overtaking."
       );
-      return [];
     }
   }
 };

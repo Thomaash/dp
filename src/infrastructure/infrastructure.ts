@@ -81,6 +81,34 @@ export class Infrastructure implements InfrastructureData {
     public readonly vertexes: ReadonlyMap<string, Vertex>
   ) {}
 
+  public getOrThrow<
+    T extends
+      | "itineraries"
+      | "paths"
+      | "routes"
+      | "stations"
+      | "timetables"
+      | "trains"
+      | "vertexes"
+  >(propName: T, key: string): NonNullable<Parameters<this[T]["get"]>[1]>;
+  public getOrThrow<
+    T extends
+      | "itineraries"
+      | "paths"
+      | "routes"
+      | "stations"
+      | "timetables"
+      | "trains"
+      | "vertexes"
+  >(propName: T, key: string): unknown {
+    const value = this[propName].get(key);
+    if (value == null) {
+      throw new Error(`Can't find ${key} in ${propName}.`);
+    }
+
+    return value;
+  }
+
   public getTimetableDuration(
     train: Train,
     fromStation: Station,

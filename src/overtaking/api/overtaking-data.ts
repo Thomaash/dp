@@ -1,9 +1,7 @@
 import { OvertakingArea } from "../api-public";
 import { Infrastructure, Route } from "../../infrastructure";
 
-export function getOvertakingData(
-  infrastructure: Infrastructure
-): { overtakingAreas: OvertakingArea[]; overtakingRouteIDs: Set<string> } {
+function getOvertakingAreas(infrastructure: Infrastructure): OvertakingArea[] {
   const overtakingAreas = [...infrastructure.itineraries.values()]
     .filter(({ args }): boolean => args.overtaking)
     .filter(({ itineraryID, stations }): boolean => {
@@ -18,6 +16,7 @@ export function getOvertakingData(
     .map(
       (itinerary): OvertakingArea =>
         Object.freeze({
+          entryRoute: itinerary.routes[0],
           exitRoute: itinerary.routes[itinerary.routes.length - 1],
           itinerary,
           next: [],
@@ -47,7 +46,13 @@ export function getOvertakingData(
     Object.freeze(oa1.previous);
   }
 
-  const overtakingRouteIDs = overtakingAreas
+  return overtakingAreas;
+}
+
+function getOvertakingRouteIDs(
+  overtakingAreas: OvertakingArea[]
+): ReadonlySet<string> {
+  return overtakingAreas
     .flatMap(
       (overtakingArea): readonly Route[] => overtakingArea.itinerary.routes
     )
@@ -55,6 +60,48 @@ export function getOvertakingData(
       (acc, route): Set<string> => acc.add(route.routeID),
       new Set()
     );
+}
 
-  return Object.freeze({ overtakingAreas, overtakingRouteIDs });
+function getOvertakingEntryRouteIDs(
+  overtakingAreas: OvertakingArea[]
+): ReadonlySet<string> {
+  return overtakingAreas.reduce<Set<string>>(
+    (acc, overtakingArea): Set<string> =>
+      acc.add(overtakingArea.entryRoute.routeID),
+    new Set()
+  );
+}
+
+function getOvertakingExitRouteIDs(
+  overtakingAreas: OvertakingArea[]
+): ReadonlySet<string> {
+  return overtakingAreas.reduce<Set<string>>(
+    (acc, overtakingArea): Set<string> =>
+      acc.add(overtakingArea.exitRoute.routeID),
+    new Set()
+  );
+}
+
+export interface OvertakingData {
+  overtakingAreas: OvertakingArea[];
+  overtakingEntryRouteIDs: ReadonlySet<string>;
+  overtakingExitRouteIDs: ReadonlySet<string>;
+  overtakingRouteIDs: ReadonlySet<string>;
+}
+
+export function getOvertakingData(
+  infrastructure: Infrastructure
+): OvertakingData {
+  const overtakingAreas = getOvertakingAreas(infrastructure);
+
+  const overtakingEntryRouteIDs = getOvertakingEntryRouteIDs(overtakingAreas);
+  const overtakingExitRouteIDs = getOvertakingExitRouteIDs(overtakingAreas);
+  const overtakingRouteIDs = getOvertakingRouteIDs(overtakingAreas);
+
+  return Object.freeze<OvertakingData>({
+    overtakingAreas,
+    overtakingEntryRouteIDs,
+    overtakingExitRouteIDs,
+    overtakingRouteIDs
+  });
 }

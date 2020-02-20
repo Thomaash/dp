@@ -1,9 +1,10 @@
-import { Infrastructure } from "../infrastructure";
+import { Infrastructure, Train } from "../infrastructure";
 import { OTAPI } from "../otapi";
 import { TrainTracker } from "../train-tracker";
 
-import { DecisionModule } from "./api-public";
+import { DecisionModule, OvertakingArea } from "./api-public";
 import { DecisionModuleAPIFactory, getOvertakingData } from "./api";
+import { MapWithDefaultValueFactory } from "./util";
 import { TrainOvertaking } from "./train-overtaking";
 
 import { decisionModule as maxSpeedDM } from "./modules/max-speed";
@@ -35,15 +36,17 @@ export function overtaking({
   }
   const defaultModule: DecisionModule = requestedDefaultModule;
 
+  const inOvertakingArea = new MapWithDefaultValueFactory<
+    OvertakingArea,
+    Set<Train>
+  >((): Set<Train> => new Set());
   const trainOvertaking = new TrainOvertaking(infrastructure, otapi);
   const cleanupCallbacks: (() => void)[] = [];
 
   const tracker = new TrainTracker(otapi, infrastructure).startTracking(1);
   cleanupCallbacks.push(tracker.stopTraking.bind(tracker));
 
-  const { overtakingAreas, overtakingRouteIDs } = getOvertakingData(
-    infrastructure
-  );
+  const { overtakingAreas } = getOvertakingData(infrastructure);
   const decisionModuleAPIFactory = new DecisionModuleAPIFactory(
     infrastructure,
     tracker,
@@ -52,73 +55,57 @@ export function overtaking({
 
   async function setup(): Promise<void> {
     const removeListeners = await Promise.all([
-      otapi.on(
-        "routeEntry",
-        async (_, { routeID, time, trainID }): Promise<void> => {
-          const train = infrastructure.trains.get(trainID);
-          if (train == null) {
-            throw new Error(`No train called ${trainID}.`);
+      ...[...overtakingAreas.values()].map((overtakingArea): (() => void) =>
+        tracker.on(
+          "train-entered-itinerary",
+          overtakingArea.itinerary,
+          async ({ train, route, time }): Promise<void> => {
+            inOvertakingArea.get(overtakingArea).add(train);
+
+            try {
+              await defaultModule.newTrainEnteredOvertakingArea(
+                decisionModuleAPIFactory.get(overtakingArea),
+                Object.freeze({
+                  entryRoute: route,
+                  newTrain: train,
+                  overtakingArea,
+                  time
+                })
+              );
+            } catch (error) {
+              console.error(
+                "Overtaking decision module failed for train " +
+                  train.trainID +
+                  " which just entered " +
+                  overtakingArea.itinerary.itineraryID +
+                  " through " +
+                  route.routeID +
+                  ".",
+                error
+              );
+            }
           }
-
-          if (!overtakingRouteIDs.has(routeID)) {
-            return;
-          }
-
-          const route = infrastructure.routes.get(routeID);
-          if (route == null) {
-            throw new Error(`No route called ${routeID}.`);
-          }
-
-          await Promise.all(
-            overtakingAreas
-              .filter(({ itinerary: { routes } }): boolean =>
-                routes.includes(route)
-              )
-              .map(
-                async (overtakingArea): Promise<void> => {
-                  const decisions = await defaultModule.newTrainEnteredOvertakingArea(
-                    decisionModuleAPIFactory.get(overtakingArea),
-                    Object.freeze({
-                      entryRoute: route,
-                      newTrain: train,
-                      overtakingArea,
-                      time
-                    })
-                  );
-
-                  if (decisions) {
-                    await Promise.all(
-                      decisions.map(
-                        (decision): Promise<void> =>
-                          trainOvertaking.planOvertaking(
-                            overtakingArea,
-                            decision.overtaking,
-                            decision.waiting
-                          )
-                      )
-                    );
-                  }
-                }
-              )
-          );
-        }
+        )
       ),
-      otapi.on(
-        "routeExit",
-        async (_, { routeID, trainID }): Promise<void> => {
-          const train = infrastructure.trains.get(trainID);
-          if (train == null) {
-            throw new Error(`No train called ${trainID}.`);
+      ...[...overtakingAreas.values()].map((overtakingArea): (() => void) =>
+        tracker.on(
+          "train-left-itinerary",
+          overtakingArea.itinerary,
+          async ({ train }): Promise<void> => {
+            try {
+              await trainOvertaking.releaseTrains(overtakingArea, train);
+            } catch (error) {
+              console.error(
+                "Failed to release trains blocked by " +
+                  train.trainID +
+                  " after overtaking in " +
+                  overtakingArea.itinerary.itineraryID +
+                  ".",
+                error
+              );
+            }
           }
-
-          await Promise.all(
-            overtakingAreas
-              .filter((oa): boolean => oa.exitRoute.routeID === routeID)
-              .map(
-                (oa): Promise<void> => trainOvertaking.releaseTrains(oa, train)
-              )
-          );
-        }
+        )
       ),
       otapi.on(
         "trainCreated",

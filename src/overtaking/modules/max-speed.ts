@@ -1,28 +1,26 @@
-import { DecisionModule, OvertakingDecision } from "../";
+import { DecisionModule } from "../";
 
 export const decisionModule: DecisionModule = {
   name: "max-speed",
   newTrainEnteredOvertakingArea(
-    { getTrainsOnItinerary },
+    { getTrainsOnItinerary, planOvertaking },
     { overtakingArea: { itinerary } }
-  ): OvertakingDecision[] {
+  ): void {
     const trainsOnItinerary = getTrainsOnItinerary(itinerary);
 
     if (trainsOnItinerary.length < 2) {
-      return [];
+      return;
     }
 
     if (
       trainsOnItinerary[0].train.maxSpeed < trainsOnItinerary[1].train.maxSpeed
     ) {
-      return [
-        {
-          overtaking: trainsOnItinerary[1].train,
-          waiting: trainsOnItinerary[0].train
-        }
-      ];
+      planOvertaking(
+        trainsOnItinerary[1].train,
+        trainsOnItinerary[0].train
+      ).catch((error): void => {
+        console.error("Can't plan overtaking:", error);
+      });
     }
-
-    return [];
   }
 };

@@ -169,7 +169,6 @@ async function startOpenTrack(otapi: OTAPI): Promise<{ command: any }> {
 
   console.info(`Ports: OT ${portOT} <-> App ${portApp}`);
   const otapi = new OTAPI({ portApp, portOT });
-  const trainTracker = new TrainTracker(otapi, infrastructure);
 
   const overtakingModules = await Promise.all(
     (args["overtaking-modules"] ?? []).map(
@@ -186,7 +185,6 @@ async function startOpenTrack(otapi: OTAPI): Promise<{ command: any }> {
   };
 
   try {
-    trainTracker.startTracking(1);
     await otapi.start();
 
     if (args["log-ot-responses"]) {
