@@ -6,18 +6,18 @@ export const decisionModule: DecisionModule = {
     { getTrainsDelayedArrivalAtStation, getTrainsInArea, planOvertaking },
     { overtakingArea, newTrain }
   ): void {
-    console.log();
+    console.info();
 
     const trainsOnItinerary = getTrainsInArea(overtakingArea);
 
-    console.log(
+    console.info(
       "New train " +
         newTrain.trainID +
         " in " +
         overtakingArea.overtakingAreaID +
         "."
     );
-    console.log(
+    console.info(
       "Considering:",
       trainsOnItinerary.map((value): string => value.train.trainID)
     );
@@ -47,12 +47,14 @@ export const decisionModule: DecisionModule = {
     );
 
     if (train1DelayedArrival > train2DelayedArrival) {
-      console.log("Overtake " + train1.trainID + " by " + train2.trainID + ".");
+      console.info(
+        "Overtake " + train1.trainID + " by " + train2.trainID + "."
+      );
       planOvertaking(train2, train1).catch((error): void => {
         console.error("Can't plan overtaking:", error);
       });
     }
 
-    console.log();
+    console.info();
   }
 };

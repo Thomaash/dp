@@ -12,12 +12,12 @@ module.exports.decisionModule = {
     ) {
       const overtaking = trainsOnItinerary[1].train;
       const waiting = trainsOnItinerary[0].train;
-      console.log(
+      console.info(
         `Hi there, I'm example decision module and I say that ${overtaking.trainID} should overtake ${waiting.trainID}.`
       );
       planOvertaking(overtaking, waiting);
     } else {
-      console.log(
+      console.info(
         "Hi there, I'm example decision module and I see no reason for overtaking."
       );
     }
