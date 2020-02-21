@@ -14,7 +14,7 @@ export class DecisionModuleAPIFactory {
     private readonly _tracker: TrainTracker,
     private readonly _trainOvertaking: TrainOvertaking
   ) {
-    this._apiBase = Object.freeze({
+    this._apiBase = {
       getTrain: (trainID): ReturnType<DecisionModuleAPI["getTrain"]> => {
         const train = this._infrastructure.trains.get(trainID);
         if (train == null) {
@@ -92,20 +92,13 @@ export class DecisionModuleAPIFactory {
           return reserve;
         }
       },
-      getTrainsOnItinerary: (
-        itineraryInput
-      ): ReturnType<DecisionModuleAPI["getTrainsOnItinerary"]> => {
-        const itinerary =
-          typeof itineraryInput === "string"
-            ? this._infrastructure.itineraries.get(itineraryInput)
-            : itineraryInput;
-        if (itinerary == null) {
-          throw new Error(`There's no itinerary called ${itineraryInput}.`);
-        }
-
-        return this._tracker.getTrainsOnItineraryInOrder(itinerary);
+      getTrainsInArea: (
+        area
+      ): ReturnType<DecisionModuleAPI["getTrainsInArea"]> => {
+        return this._tracker.getTrainsInAreaInOrder(area);
       }
-    });
+    };
+    Object.freeze(this._apiBase);
   }
 
   public get(overtakingArea: OvertakingArea): DecisionModuleAPI {

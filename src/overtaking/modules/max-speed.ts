@@ -3,10 +3,10 @@ import { DecisionModule } from "../";
 export const decisionModule: DecisionModule = {
   name: "max-speed",
   newTrainEnteredOvertakingArea(
-    { getTrainsOnItinerary, planOvertaking },
-    { overtakingArea: { itinerary } }
+    { getTrainsInArea, planOvertaking },
+    { overtakingArea }
   ): void {
-    const trainsOnItinerary = getTrainsOnItinerary(itinerary);
+    const trainsOnItinerary = getTrainsInArea(overtakingArea);
 
     if (trainsOnItinerary.length < 2) {
       return;

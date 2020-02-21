@@ -3,15 +3,19 @@ import { DecisionModule } from "../";
 export const decisionModule: DecisionModule = {
   name: "timetable-guess",
   newTrainEnteredOvertakingArea(
-    { getTrainsDelayedArrivalAtStation, getTrainsOnItinerary, planOvertaking },
-    { overtakingArea: { itinerary, next }, newTrain }
+    { getTrainsDelayedArrivalAtStation, getTrainsInArea, planOvertaking },
+    { overtakingArea, newTrain }
   ): void {
     console.log();
 
-    const trainsOnItinerary = getTrainsOnItinerary(itinerary);
+    const trainsOnItinerary = getTrainsInArea(overtakingArea);
 
     console.log(
-      "New train " + newTrain.trainID + " on " + itinerary.itineraryID + "."
+      "New train " +
+        newTrain.trainID +
+        " in " +
+        overtakingArea.overtakingAreaID +
+        "."
     );
     console.log(
       "Considering:",
@@ -22,14 +26,15 @@ export const decisionModule: DecisionModule = {
       return;
     }
 
-    if (next.length === 0) {
+    const { next } = overtakingArea;
+    if (next.size === 0) {
       return;
-    } else if (next.length > 1) {
+    } else if (next.size > 1) {
       console.error("TODO");
       return;
     }
 
-    const nextStation = next[0].station;
+    const nextStation = [...next][0].station;
     const [{ train: train1 }, { train: train2 }] = trainsOnItinerary;
 
     const train1DelayedArrival = getTrainsDelayedArrivalAtStation(

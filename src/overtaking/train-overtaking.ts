@@ -67,7 +67,7 @@ export class TrainOvertaking {
   }
 
   async planOvertaking(
-    { exitRoute, station }: OvertakingArea,
+    { exitRoutes, station }: OvertakingArea,
     overtaking: Train,
     waiting: Train
   ): Promise<void> {
@@ -88,15 +88,20 @@ export class TrainOvertaking {
       waiting.trainID
     );
 
-    return this._sendBlockRequests(
-      exitRoute.routeID,
-      station.stationID,
-      waiting.trainID
+    await Promise.all(
+      [...exitRoutes.values()].map(
+        (exitRoute): Promise<void> =>
+          this._sendBlockRequests(
+            exitRoute.routeID,
+            station.stationID,
+            waiting.trainID
+          )
+      )
     );
   }
 
   async cancelOvertaking(
-    { exitRoute, station }: OvertakingArea,
+    { exitRoutes, station }: OvertakingArea,
     overtaking: Train,
     waiting: Train
   ): Promise<void> {
@@ -127,15 +132,20 @@ export class TrainOvertaking {
       return;
     }
 
-    return this._sendReleaseRequests(
-      exitRoute.routeID,
-      station.stationID,
-      waiting
+    await Promise.all(
+      [...exitRoutes.values()].map(
+        (exitRoute): Promise<void> =>
+          this._sendReleaseRequests(
+            exitRoute.routeID,
+            station.stationID,
+            waiting
+          )
+      )
     );
   }
 
   async releaseTrains(
-    { exitRoute, station }: OvertakingArea,
+    { exitRoutes, station }: OvertakingArea,
     overtaking: Train
   ): Promise<void> {
     const blockedByOvertaking = this._blocking.unblockAll({
@@ -163,13 +173,15 @@ export class TrainOvertaking {
               blocked: waiting.trainID
             })
         )
-        .map(
-          (waiting): Promise<void> =>
-            this._sendReleaseRequests(
-              exitRoute.routeID,
-              station.stationID,
-              waiting
-            )
+        .flatMap((waiting): Promise<void>[] =>
+          [...exitRoutes.values()].map(
+            (exitRoute): Promise<void> =>
+              this._sendReleaseRequests(
+                exitRoute.routeID,
+                station.stationID,
+                waiting
+              )
+          )
         )
     );
   }

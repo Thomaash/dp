@@ -1,10 +1,10 @@
 module.exports.decisionModule = {
   name: "example-decision-module",
   newTrainEnteredOvertakingArea(
-    { getTrainsOnItinerary, planOvertaking },
+    { getTrainsInArea, planOvertaking },
     { overtakingArea: { itinerary } }
   ) {
-    const trainsOnItinerary = getTrainsOnItinerary(itinerary);
+    const trainsOnItinerary = getTrainsInArea(itinerary);
 
     if (
       trainsOnItinerary.length >= 2 &&

@@ -1,4 +1,7 @@
-import { Itinerary, Route, Station, Train } from "../infrastructure";
+import { Itinerary, Route, Station, Train, Vertex } from "../infrastructure";
+import { Area } from "../train-tracker";
+
+export { Area };
 
 export interface DecisionModuleAPI {
   cancelOvertaking(overtaking: Train, waiting: Train): Promise<void>;
@@ -7,9 +10,7 @@ export interface DecisionModuleAPI {
   getTrain(trainID: string): Train;
   getTrainsDelayedArrivalAtStation(train: Train, station: Station): number;
   getTrainsLastStation(train: Train): Station | undefined;
-  getTrainsOnItinerary(
-    itinerary: string | Itinerary
-  ): { train: Train; position: number }[];
+  getTrainsInArea(area: Area): { train: Train; position: number }[];
   getTrainsTimetableReserve(
     train: Train,
     fromStation: Station,
@@ -19,12 +20,15 @@ export interface DecisionModuleAPI {
 }
 
 export interface OvertakingArea {
-  entryRoute: Route;
-  exitRoute: Route;
-  itinerary: Itinerary;
-  next: OvertakingArea[];
-  previous: OvertakingArea[];
-  station: Station;
+  readonly entryVertexes: ReadonlySet<Vertex>;
+  readonly exitRoutes: ReadonlySet<Route>;
+  readonly exitVertex: Vertex;
+  readonly itineraries: ReadonlySet<Itinerary>;
+  readonly next: ReadonlySet<OvertakingArea>;
+  readonly overtakingAreaID: string;
+  readonly previous: ReadonlySet<OvertakingArea>;
+  readonly routes: ReadonlySet<Route>;
+  readonly station: Station;
 }
 
 export interface OvertakingDecision {

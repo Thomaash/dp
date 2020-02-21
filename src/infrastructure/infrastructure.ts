@@ -66,6 +66,16 @@ export const infrastructureFactory = {
   }
 };
 
+const kindToPropName = new Map([
+  ["itinerary", "itineraries"],
+  ["path", "paths"],
+  ["route", "routes"],
+  ["station", "stations"],
+  ["timetable", "timetables"],
+  ["train", "trains"],
+  ["vertex", "vertexes"]
+] as const);
+
 export class Infrastructure implements InfrastructureData {
   public constructor(
     public readonly itineraries: ReadonlyMap<string, Itinerary>,
@@ -81,29 +91,25 @@ export class Infrastructure implements InfrastructureData {
     public readonly vertexes: ReadonlyMap<string, Vertex>
   ) {}
 
-  public getOrThrow<
-    T extends
-      | "itineraries"
-      | "paths"
-      | "routes"
-      | "stations"
-      | "timetables"
-      | "trains"
-      | "vertexes"
-  >(propName: T, key: string): NonNullable<Parameters<this[T]["get"]>[1]>;
-  public getOrThrow<
-    T extends
-      | "itineraries"
-      | "paths"
-      | "routes"
-      | "stations"
-      | "timetables"
-      | "trains"
-      | "vertexes"
-  >(propName: T, key: string): unknown {
+  public getOrThrow(kind: "itinerary", key: string): Itinerary;
+  public getOrThrow(kind: "path", key: string): Path;
+  public getOrThrow(kind: "route", key: string): Route;
+  public getOrThrow(kind: "station", key: string): Station;
+  public getOrThrow(kind: "timetable", key: string): Timetable;
+  public getOrThrow(kind: "train", key: string): Train;
+  public getOrThrow(kind: "vertex", key: string): Vertex;
+  public getOrThrow(
+    kind: Parameters<typeof kindToPropName["get"]>[0],
+    key: string
+  ): unknown {
+    const propName = kindToPropName.get(kind);
+    if (propName == null) {
+      throw new Error(`Invalid kind ${kind}.`);
+    }
+
     const value = this[propName].get(key);
     if (value == null) {
-      throw new Error(`Can't find ${key} in ${propName}.`);
+      throw new Error(`Can't find ${kind} ${key}.`);
     }
 
     return value;

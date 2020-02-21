@@ -1,8 +1,10 @@
 import { OvertakingArea } from "../api-public";
-import { Infrastructure, Route } from "../../infrastructure";
+import { Infrastructure, Route, Vertex, Itinerary } from "../../infrastructure";
+import { MapOfSets, RW } from "../../util";
+import { expect } from "chai";
 
 function getOvertakingAreas(infrastructure: Infrastructure): OvertakingArea[] {
-  const overtakingAreas = [...infrastructure.itineraries.values()]
+  const overtakingItiniraries = [...infrastructure.itineraries.values()]
     .filter(({ args }): boolean => args.overtaking)
     .filter(({ itineraryID, stations }): boolean => {
       if (stations.length) {
@@ -13,80 +15,84 @@ function getOvertakingAreas(infrastructure: Infrastructure): OvertakingArea[] {
         );
       }
     })
-    .map(
-      (itinerary): OvertakingArea =>
-        Object.freeze({
-          entryRoute: itinerary.routes[0],
-          exitRoute: itinerary.routes[itinerary.routes.length - 1],
-          itinerary,
-          next: [],
-          previous: [],
-          station: itinerary.stations[itinerary.stations.length - 1]
-        })
-    );
+    .filter(({ itineraryID, vertexes }): boolean => {
+      if (vertexes.length) {
+        return true;
+      } else {
+        throw new Error(`No vertexes were found in ${itineraryID}.`);
+      }
+    })
+    .reduce<MapOfSets<Vertex, Itinerary>>((acc, itinerary): MapOfSets<
+      Vertex,
+      Itinerary
+    > => {
+      acc.get(itinerary.vertexes[itinerary.vertexes.length - 1]).add(itinerary);
+
+      return acc;
+    }, new MapOfSets());
+
+  const overtakingAreas = [...overtakingItiniraries.entries()].map(
+    ([exitVertex, itineraries]): RW<OvertakingArea> => {
+      const someItinerary = [...itineraries.values()][0];
+      expect(
+        someItinerary,
+        "This is a bug in the app. If you see this report it and include the stack trace, please."
+      ).to.exist;
+
+      const station = someItinerary.stations[someItinerary.stations.length - 1];
+      for (const itinerary of itineraries) {
+        expect(
+          itinerary.stations[itinerary.stations.length - 1],
+          "All overtaking itineraries in the same overtaking area have to go through the same final station."
+        ).to.equal(station);
+      }
+
+      const overtakingArea: RW<OvertakingArea> = {
+        overtakingAreaID: [...itineraries.values()]
+          .map((itinerary): string => itinerary.itineraryID.split(" --", 1)[0])
+          .join(" + "),
+        entryVertexes: new Set<Vertex>(
+          [...itineraries.values()].map(
+            (itinerary): Vertex => itinerary.vertexes[0]
+          )
+        ),
+        exitVertex,
+        exitRoutes: new Set<Route>(
+          [...itineraries.values()].map(
+            (itinerary): Route => itinerary.routes[itinerary.routes.length - 1]
+          )
+        ),
+        routes: new Set<Route>(
+          [...itineraries.values()].flatMap(
+            (itinerary): readonly Route[] => itinerary.routes
+          )
+        ),
+        itineraries,
+        next: new Set(),
+        previous: new Set(),
+        station
+      };
+      Object.freeze(overtakingArea);
+      return overtakingArea;
+    }
+  );
 
   for (const oa1 of overtakingAreas) {
-    const firstVertex = oa1.itinerary.vertexes[0];
-    const lastVertex =
-      oa1.itinerary.vertexes[oa1.itinerary.vertexes.length - 1];
-
     for (const oa2 of overtakingAreas) {
-      if (oa2.itinerary.vertexes[0] === lastVertex) {
-        oa1.next.push(oa2);
+      if (oa1.entryVertexes.has(oa2.exitVertex)) {
+        oa1.previous.add(oa2);
       }
-      if (
-        oa2.itinerary.vertexes[oa2.itinerary.vertexes.length - 1] ===
-        firstVertex
-      ) {
-        oa1.previous.push(oa2);
+      if (oa2.entryVertexes.has(oa1.exitVertex)) {
+        oa1.next.add(oa2);
       }
     }
-
-    Object.freeze(oa1.next);
-    Object.freeze(oa1.previous);
   }
 
   return overtakingAreas;
 }
 
-function getOvertakingRouteIDs(
-  overtakingAreas: OvertakingArea[]
-): ReadonlySet<string> {
-  return overtakingAreas
-    .flatMap(
-      (overtakingArea): readonly Route[] => overtakingArea.itinerary.routes
-    )
-    .reduce<Set<string>>(
-      (acc, route): Set<string> => acc.add(route.routeID),
-      new Set()
-    );
-}
-
-function getOvertakingEntryRouteIDs(
-  overtakingAreas: OvertakingArea[]
-): ReadonlySet<string> {
-  return overtakingAreas.reduce<Set<string>>(
-    (acc, overtakingArea): Set<string> =>
-      acc.add(overtakingArea.entryRoute.routeID),
-    new Set()
-  );
-}
-
-function getOvertakingExitRouteIDs(
-  overtakingAreas: OvertakingArea[]
-): ReadonlySet<string> {
-  return overtakingAreas.reduce<Set<string>>(
-    (acc, overtakingArea): Set<string> =>
-      acc.add(overtakingArea.exitRoute.routeID),
-    new Set()
-  );
-}
-
 export interface OvertakingData {
   overtakingAreas: OvertakingArea[];
-  overtakingEntryRouteIDs: ReadonlySet<string>;
-  overtakingExitRouteIDs: ReadonlySet<string>;
-  overtakingRouteIDs: ReadonlySet<string>;
 }
 
 export function getOvertakingData(
@@ -94,14 +100,5 @@ export function getOvertakingData(
 ): OvertakingData {
   const overtakingAreas = getOvertakingAreas(infrastructure);
 
-  const overtakingEntryRouteIDs = getOvertakingEntryRouteIDs(overtakingAreas);
-  const overtakingExitRouteIDs = getOvertakingExitRouteIDs(overtakingAreas);
-  const overtakingRouteIDs = getOvertakingRouteIDs(overtakingAreas);
-
-  return Object.freeze<OvertakingData>({
-    overtakingAreas,
-    overtakingEntryRouteIDs,
-    overtakingExitRouteIDs,
-    overtakingRouteIDs
-  });
+  return Object.freeze<OvertakingData>({ overtakingAreas });
 }
