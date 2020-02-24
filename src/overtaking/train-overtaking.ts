@@ -123,7 +123,7 @@ export class TrainOvertaking {
     );
 
     if (
-      !this._blocking.isBlockedQuery({
+      this._blocking.isBlockedQuery({
         place: station.stationID,
         blocked: waiting.trainID
       })
