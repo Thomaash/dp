@@ -1,7 +1,14 @@
-import { Itinerary, Route, Station, Train, Vertex } from "../infrastructure";
+import {
+  Itinerary,
+  Route,
+  Station,
+  Train,
+  Vertex,
+  Path
+} from "../infrastructure";
 import { Area } from "../train-tracker";
 
-export { Area };
+export { Area, Itinerary, Path, Route, Station, Train, Vertex };
 
 export interface DecisionModuleAPI {
   cancelOvertaking(overtaking: Train, waiting: Train): Promise<void>;
