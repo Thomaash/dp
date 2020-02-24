@@ -1,3 +1,4 @@
+export * from "./arrays";
 export * from "./deep-freeze";
 export * from "./deffered";
 export * from "./errors";

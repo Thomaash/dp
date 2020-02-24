@@ -1,9 +1,16 @@
 import { DecisionModule } from "../";
 
+import { getConsecutivePairs } from "../../util";
+
 export const decisionModule: DecisionModule = {
   name: "timetable-guess",
   newTrainEnteredOvertakingArea(
-    { getTrainsDelayedArrivalAtStation, getTrainsInArea, planOvertaking },
+    {
+      cancelOvertaking,
+      getTrainsDelayedArrivalAtStation,
+      getTrainsInArea,
+      planOvertaking
+    },
     { overtakingArea, newTrain }
   ): void {
     console.info();
@@ -18,13 +25,9 @@ export const decisionModule: DecisionModule = {
         "."
     );
     console.info(
-      "Considering:",
+      "Trains:",
       trainsOnItinerary.map((value): string => value.train.trainID)
     );
-
-    if (trainsOnItinerary.length < 2) {
-      return;
-    }
 
     const { next } = overtakingArea;
     if (next.size === 0) {
@@ -35,24 +38,34 @@ export const decisionModule: DecisionModule = {
     }
 
     const nextStation = [...next][0].station;
-    const [{ train: train1 }, { train: train2 }] = trainsOnItinerary;
 
-    const train1DelayedArrival = getTrainsDelayedArrivalAtStation(
-      train1,
-      nextStation
-    );
-    const train2DelayedArrival = getTrainsDelayedArrivalAtStation(
-      train2,
-      nextStation
-    );
+    for (const [{ train: train1 }, { train: train2 }] of getConsecutivePairs(
+      trainsOnItinerary
+    )) {
+      console.info("Considering:", [train1.trainID, train2.trainID]);
 
-    if (train1DelayedArrival > train2DelayedArrival) {
-      console.info(
-        "Overtake " + train1.trainID + " by " + train2.trainID + "."
+      const train1DelayedArrival = getTrainsDelayedArrivalAtStation(
+        train1,
+        nextStation
       );
-      planOvertaking(train2, train1).catch((error): void => {
-        console.error("Can't plan overtaking:", error);
-      });
+      const train2DelayedArrival = getTrainsDelayedArrivalAtStation(
+        train2,
+        nextStation
+      );
+
+      if (train1DelayedArrival > train2DelayedArrival) {
+        console.info(
+          "Overtake " + train1.trainID + " by " + train2.trainID + "."
+        );
+        planOvertaking(train2, train1).catch((error): void => {
+          console.error("Can't plan overtaking:", error);
+        });
+      } else {
+        console.info("Don't overtake.");
+        cancelOvertaking(train2, train1).catch((error): void => {
+          console.error("Can't plan overtaking:", error);
+        });
+      }
     }
 
     console.info();
