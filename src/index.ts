@@ -132,6 +132,7 @@ async function startOpenTrack(otapi: OTAPI): Promise<{ command: any }> {
   const runfile = parseRunfile((await readFile(args["ot-runfile"])).toString());
   const portOT = +runfile["OpenTrack Server Port"][0];
   const portApp = +runfile["OTD Server Port"][0];
+  const keepAlive = runfile["Keep Connection"][0] === "1";
 
   const infrastructure = await infrastructureFactory.buildFromFiles({
     courses: args["ot-export-courses"],
@@ -168,7 +169,7 @@ async function startOpenTrack(otapi: OTAPI): Promise<{ command: any }> {
   );
 
   console.info(`Ports: OT ${portOT} <-> App ${portApp}`);
-  const otapi = new OTAPI({ portApp, portOT });
+  const otapi = new OTAPI({ keepAlive, portApp, portOT });
 
   const overtakingModules = await Promise.all(
     (args["overtaking-modules"] ?? []).map(

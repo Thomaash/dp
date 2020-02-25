@@ -67,6 +67,7 @@ export * from "./runfile";
 
 export interface OTAPIConstructorParams {
   host?: string;
+  keepAlive?: boolean;
   maxSimultaneousRequests?: number;
   portApp?: number;
   portOT?: number;
@@ -75,6 +76,7 @@ export interface OTAPIConstructorParams {
 
 const defaultConstructorParams: Required<OTAPIConstructorParams> = {
   host: "localhost",
+  keepAlive: false,
   maxSimultaneousRequests: 10,
   portApp: 9004,
   portOT: 9002,
@@ -93,8 +95,9 @@ export class OTAPI {
       ...constructorParams
     });
 
-    this.config = Object.freeze({
+    this.config = Object.freeze<Config>({
       host: params.host,
+      keepAlive: params.keepAlive,
       portApp: params.portApp,
       portOT: params.portOT,
       protocol: params.protocol

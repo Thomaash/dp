@@ -1,3 +1,5 @@
+import http from "http";
+import https from "https";
 import fetch from "node-fetch";
 import { Config } from "../config";
 import { SendParameters } from "./parameters";
@@ -59,6 +61,34 @@ function buildBody(tagName: string, attributes: SendAttribute[]): string {
 </SOAP-ENV:Envelope>`;
 }
 
+const httpAgent = new http.Agent({
+  keepAlive: false
+});
+const httpsAgent = new https.Agent({
+  keepAlive: false
+});
+function getAgent(parsedURL: URL): http.Agent | https.Agent {
+  if (parsedURL.protocol == "http:") {
+    return httpAgent;
+  } else {
+    return httpsAgent;
+  }
+}
+
+const httpKeepAliveAgent = new http.Agent({
+  keepAlive: true
+});
+const httpsKeepAliveAgent = new https.Agent({
+  keepAlive: true
+});
+function getKeepAliveAgent(parsedURL: URL): http.Agent | https.Agent {
+  if (parsedURL.protocol == "http:") {
+    return httpKeepAliveAgent;
+  } else {
+    return httpsKeepAliveAgent;
+  }
+}
+
 export async function send<Name extends keyof SendParameters>(
   config: Config,
   name: Name,
@@ -68,6 +98,7 @@ export async function send<Name extends keyof SendParameters>(
 
   try {
     await fetch(getURL(config), {
+      agent: config.keepAlive ? getKeepAliveAgent : getAgent,
       body,
       headers: {
         "Content-Type": "application/xml; charset=utf-8",
