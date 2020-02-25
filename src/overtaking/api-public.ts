@@ -4,7 +4,9 @@ import {
   Station,
   Train,
   Vertex,
-  Path
+  Path,
+  CommonTimetableEntry,
+  Timetable
 } from "../infrastructure";
 import { Area } from "../train-tracker";
 
@@ -24,6 +26,11 @@ export interface DecisionModuleAPI {
     toStation: Station,
     inclusive?: boolean
   ): number;
+  getCommonTimetableEntries(
+    fromStation: Station,
+    timetable1: Timetable,
+    timetable2: Timetable
+  ): CommonTimetableEntry[];
 }
 
 export interface OvertakingArea {

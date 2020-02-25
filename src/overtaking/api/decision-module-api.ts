@@ -92,6 +92,17 @@ export class DecisionModuleAPIFactory {
           return reserve;
         }
       },
+      getCommonTimetableEntries: (
+        fromStation,
+        timetable1,
+        timetable2
+      ): ReturnType<DecisionModuleAPI["getCommonTimetableEntries"]> => {
+        return this._infrastructure.getCommonTimetableEntries(
+          fromStation,
+          timetable1,
+          timetable2
+        );
+      },
       getTrainsInArea: (
         area
       ): ReturnType<DecisionModuleAPI["getTrainsInArea"]> => {

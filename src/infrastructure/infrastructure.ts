@@ -9,7 +9,8 @@ import {
   Station,
   Train,
   Timetable,
-  Vertex
+  Vertex,
+  TimetableEntry
 } from "./types";
 
 import { parseInfrastructure, ParseInfrastructureXML } from "./parser";
@@ -76,6 +77,8 @@ const kindToPropName = new Map([
   ["vertex", "vertexes"]
 ] as const);
 
+export type CommonTimetableEntry = [TimetableEntry, TimetableEntry];
+
 export class Infrastructure implements InfrastructureData {
   public constructor(
     public readonly itineraries: ReadonlyMap<string, Itinerary>,
@@ -113,6 +116,41 @@ export class Infrastructure implements InfrastructureData {
     }
 
     return value;
+  }
+
+  public getCommonTimetableEntries(
+    fromStation: Station,
+    timetable1: Timetable,
+    timetable2: Timetable
+  ): CommonTimetableEntry[] {
+    const timetable1FirstEntryIndex = timetable1.entries.findIndex(
+      (entry): boolean => entry.station === fromStation
+    );
+    const timetable2FirstEntryIndex = timetable2.entries.findIndex(
+      (entry): boolean => entry.station === fromStation
+    );
+
+    if (timetable1FirstEntryIndex === -1 || timetable2FirstEntryIndex === -1) {
+      return [];
+    }
+
+    const commonEntries: CommonTimetableEntry[] = [];
+    for (
+      let i1 = timetable1FirstEntryIndex, i2 = timetable2FirstEntryIndex;
+      i1 < timetable1.entries.length && i2 < timetable1.entries.length;
+      ++i1, ++i2
+    ) {
+      const entry1 = timetable1.entries[i1];
+      const entry2 = timetable2.entries[i2];
+
+      if (entry1.station !== entry2.station) {
+        break;
+      }
+
+      commonEntries.push([entry1, entry2]);
+    }
+
+    return commonEntries;
   }
 
   public getTimetableDuration(
