@@ -1,4 +1,4 @@
-import { DecisionModule } from "../";
+import { DecisionModule, Station } from "../";
 
 import { getConsecutivePairs } from "../../util";
 
@@ -7,6 +7,7 @@ export const decisionModule: DecisionModule = {
   newTrainEnteredOvertakingArea(
     {
       cancelOvertaking,
+      getCommonTimetableEntries,
       getTrainsDelayedArrivalAtStation,
       getTrainsInArea,
       planOvertaking
@@ -15,7 +16,7 @@ export const decisionModule: DecisionModule = {
   ): void {
     console.info();
 
-    const trainsOnItinerary = getTrainsInArea(overtakingArea);
+    const trainsInArea = getTrainsInArea(overtakingArea);
 
     console.info(
       "New train " +
@@ -26,23 +27,58 @@ export const decisionModule: DecisionModule = {
     );
     console.info(
       "Trains:",
-      trainsOnItinerary.map((value): string => value.train.trainID)
+      trainsInArea.map((value): string => value.train.trainID)
     );
 
-    const { next } = overtakingArea;
-    if (next.size === 0) {
-      return;
-    } else if (next.size > 1) {
-      console.error("TODO");
+    if (trainsInArea.length <= 1) {
+      console.info("Can't overtake with less than two trains.");
+      console.info();
+
       return;
     }
 
-    const nextStation = [...next][0].station;
+    const nextOvertakingOpportunityStations = new Set<Station>(
+      [...overtakingArea.next.values()].map(
+        (nextOvertakingArea): Station => nextOvertakingArea.station
+      )
+    );
 
+    console.info();
     for (const [{ train: train1 }, { train: train2 }] of getConsecutivePairs(
-      trainsOnItinerary
+      trainsInArea
     )) {
       console.info("Considering:", [train1.trainID, train2.trainID]);
+
+      const commonTimetableEntries = getCommonTimetableEntries(
+        overtakingArea.station,
+        train1.timetable,
+        train2.timetable
+      );
+
+      const commonStationIDs = commonTimetableEntries.map(
+        ([e1]): string => e1.station.stationID
+      );
+      console.info(
+        "Common stations:",
+        commonStationIDs.slice(0, 1),
+        "->",
+        commonStationIDs.slice(1)
+      );
+
+      if (commonTimetableEntries.length <= 1) {
+        console.info(
+          "No common stations after the overtaking point. Don't overtake."
+        );
+        console.info();
+
+        continue;
+      }
+
+      const nextStation =
+        commonTimetableEntries.find(([entry]): boolean =>
+          nextOvertakingOpportunityStations.has(entry.station)
+        )?.[0]?.station ??
+        commonTimetableEntries[commonTimetableEntries.length - 1][0].station;
 
       const train1DelayedArrival = getTrainsDelayedArrivalAtStation(
         train1,
@@ -57,11 +93,15 @@ export const decisionModule: DecisionModule = {
         console.info(
           "Overtake " + train1.trainID + " by " + train2.trainID + "."
         );
+        console.info();
+
         planOvertaking(train2, train1).catch((error): void => {
           console.error("Can't plan overtaking:", error);
         });
       } else {
         console.info("Don't overtake.");
+        console.info();
+
         cancelOvertaking(train2, train1).catch((error): void => {
           console.error("Can't plan overtaking:", error);
         });
