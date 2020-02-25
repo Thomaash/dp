@@ -1,6 +1,6 @@
 import { DecisionModule, Station } from "../";
 
-import { getConsecutivePairs } from "../../util";
+import { getAllOvertakingCandidates } from "../../util";
 
 export const decisionModule: DecisionModule = {
   name: "timetable-guess",
@@ -44,9 +44,10 @@ export const decisionModule: DecisionModule = {
     );
 
     console.info();
-    for (const [{ train: train1 }, { train: train2 }] of getConsecutivePairs(
-      trainsInArea
-    )) {
+    for (const [
+      { train: train1 },
+      { train: train2 }
+    ] of getAllOvertakingCandidates(trainsInArea)) {
       console.info("Considering:", [train1.trainID, train2.trainID]);
 
       const commonTimetableEntries = getCommonTimetableEntries(
