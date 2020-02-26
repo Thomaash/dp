@@ -111,11 +111,28 @@ function getOvertakingAreas(infrastructure: Infrastructure): OvertakingArea[] {
 /**
  * Mapped as inflow station -> overtaking station -> overtaking areas.
  */
+export type OvertakingAreasByStation = MapSet<Station, OvertakingArea>;
+
+/**
+ * Mapped as inflow station -> overtaking station -> overtaking areas.
+ */
 export type OvertakingAreasByStations = MapMapSet<
   Station | null,
   Station,
   OvertakingArea
 >;
+
+function getOvertakingAreasByStation(
+  overtakingAreas: readonly OvertakingArea[]
+): OvertakingAreasByStation {
+  const overtakingAreasByStation: OvertakingAreasByStation = new MapSet();
+
+  for (const oa of overtakingAreas) {
+    overtakingAreasByStation.get(oa.station).add(oa);
+  }
+
+  return overtakingAreasByStation;
+}
 
 function getOvertakingAreasByStations(
   overtakingAreas: readonly OvertakingArea[]
@@ -138,6 +155,7 @@ function getOvertakingAreasByStations(
 
 export interface OvertakingData {
   overtakingAreas: OvertakingArea[];
+  overtakingAreasByStation: OvertakingAreasByStation;
   overtakingAreasByStations: OvertakingAreasByStations;
 }
 
@@ -148,9 +166,11 @@ export function getOvertakingData(
   const overtakingAreasByStations = getOvertakingAreasByStations(
     overtakingAreas
   );
+  const overtakingAreasByStation = getOvertakingAreasByStation(overtakingAreas);
 
   return Object.freeze<OvertakingData>({
     overtakingAreas,
+    overtakingAreasByStation,
     overtakingAreasByStations
   });
 }
