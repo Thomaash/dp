@@ -45,9 +45,7 @@ export interface OvertakingArea {
   readonly exitVertex: Vertex;
   readonly inflowStations: ReadonlySet<Station>;
   readonly itineraries: ReadonlySet<Itinerary>;
-  readonly next: ReadonlySet<OvertakingArea>;
   readonly overtakingAreaID: string;
-  readonly previous: ReadonlySet<OvertakingArea>;
   readonly routes: ReadonlySet<Route>;
   readonly station: Station;
 }

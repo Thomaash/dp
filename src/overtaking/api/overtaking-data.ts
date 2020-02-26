@@ -6,7 +6,7 @@ import {
   Itinerary,
   Station
 } from "../../infrastructure";
-import { MapSet, RW, MapMapSet } from "../../util";
+import { MapSet, MapMapSet } from "../../util";
 import { expect } from "chai";
 
 function getOvertakingAreas(infrastructure: Infrastructure): OvertakingArea[] {
@@ -38,7 +38,7 @@ function getOvertakingAreas(infrastructure: Infrastructure): OvertakingArea[] {
     }, new MapSet());
 
   const overtakingAreas = [...overtakingItiniraries.entries()].map(
-    ([exitVertex, itineraries]): RW<OvertakingArea> => {
+    ([exitVertex, itineraries]): OvertakingArea => {
       const someItinerary = [...itineraries.values()][0];
       expect(
         someItinerary,
@@ -59,7 +59,7 @@ function getOvertakingAreas(infrastructure: Infrastructure): OvertakingArea[] {
         )
       );
 
-      const overtakingArea: RW<OvertakingArea> = {
+      const overtakingArea: OvertakingArea = {
         overtakingAreaID: [...itineraries.values()]
           .map((itinerary): string => itinerary.itineraryID.split(" --", 1)[0])
           .join(" + "),
@@ -85,25 +85,12 @@ function getOvertakingAreas(infrastructure: Infrastructure): OvertakingArea[] {
             .filter((inflowStation): boolean => inflowStation !== station)
         ),
         itineraries,
-        next: new Set(),
-        previous: new Set(),
         station
       };
       Object.freeze(overtakingArea);
       return overtakingArea;
     }
   );
-
-  for (const oa1 of overtakingAreas) {
-    for (const oa2 of overtakingAreas) {
-      if (oa1.entryVertexes.has(oa2.exitVertex)) {
-        oa1.previous.add(oa2);
-      }
-      if (oa2.entryVertexes.has(oa1.exitVertex)) {
-        oa1.next.add(oa2);
-      }
-    }
-  }
 
   return overtakingAreas;
 }
