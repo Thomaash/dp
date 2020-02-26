@@ -2,6 +2,7 @@ import { Infrastructure, Train, Station } from "../../infrastructure";
 import { TrainTracker } from "../../train-tracker";
 import { DecisionModuleAPI, OvertakingArea } from "../api-public";
 import { TrainOvertaking } from "../train-overtaking";
+import { OvertakingData } from "./overtaking-data";
 
 export class DecisionModuleAPIFactory {
   private readonly _apiBase: Omit<
@@ -11,6 +12,7 @@ export class DecisionModuleAPIFactory {
 
   public constructor(
     private readonly _infrastructure: Infrastructure,
+    private readonly _overtakingData: OvertakingData,
     private readonly _tracker: TrainTracker,
     private readonly _trainOvertaking: TrainOvertaking
   ) {
@@ -107,6 +109,19 @@ export class DecisionModuleAPIFactory {
         area
       ): ReturnType<DecisionModuleAPI["getTrainsInArea"]> => {
         return this._tracker.getTrainsInAreaInOrder(area);
+      },
+      getOvertakingAreasByStation: (
+        station
+      ): ReturnType<DecisionModuleAPI["getOvertakingAreasByStation"]> => {
+        return this._overtakingData.overtakingAreasByStation.get(station);
+      },
+      getOvertakingAreasByStations: (
+        inflowStation,
+        station
+      ): ReturnType<DecisionModuleAPI["getOvertakingAreasByStations"]> => {
+        return this._overtakingData.overtakingAreasByStations
+          .get(inflowStation)
+          .get(station);
       }
     };
     Object.freeze(this._apiBase);

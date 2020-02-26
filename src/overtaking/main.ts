@@ -38,7 +38,8 @@ export function overtaking({
   const trainOvertaking = new TrainOvertaking(infrastructure, otapi);
   const cleanupCallbacks: (() => void)[] = [];
 
-  const { overtakingAreas } = getOvertakingData(infrastructure);
+  const overtakingData = getOvertakingData(infrastructure);
+  const { overtakingAreas } = overtakingData;
 
   const tracker = new TrainTracker(
     otapi,
@@ -49,6 +50,7 @@ export function overtaking({
 
   const decisionModuleAPIFactory = new DecisionModuleAPIFactory(
     infrastructure,
+    overtakingData,
     tracker,
     trainOvertaking
   );

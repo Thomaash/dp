@@ -31,6 +31,12 @@ export interface DecisionModuleAPI {
     timetable1: Timetable,
     timetable2: Timetable
   ): CommonTimetableEntry[];
+
+  getOvertakingAreasByStation(station: Station): ReadonlySet<OvertakingArea>;
+  getOvertakingAreasByStations(
+    inflowStation: Station | null,
+    station: Station
+  ): ReadonlySet<OvertakingArea>;
 }
 
 export interface OvertakingArea {
