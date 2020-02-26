@@ -47,6 +47,12 @@ function getOvertakingAreas(infrastructure: Infrastructure): OvertakingArea[] {
         ).to.equal(station);
       }
 
+      const routes = new Set<Route>(
+        [...itineraries.values()].flatMap(
+          (itinerary): readonly Route[] => itinerary.routes
+        )
+      );
+
       const overtakingArea: RW<OvertakingArea> = {
         overtakingAreaID: [...itineraries.values()]
           .map((itinerary): string => itinerary.itineraryID.split(" --", 1)[0])
@@ -66,6 +72,11 @@ function getOvertakingAreas(infrastructure: Infrastructure): OvertakingArea[] {
           [...itineraries.values()].flatMap(
             (itinerary): readonly Route[] => itinerary.routes
           )
+        ),
+        inflowStations: new Set<Station>(
+          [...routes.values()]
+            .flatMap((route): readonly Station[] => route.stations)
+            .filter((inflowStation): boolean => inflowStation !== station)
         ),
         itineraries,
         next: new Set(),
