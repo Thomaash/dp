@@ -1,6 +1,6 @@
 import { DecisionModule, Station } from "../";
 
-import { getAllOvertakingCandidates } from "../../util";
+import { getAllOvertakingCandidates, getConsecutivePairs } from "../../util";
 
 export const decisionModule: DecisionModule = {
   name: "timetable-guess",
@@ -8,6 +8,7 @@ export const decisionModule: DecisionModule = {
     {
       cancelOvertaking,
       getCommonTimetableEntries,
+      getOvertakingAreasByStations,
       getTrainsDelayedArrivalAtStation,
       getTrainsInArea,
       planOvertaking
@@ -37,12 +38,6 @@ export const decisionModule: DecisionModule = {
       return;
     }
 
-    const nextOvertakingOpportunityStations = new Set<Station>(
-      [...overtakingArea.next.values()].map(
-        (nextOvertakingArea): Station => nextOvertakingArea.station
-      )
-    );
-
     console.info();
     for (const [
       { train: train1 },
@@ -55,10 +50,13 @@ export const decisionModule: DecisionModule = {
         train1.timetable,
         train2.timetable
       );
-
-      const commonStationIDs = commonTimetableEntries.map(
-        ([e1]): string => e1.station.stationID
+      const commonStations = commonTimetableEntries.map(
+        ([{ station }]): Station => station
       );
+      const commonStationIDs = commonStations.map(
+        (station): string => station.stationID
+      );
+
       console.info(
         "Common stations:",
         commonStationIDs.slice(0, 1),
@@ -76,10 +74,18 @@ export const decisionModule: DecisionModule = {
       }
 
       const nextStation =
-        commonTimetableEntries.find(([entry]): boolean =>
-          nextOvertakingOpportunityStations.has(entry.station)
-        )?.[0]?.station ??
-        commonTimetableEntries[commonTimetableEntries.length - 1][0].station;
+        getConsecutivePairs(commonStations).find(
+          ([inflowStation, overtakingStation]): boolean => {
+            const nextOvertakingAreas = getOvertakingAreasByStations(
+              inflowStation,
+              overtakingStation
+            );
+
+            return !!nextOvertakingAreas.size;
+          }
+        )?.[1] ?? commonStations[commonStations.length - 1];
+
+      console.info("Next overtaking station:", [nextStation.stationID]);
 
       const train1DelayedArrival = getTrainsDelayedArrivalAtStation(
         train1,
