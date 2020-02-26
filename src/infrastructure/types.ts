@@ -13,7 +13,7 @@ export interface TimetableEntry {
 
 export interface Timetable {
   readonly trainID: string;
-  readonly entries: TimetableEntry[];
+  readonly entries: readonly TimetableEntry[];
 }
 
 export interface Station {
@@ -30,8 +30,9 @@ export interface Vertex {
 export interface Route {
   readonly length: number;
   readonly routeID: string;
+  readonly stationAreas: readonly Station[];
   readonly stations: readonly Station[];
-  readonly vertexes: Vertex[];
+  readonly vertexes: readonly Vertex[];
 }
 
 export interface Path {
@@ -39,7 +40,7 @@ export interface Path {
   readonly pathID: string;
   readonly routes: readonly Route[];
   readonly stations: readonly Station[];
-  readonly vertexes: Vertex[];
+  readonly vertexes: readonly Vertex[];
 }
 
 export interface Itinerary {
@@ -49,7 +50,7 @@ export interface Itinerary {
   readonly paths: readonly Path[];
   readonly routes: readonly Route[];
   readonly stations: readonly Station[];
-  readonly vertexes: Vertex[];
+  readonly vertexes: readonly Vertex[];
 }
 
 export interface Train {

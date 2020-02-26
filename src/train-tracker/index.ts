@@ -6,7 +6,7 @@ import {
   Train,
   Route
 } from "../infrastructure";
-import { MapSet, haveIntersection, findAnyIntersectionValue } from "../util";
+import { MapSet, haveIntersection } from "../util";
 import { Bug } from "../util";
 
 export type Report = EventPayloads["trainPositionReport"];
@@ -23,8 +23,10 @@ export type TrainHandler = (payload: {
 }) => void;
 
 export interface Area {
-  readonly itineraries?: Iterable<Itinerary>;
-  readonly routes: Iterable<Route>;
+  readonly areaID: string;
+  readonly entryRoutes: ReadonlySet<Route>;
+  readonly exitRoutes: ReadonlySet<Route>;
+  readonly routes: ReadonlySet<Route>;
 }
 
 export class TrainTracker {
@@ -60,10 +62,7 @@ export class TrainTracker {
     private readonly _infrastructure: Infrastructure,
     areas: Iterable<Area> = []
   ) {
-    this._areas = new Set<Area>([
-      ...this._infrastructure.itineraries.values(),
-      ...areas
-    ]);
+    this._areas = new Set<Area>(areas);
 
     for (const itinerary of this._infrastructure.itineraries.values()) {
       for (const { routeID } of itinerary.routes) {
@@ -72,9 +71,9 @@ export class TrainTracker {
     }
 
     for (const area of this._areas) {
-      this._areaRoutes.set(area, new Set(area.routes));
+      this._areaRoutes.set(area, new Set(area.entryRoutes));
 
-      for (const { routeID } of area.routes) {
+      for (const { routeID } of area.entryRoutes) {
         this._areasByRouteID.get(routeID).add(area);
       }
     }
@@ -101,16 +100,9 @@ export class TrainTracker {
    * area is first.
    *
    * @remarks
-   * In case of multiple itineraries per area this assumes but doesn't check
-   * that all the itineraries of the area end in the same point or that it makes
-   * sense in some way to compare the distance from the end of each individual
-   * itinerary in the area.
-   *
-   * The position is from the end of the itinerary.
+   * The position is from the end of the area.
    */
   public getTrainsInAreaInOrder(area: Area): TrainPositionInArea[] {
-    const itinerariesInArea = new Set<Area>(area.itineraries ?? [area]);
-
     return [...this._trainsInArea.get(area).values()]
       .map(
         (train): TrainPositionInArea => {
@@ -121,16 +113,6 @@ export class TrainTracker {
             throw new Bug(`Couldn't find last route of ${train.trainID}. `);
           }
 
-          const itinerary = findAnyIntersectionValue<Itinerary>(
-            this._itinerariesByRouteID.get(route.routeID),
-            itinerariesInArea
-          );
-          if (itinerary == null) {
-            throw new Bug(
-              `Couldn't find any itinerary for the route ${route.routeID} in given area. `
-            );
-          }
-
           // The reports arrive with some delay. It's possible we don't have any
           // or that the report we do have is not on the itinerary yet. If the
           // train is on this itinerary but we don't have a report yet assume
@@ -138,15 +120,20 @@ export class TrainTracker {
           const routeOffset =
             report && report.routeID === route.routeID ? report.routeOffset : 0;
 
+          const distanceToEnd = this._infrastructure.getShortestWayFromRouteToAnyRoute(
+            route,
+            area.exitRoutes,
+            routeOffset
+          ).length;
+
+          // If the train can't get to any exit route of the area it is assumed
+          // it already reached a point where it leaves the area.
+          const position =
+            distanceToEnd === Number.POSITIVE_INFINITY ? 0 : distanceToEnd;
+
           return {
             train,
-            position:
-              itinerary.length -
-              (this._infrastructure.getItineraryOffset(
-                itinerary,
-                route.routeID,
-                routeOffset
-              ) ?? 0)
+            position
           };
         }
       )
@@ -279,6 +266,34 @@ export class TrainTracker {
     }
   }
 
+  private _enterArea(
+    train: Train,
+    area: Area,
+    route: Route,
+    time: number
+  ): () => void {
+    console.log(`Train ${train.trainID} entered area ${area.areaID}.`);
+    this._trainsInArea.get(area).add(train);
+
+    return (): void => {
+      this._emit("train-entered-area", area, train, route, time);
+    };
+  }
+
+  private _leaveArea(
+    train: Train,
+    area: Area,
+    route: Route,
+    time: number
+  ): () => void {
+    console.log(`Train ${train.trainID} left area ${area.areaID}.`);
+    this._trainsInArea.get(area).delete(train);
+
+    return (): void => {
+      this._emit("train-left-area", area, train, route, time);
+    };
+  }
+
   private _handleTrainCreated(
     frequency: number,
     _name: string,
@@ -325,17 +340,14 @@ export class TrainTracker {
     const route = this._infrastructure.getOrThrow("route", routeID);
     const train = this._infrastructure.getOrThrow("train", trainID);
 
-    this._trainRoutes.get(trainID).add(route);
     this._lastRoutes.set(trainID, route);
+    this._trainRoutes.get(trainID).add(route);
 
     for (const area of this._areasByRouteID.get(routeID)) {
       const trainsInArea = this._trainsInArea.get(area);
 
       if (!trainsInArea.has(train)) {
-        trainsInArea.add(train);
-        emits.push((): void => {
-          this._emit("train-entered-area", area, train, route, time);
-        });
+        emits.push(this._enterArea(train, area, route, time));
       }
     }
 
@@ -357,13 +369,11 @@ export class TrainTracker {
     trainRoutes.delete(route);
 
     for (const area of this._areasByRouteID.get(routeID)) {
-      if (!haveIntersection(trainRoutes, this._areaRoutes.get(area))) {
-        this._trainsInArea.get(area).delete(train);
-
-        emits.push((): void => {
-          this._emit("train-left-area", area, train, route, time);
-        });
+      if (haveIntersection(trainRoutes, area.routes)) {
+        continue;
       }
+
+      emits.push(this._leaveArea(train, area, route, time));
     }
 
     for (const emit of emits) {

@@ -1,6 +1,8 @@
 import { promisify } from "util";
 import { readFile as readFileCallback } from "fs";
 
+import { PriorityQueue } from "typescript-collections";
+
 import {
   InfrastructureData,
   Itinerary,
@@ -14,6 +16,7 @@ import {
 } from "./types";
 
 import { parseInfrastructure, ParseInfrastructureXML } from "./parser";
+import { MapSet } from "../util";
 
 const readFile = promisify(readFileCallback);
 
@@ -80,6 +83,8 @@ const kindToPropName = new Map([
 export type CommonTimetableEntry = [TimetableEntry, TimetableEntry];
 
 export class Infrastructure implements InfrastructureData {
+  private readonly _vertexToRoutes = new MapSet<Vertex, Route>();
+
   public constructor(
     public readonly itineraries: ReadonlyMap<string, Itinerary>,
     public readonly itinerariesLength: number,
@@ -92,7 +97,11 @@ export class Infrastructure implements InfrastructureData {
     public readonly timetables: ReadonlyMap<string, Timetable>,
     public readonly trains: ReadonlyMap<string, Train>,
     public readonly vertexes: ReadonlyMap<string, Vertex>
-  ) {}
+  ) {
+    for (const route of routes.values()) {
+      this._vertexToRoutes.get(route.vertexes[0]).add(route);
+    }
+  }
 
   public getOrThrow(kind: "itinerary", key: string): Itinerary;
   public getOrThrow(kind: "path", key: string): Path;
@@ -248,5 +257,94 @@ export class Infrastructure implements InfrastructureData {
     return train.timetable.entries.find(
       (entry): boolean => entry.station.stationID === stationID
     )?.departure;
+  }
+
+  public getShortestWayFromRouteToAnyRoute(
+    startRoute: Route,
+    endRoutes: ReadonlySet<Route>,
+    startRouteOffset = 0
+  ): { routes: Route[]; length: number } {
+    console.log("from", [startRoute.routeID]);
+    console.log(
+      "to",
+      JSON.stringify([...endRoutes].map((route): string => route.routeID))
+    );
+    console.log("start");
+    console.time("done");
+
+    type Item = {
+      endRoute: Route;
+      length: number;
+      routes: ReadonlySet<Route>;
+    };
+    const queue = new PriorityQueue<Item>(
+      (a, b): number => a.length - b.length
+    );
+    queue.enqueue({
+      endRoute: startRoute,
+      length: startRoute.length - startRouteOffset,
+      routes: new Set([startRoute])
+    });
+
+    const visited = new Set<string>();
+
+    let item: Item | undefined;
+    while ((item = queue.dequeue())) {
+      if (
+        visited.has(
+          JSON.stringify([...item.routes].map((route): string => route.routeID))
+        )
+      ) {
+        console.log(
+          "dupe",
+          JSON.stringify([...item.routes].map((route): string => route.routeID))
+        );
+      }
+      visited.add(
+        JSON.stringify([...item.routes].map((route): string => route.routeID))
+      );
+
+      if (endRoutes.has(item.endRoute)) {
+        console.timeEnd("done");
+        return {
+          length: item.length,
+          routes: [...item.routes]
+        };
+      }
+
+      const lastRoute = item.endRoute;
+      const nextStartVertex = lastRoute.vertexes[lastRoute.vertexes.length - 1];
+      const nextRoutes = this._vertexToRoutes.get(nextStartVertex);
+
+      for (const nextRoute of nextRoutes) {
+        if (item.routes.has(nextRoute)) {
+          continue;
+        }
+        // console.log(
+        //   item.length,
+        //   nextRoute.length,
+        //   item.routes.size,
+        //   [...item.routes][item.routes.size - 1]?.routeID,
+        //   nextRoute.routeID
+        // );
+
+        const length = item.length + nextRoute.length;
+        // const routes = new Set([...item.routes, nextRoute]);
+        const routes = new Set(item.routes);
+        routes.add(nextRoute);
+
+        queue.enqueue({
+          endRoute: nextRoute,
+          length,
+          routes
+        });
+      }
+    }
+
+    console.timeEnd("done");
+    return {
+      length: Number.POSITIVE_INFINITY,
+      routes: []
+    };
   }
 }

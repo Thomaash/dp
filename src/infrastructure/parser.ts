@@ -392,9 +392,23 @@ export async function parseInfrastructure(
 
           return acc + distance;
         }, 0),
+        stationAreas: filterChildren(xmlRoute, "vertex", "stationvertex")
+          .filter((xmlVertex): boolean => xmlVertex.$.station !== "")
+          .map(
+            (xmlVertex): Station => {
+              const stationID = xmlVertex.$.station;
+
+              const station = stations.get(stationID);
+              if (station == null) {
+                throw new Error(`Can't find any station called ${stationID}.`);
+              }
+
+              return station;
+            }
+          ),
         stations: filterChildren(xmlRoute, "stationvertex").map(
-          (stationVertex): Station => {
-            const stationID = stationVertex.$.station;
+          (xmlStationVertex): Station => {
+            const stationID = xmlStationVertex.$.station;
 
             const station = stations.get(stationID);
             if (station == null) {

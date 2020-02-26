@@ -6,7 +6,7 @@ import {
   Itinerary,
   Station
 } from "../../infrastructure";
-import { MapSet, MapMapSet } from "../../util";
+import { MapSet, MapMapSet, Bug } from "../../util";
 import { expect } from "chai";
 
 function getOvertakingAreas(infrastructure: Infrastructure): OvertakingArea[] {
@@ -40,55 +40,87 @@ function getOvertakingAreas(infrastructure: Infrastructure): OvertakingArea[] {
   const overtakingAreas = [...overtakingItiniraries.entries()].map(
     ([exitVertex, itineraries]): OvertakingArea => {
       const someItinerary = [...itineraries.values()][0];
-      expect(
-        someItinerary,
-        "This is a bug in the app. If you see this report it and include the stack trace, please."
-      ).to.exist;
+      if (someItinerary == null) {
+        throw new Bug(
+          "Impossible happend: " +
+            "An overtaking area without itineraries was found."
+        );
+      }
 
-      const station = someItinerary.stations[someItinerary.stations.length - 1];
+      const outflowStation =
+        someItinerary.stations[someItinerary.stations.length - 1];
       for (const itinerary of itineraries) {
         expect(
           itinerary.stations[itinerary.stations.length - 1],
           "All overtaking itineraries in the same overtaking area have to go through the same final station."
-        ).to.equal(station);
+        ).to.equal(outflowStation);
       }
 
-      const routes = new Set<Route>(
+      const entryRoutes = new Set<Route>(
         [...itineraries.values()].flatMap(
           (itinerary): readonly Route[] => itinerary.routes
         )
       );
 
-      const overtakingArea: OvertakingArea = {
-        overtakingAreaID: [...itineraries.values()]
-          .map((itinerary): string => itinerary.itineraryID.split(" --", 1)[0])
-          .join(" + "),
-        entryVertexes: new Set<Vertex>(
-          [...itineraries.values()].map(
-            (itinerary): Vertex => itinerary.vertexes[0]
+      const overtakingAreaID = [...itineraries.values()]
+        .map((itinerary): string => itinerary.itineraryID.split(" --", 1)[0])
+        .join(" + ");
+      const areaID = overtakingAreaID;
+
+      const entryVertexes = new Set<Vertex>(
+        [...itineraries.values()].map(
+          (itinerary): Vertex => itinerary.vertexes[0]
+        )
+      );
+
+      const exitRoutes = new Set<Route>(
+        [...itineraries.values()].map(
+          (itinerary): Route => itinerary.routes[itinerary.routes.length - 1]
+        )
+      );
+
+      const stations = new Set<Station>(
+        [...entryRoutes.values()].flatMap(
+          (route): readonly Station[] => route.stations
+        )
+      );
+
+      const stationAreas = new Set<Station>(
+        [...entryRoutes.values()].flatMap(
+          (route): readonly Station[] => route.stationAreas
+        )
+      );
+
+      const inflowStations = new Set<Station>(
+        [...stations.values()].filter(
+          (inflowStation): boolean => inflowStation !== outflowStation
+        )
+      );
+
+      const routes = new Set<Route>([
+        ...entryRoutes.values(),
+        ...[...stations.values()].flatMap((station): readonly Route[] =>
+          [...infrastructure.routes.values()].filter((route): boolean =>
+            route.stations.includes(station)
           )
-        ),
+        )
+      ]);
+
+      return Object.freeze<OvertakingArea>({
+        areaID,
+        entryRoutes,
+        entryVertexes,
+        exitRoutes,
         exitVertex,
-        exitRoutes: new Set<Route>(
-          [...itineraries.values()].map(
-            (itinerary): Route => itinerary.routes[itinerary.routes.length - 1]
-          )
-        ),
-        routes: new Set<Route>(
-          [...itineraries.values()].flatMap(
-            (itinerary): readonly Route[] => itinerary.routes
-          )
-        ),
-        inflowStations: new Set<Station>(
-          [...routes.values()]
-            .flatMap((route): readonly Station[] => route.stations)
-            .filter((inflowStation): boolean => inflowStation !== station)
-        ),
+        inflowStations,
         itineraries,
-        station
-      };
-      Object.freeze(overtakingArea);
-      return overtakingArea;
+        leaveOnlyAfterDepartureFromStation: true,
+        outflowStation,
+        overtakingAreaID,
+        routes,
+        stationAreas,
+        stations
+      });
     }
   );
 
@@ -115,7 +147,7 @@ function getOvertakingAreasByStation(
   const overtakingAreasByStation: OvertakingAreasByStation = new MapSet();
 
   for (const oa of overtakingAreas) {
-    overtakingAreasByStation.get(oa.station).add(oa);
+    overtakingAreasByStation.get(oa.outflowStation).add(oa);
   }
 
   return overtakingAreasByStation;
@@ -127,7 +159,7 @@ function getOvertakingAreasByStations(
   const overtakingAreasByStations: OvertakingAreasByStations = new MapMapSet();
 
   for (const oa of overtakingAreas) {
-    const finalStation = oa.station;
+    const finalStation = oa.outflowStation;
 
     for (const inflowStation of oa.inflowStations) {
       overtakingAreasByStations

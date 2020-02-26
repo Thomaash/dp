@@ -39,15 +39,19 @@ export interface DecisionModuleAPI {
   ): ReadonlySet<OvertakingArea>;
 }
 
-export interface OvertakingArea {
+export interface OvertakingArea extends Area {
+  readonly entryRoutes: ReadonlySet<Route>;
   readonly entryVertexes: ReadonlySet<Vertex>;
   readonly exitRoutes: ReadonlySet<Route>;
   readonly exitVertex: Vertex;
   readonly inflowStations: ReadonlySet<Station>;
   readonly itineraries: ReadonlySet<Itinerary>;
+  readonly leaveOnlyAfterDepartureFromStation: boolean;
+  readonly outflowStation: Station;
   readonly overtakingAreaID: string;
   readonly routes: ReadonlySet<Route>;
-  readonly station: Station;
+  readonly stationAreas: ReadonlySet<Station>;
+  readonly stations: ReadonlySet<Station>;
 }
 
 export interface OvertakingDecision {

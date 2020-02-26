@@ -67,7 +67,7 @@ export class TrainOvertaking {
   }
 
   async planOvertaking(
-    { exitRoutes, station }: OvertakingArea,
+    { exitRoutes, outflowStation: station }: OvertakingArea,
     overtaking: Train,
     waiting: Train
   ): Promise<void> {
@@ -101,7 +101,7 @@ export class TrainOvertaking {
   }
 
   async cancelOvertaking(
-    { exitRoutes, station }: OvertakingArea,
+    { exitRoutes, outflowStation: station }: OvertakingArea,
     overtaking: Train,
     waiting: Train
   ): Promise<void> {
@@ -145,7 +145,7 @@ export class TrainOvertaking {
   }
 
   async releaseTrains(
-    { exitRoutes, station }: OvertakingArea,
+    { exitRoutes, outflowStation: station }: OvertakingArea,
     overtaking: Train
   ): Promise<void> {
     const blockedByOvertaking = this._blocking.unblockAll({

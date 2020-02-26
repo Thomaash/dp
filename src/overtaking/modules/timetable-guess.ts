@@ -28,7 +28,13 @@ export const decisionModule: DecisionModule = {
     );
     console.info(
       "Trains:",
-      trainsInArea.map((value): string => value.train.trainID)
+      trainsInArea
+        .slice()
+        .reverse()
+        .map(({ train, position }): [string, number] => [
+          train.trainID,
+          position
+        ])
     );
 
     if (trainsInArea.length <= 1) {
@@ -46,7 +52,7 @@ export const decisionModule: DecisionModule = {
       console.info("Considering:", [train1.trainID, train2.trainID]);
 
       const commonTimetableEntries = getCommonTimetableEntries(
-        overtakingArea.station,
+        overtakingArea.outflowStation,
         train1.timetable,
         train2.timetable
       );

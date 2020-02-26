@@ -30,6 +30,7 @@ export default [
       typescript2({ tsconfig: "./tsconfig.rollup.json" }),
       commonjs({
         namedExports: {
+          "typescript-collections": ["PriorityQueue"],
           chai: ["expect"]
         }
       })
