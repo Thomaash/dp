@@ -1,6 +1,12 @@
 import { OvertakingArea } from "../api-public";
-import { Infrastructure, Route, Vertex, Itinerary } from "../../infrastructure";
-import { MapSets, RW } from "../../util";
+import {
+  Infrastructure,
+  Route,
+  Vertex,
+  Itinerary,
+  Station
+} from "../../infrastructure";
+import { MapSet, RW, MapMapSet } from "../../util";
 import { expect } from "chai";
 
 function getOvertakingAreas(infrastructure: Infrastructure): OvertakingArea[] {
@@ -102,14 +108,49 @@ function getOvertakingAreas(infrastructure: Infrastructure): OvertakingArea[] {
   return overtakingAreas;
 }
 
+/**
+ * Mapped as inflow station -> overtaking station -> overtaking areas.
+ */
+export type OvertakingAreasByStations = MapMapSet<
+  Station | null,
+  Station,
+  OvertakingArea
+>;
+
+function getOvertakingAreasByStations(
+  overtakingAreas: readonly OvertakingArea[]
+): OvertakingAreasByStations {
+  const overtakingAreasByStations: OvertakingAreasByStations = new MapMapSet();
+
+  for (const oa of overtakingAreas) {
+    const finalStation = oa.station;
+
+    for (const inflowStation of oa.inflowStations) {
+      overtakingAreasByStations
+        .get(inflowStation)
+        .get(finalStation)
+        .add(oa);
+    }
+  }
+
+  return overtakingAreasByStations;
+}
+
 export interface OvertakingData {
   overtakingAreas: OvertakingArea[];
+  overtakingAreasByStations: OvertakingAreasByStations;
 }
 
 export function getOvertakingData(
   infrastructure: Infrastructure
 ): OvertakingData {
   const overtakingAreas = getOvertakingAreas(infrastructure);
+  const overtakingAreasByStations = getOvertakingAreasByStations(
+    overtakingAreas
+  );
 
-  return Object.freeze<OvertakingData>({ overtakingAreas });
+  return Object.freeze<OvertakingData>({
+    overtakingAreas,
+    overtakingAreasByStations
+  });
 }
