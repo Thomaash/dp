@@ -1,6 +1,6 @@
 import { OvertakingArea } from "../api-public";
 import { Infrastructure, Route, Vertex, Itinerary } from "../../infrastructure";
-import { MapOfSets, RW } from "../../util";
+import { MapSets, RW } from "../../util";
 import { expect } from "chai";
 
 function getOvertakingAreas(infrastructure: Infrastructure): OvertakingArea[] {
@@ -22,14 +22,14 @@ function getOvertakingAreas(infrastructure: Infrastructure): OvertakingArea[] {
         throw new Error(`No vertexes were found in ${itineraryID}.`);
       }
     })
-    .reduce<MapOfSets<Vertex, Itinerary>>((acc, itinerary): MapOfSets<
+    .reduce<MapSet<Vertex, Itinerary>>((acc, itinerary): MapSet<
       Vertex,
       Itinerary
     > => {
       acc.get(itinerary.vertexes[itinerary.vertexes.length - 1]).add(itinerary);
 
       return acc;
-    }, new MapOfSets());
+    }, new MapSet());
 
   const overtakingAreas = [...overtakingItiniraries.entries()].map(
     ([exitVertex, itineraries]): RW<OvertakingArea> => {

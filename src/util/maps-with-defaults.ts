@@ -24,7 +24,7 @@ export class MapWithDefaultValue<K, V> extends Map<K, V> {
   }
 }
 
-export class MapOfSets<K, V> extends Map<K, Set<V>> {
+export class MapSet<K, V> extends Map<K, Set<V>> {
   public constructor() {
     super();
   }
@@ -35,6 +35,23 @@ export class MapOfSets<K, V> extends Map<K, Set<V>> {
       return existing;
     } else {
       const newSet = new Set<V>();
+      super.set(key, newSet);
+      return newSet;
+    }
+  }
+}
+
+export class MapMapSet<K1, K2, V> extends Map<K1, MapSet<K2, V>> {
+  public constructor() {
+    super();
+  }
+
+  public get(key: K1): MapSet<K2, V> {
+    const existing = super.get(key);
+    if (typeof existing !== "undefined") {
+      return existing;
+    } else {
+      const newSet = new MapSet<K2, V>();
       super.set(key, newSet);
       return newSet;
     }

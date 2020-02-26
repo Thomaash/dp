@@ -6,7 +6,7 @@ import {
   Train,
   Route
 } from "../infrastructure";
-import { MapOfSets, haveIntersection, findAnyIntersectionValue } from "../util";
+import { MapSet, haveIntersection, findAnyIntersectionValue } from "../util";
 import { Bug } from "../util";
 
 export type Report = EventPayloads["trainPositionReport"];
@@ -30,21 +30,21 @@ export interface Area {
 export class TrainTracker {
   private readonly _cleanupCallbacks: (() => void)[] = [];
 
-  private readonly _areaRoutes = new MapOfSets<Area, Route>();
+  private readonly _areaRoutes = new MapSet<Area, Route>();
   private readonly _areas: ReadonlySet<Area>;
-  private readonly _areasByRouteID = new MapOfSets<string, Area>();
-  private readonly _itinerariesByRouteID = new MapOfSets<string, Itinerary>();
+  private readonly _areasByRouteID = new MapSet<string, Area>();
+  private readonly _itinerariesByRouteID = new MapSet<string, Itinerary>();
 
   private readonly _lastRoutes = new Map<string, Route>();
   private readonly _lastStations = new Map<string, Station>();
   private readonly _reports = new Map<string, Report>();
-  private readonly _trainRoutes = new MapOfSets<string, Route>();
+  private readonly _trainRoutes = new MapSet<string, Route>();
 
-  private readonly _trainsInArea = new MapOfSets<Area, Train>();
+  private readonly _trainsInArea = new MapSet<Area, Train>();
 
   private readonly _listeners = {
-    "train-entered-area": new MapOfSets<Area, TrainHandler>(),
-    "train-left-area": new MapOfSets<Area, TrainHandler>()
+    "train-entered-area": new MapSet<Area, TrainHandler>(),
+    "train-left-area": new MapSet<Area, TrainHandler>()
   };
 
   public get size(): number {
