@@ -11,6 +11,7 @@
     "playground:inspect": "TS_NODE_PROJECT=tsconfig.start.json node -r ts-node/register --inspect-brk playground.ts",
     "start": "node -r source-map-support/register dist/index.js",
     "start-from-sources": "ts-node --project tsconfig.start.json src/index.ts",
+    "start:inspect": "node --inspect-brk -r source-map-support/register dist/index.js",
     "test": "run-s type-check lint unit",
     "type-check": "tsc --noemit",
     "unit": "NODE_ENV=test mocha -p tsconfig.start.json --exit"
@@ -25,9 +26,7 @@
     "url": "https://github.com/Thomaash/dp/issues"
   },
   "homepage": "https://github.com/Thomaash/dp#readme",
-  "files": [
-    "dist"
-  ],
+  "files": ["dist"],
   "dependencies": {
     "body-parser": "^1.19.0",
     "express": "^4.17.1",
