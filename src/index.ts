@@ -14,7 +14,6 @@ import {
   randomizePortsInRunfile
 } from "./otapi";
 import { Deferred } from "./util";
-import { TrainTracker } from "./train-tracker";
 import { args } from "./cli";
 import { buildChunkLogger } from "./util";
 import { infrastructureFactory } from "./infrastructure";

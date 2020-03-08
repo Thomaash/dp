@@ -259,92 +259,67 @@ export class Infrastructure implements InfrastructureData {
     )?.departure;
   }
 
-  public getShortestWayFromRouteToAnyRoute(
-    startRoute: Route,
-    endRoutes: ReadonlySet<Route>,
-    startRouteOffset = 0
-  ): { routes: Route[]; length: number } {
-    console.log("from", [startRoute.routeID]);
-    console.log(
-      "to",
-      JSON.stringify([...endRoutes].map((route): string => route.routeID))
-    );
-    console.log("start");
-    console.time("done");
+  public computeDistanceMap(
+    allRoutes: Iterable<Route>,
+    zeroRoutes: ReadonlySet<Route>
+  ): Map<Route, number> {
+    const routesByVertex = new MapSet<Vertex, Route>();
+    for (const route of allRoutes) {
+      routesByVertex.get(route.vertexes[route.vertexes.length - 1]).add(route);
+    }
+
+    const distanceMap = new Map<Route, number>();
+
+    for (const route of zeroRoutes) {
+      distanceMap.set(route, route.length);
+    }
 
     type Item = {
-      endRoute: Route;
+      firstRoute: Route;
       length: number;
       routes: ReadonlySet<Route>;
     };
     const queue = new PriorityQueue<Item>(
       (a, b): number => a.length - b.length
     );
-    queue.enqueue({
-      endRoute: startRoute,
-      length: startRoute.length - startRouteOffset,
-      routes: new Set([startRoute])
-    });
-
-    const visited = new Set<string>();
+    for (const route of zeroRoutes.values()) {
+      queue.enqueue({
+        firstRoute: route,
+        length: route.length,
+        routes: new Set([route])
+      });
+    }
 
     let item: Item | undefined;
     while ((item = queue.dequeue())) {
-      if (
-        visited.has(
-          JSON.stringify([...item.routes].map((route): string => route.routeID))
-        )
-      ) {
-        console.log(
-          "dupe",
-          JSON.stringify([...item.routes].map((route): string => route.routeID))
-        );
-      }
-      visited.add(
-        JSON.stringify([...item.routes].map((route): string => route.routeID))
-      );
+      const nextStartVertex = item.firstRoute.vertexes[0];
+      const prevRoutes = routesByVertex.get(nextStartVertex);
 
-      if (endRoutes.has(item.endRoute)) {
-        console.timeEnd("done");
-        return {
-          length: item.length,
-          routes: [...item.routes]
-        };
-      }
-
-      const lastRoute = item.endRoute;
-      const nextStartVertex = lastRoute.vertexes[lastRoute.vertexes.length - 1];
-      const nextRoutes = this._vertexToRoutes.get(nextStartVertex);
-
-      for (const nextRoute of nextRoutes) {
-        if (item.routes.has(nextRoute)) {
+      for (const prevRoute of prevRoutes) {
+        if (item.routes.has(prevRoute)) {
+          // This route has already been visited.
           continue;
         }
-        // console.log(
-        //   item.length,
-        //   nextRoute.length,
-        //   item.routes.size,
-        //   [...item.routes][item.routes.size - 1]?.routeID,
-        //   nextRoute.routeID
-        // );
 
-        const length = item.length + nextRoute.length;
-        // const routes = new Set([...item.routes, nextRoute]);
-        const routes = new Set(item.routes);
-        routes.add(nextRoute);
+        const length = item.length + prevRoute.length;
+        if (
+          length >= (distanceMap.get(prevRoute) ?? Number.POSITIVE_INFINITY)
+        ) {
+          // Shorter way was already found.
+          continue;
+        }
+        distanceMap.set(prevRoute, length);
+
+        const routes = new Set([...item.routes, prevRoute]);
 
         queue.enqueue({
-          endRoute: nextRoute,
+          firstRoute: prevRoute,
           length,
           routes
         });
       }
     }
 
-    console.timeEnd("done");
-    return {
-      length: Number.POSITIVE_INFINITY,
-      routes: []
-    };
+    return distanceMap;
   }
 }

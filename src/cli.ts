@@ -14,7 +14,7 @@ const y = yargs
     type: "string"
   })
   .option("overtaking-default-module", {
-    default: "max-speed",
+    default: "timetable-guess",
     describe:
       "The decision module that will be used unless specified otherwise",
     required: false,

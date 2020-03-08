@@ -1,12 +1,6 @@
 import { EventPayloads, OTAPI } from "../otapi";
-import {
-  Infrastructure,
-  Itinerary,
-  Station,
-  Train,
-  Route
-} from "../infrastructure";
-import { MapSet, haveIntersection } from "../util";
+import { Infrastructure, Route, Station, Train } from "../infrastructure";
+import { MapSet, haveIntersection, MapMap } from "../util";
 import { Bug } from "../util";
 
 export type Report = EventPayloads["trainPositionReport"];
@@ -32,15 +26,17 @@ export interface Area {
 export class TrainTracker {
   private readonly _cleanupCallbacks: (() => void)[] = [];
 
-  private readonly _areaRoutes = new MapSet<Area, Route>();
-  private readonly _areas: ReadonlySet<Area>;
-  private readonly _areasByRouteID = new MapSet<string, Area>();
-  private readonly _itinerariesByRouteID = new MapSet<string, Itinerary>();
+  private readonly _areasByEntryRoute = new MapSet<Route, Area>();
+  private readonly _areasByRoute = new MapSet<Route, Area>();
+  private readonly _areasByExitRoute = new MapSet<Route, Area>();
 
-  private readonly _lastRoutes = new Map<string, Route>();
-  private readonly _lastStations = new Map<string, Station>();
-  private readonly _reports = new Map<string, Report>();
-  private readonly _trainRoutes = new MapSet<string, Route>();
+  private readonly _areas = new Set<Area>();
+  private readonly _distancesToEnd = new MapMap<Area, Route, number>();
+
+  private readonly _lastRoutes = new Map<Train, Route>();
+  private readonly _lastStations = new Map<Train, Station>();
+  private readonly _reports = new Map<Train, Report>();
+  private readonly _trainRoutes = new MapSet<Train, Route>();
 
   private readonly _trainsInArea = new MapSet<Area, Train>();
 
@@ -54,7 +50,7 @@ export class TrainTracker {
   }
 
   public get trainIDs(): string[] {
-    return [...this._reports.keys()];
+    return [...this._reports.values()].map((train): string => train.trainID);
   }
 
   public constructor(
@@ -62,37 +58,52 @@ export class TrainTracker {
     private readonly _infrastructure: Infrastructure,
     areas: Iterable<Area> = []
   ) {
-    this._areas = new Set<Area>(areas);
+    for (const area of areas) {
+      this._areas.add(area);
 
-    for (const itinerary of this._infrastructure.itineraries.values()) {
-      for (const { routeID } of itinerary.routes) {
-        this._itinerariesByRouteID.get(routeID).add(itinerary);
+      this._distancesToEnd.set(
+        area,
+        this._infrastructure.computeDistanceMap(area.routes, area.exitRoutes)
+      );
+
+      for (const route of area.entryRoutes) {
+        this._areasByEntryRoute.get(route).add(area);
+      }
+      for (const route of area.routes) {
+        this._areasByRoute.get(route).add(area);
+      }
+      for (const route of area.exitRoutes) {
+        this._areasByExitRoute.get(route).add(area);
       }
     }
-
-    for (const area of this._areas) {
-      this._areaRoutes.set(area, new Set(area.entryRoutes));
-
-      for (const { routeID } of area.entryRoutes) {
-        this._areasByRouteID.get(routeID).add(area);
-      }
-    }
   }
 
-  public getReport(trainID: string): Report | undefined {
-    return this._reports.get(trainID);
+  public getReport(train: Train | string): Report | undefined {
+    return this._reports.get(
+      typeof train === "string"
+        ? this._infrastructure.getOrThrow("train", train)
+        : train
+    );
   }
 
-  public getTrainsLastStation(trainID: string): Station | undefined {
-    return this._lastStations.get(trainID);
+  public getTrainsLastStation(train: Train | string): Station | undefined {
+    return this._lastStations.get(
+      typeof train === "string"
+        ? this._infrastructure.getOrThrow("train", train)
+        : train
+    );
   }
 
-  public getTrainsRoutes(trainID: string): ReadonlySet<Route> {
-    return this._trainRoutes.get(trainID);
+  public getTrainsRoutes(train: Train | string): ReadonlySet<Route> {
+    return this._trainRoutes.get(
+      typeof train === "string"
+        ? this._infrastructure.getOrThrow("train", train)
+        : train
+    );
   }
 
-  public getDelay(trainID: string): number {
-    return this.getReport(trainID)?.delay ?? 0;
+  public getDelay(train: Train | string): number {
+    return this.getReport(train)?.delay ?? 0;
   }
 
   /**
@@ -103,12 +114,16 @@ export class TrainTracker {
    * The position is from the end of the area.
    */
   public getTrainsInAreaInOrder(area: Area): TrainPositionInArea[] {
+    if (!this._areas.has(area)) {
+      throw new Error(`Unknown area ${area.areaID}.`);
+    }
+
     return [...this._trainsInArea.get(area).values()]
       .map(
         (train): TrainPositionInArea => {
-          const report = this._reports.get(train.trainID);
+          const report = this._reports.get(train);
 
-          const route = this._lastRoutes.get(train.trainID);
+          const route = this._lastRoutes.get(train);
           if (route == null) {
             throw new Bug(`Couldn't find last route of ${train.trainID}. `);
           }
@@ -120,16 +135,12 @@ export class TrainTracker {
           const routeOffset =
             report && report.routeID === route.routeID ? report.routeOffset : 0;
 
-          const distanceToEnd = this._infrastructure.getShortestWayFromRouteToAnyRoute(
-            route,
-            area.exitRoutes,
-            routeOffset
-          ).length;
+          const distanceToEnd = this._distancesToEnd.get(area).get(route);
 
           // If the train can't get to any exit route of the area it is assumed
-          // it already reached a point where it leaves the area.
+          // it already reached a point where it will leave the area soon.
           const position =
-            distanceToEnd === Number.POSITIVE_INFINITY ? 0 : distanceToEnd;
+            distanceToEnd == null ? 0 : distanceToEnd - routeOffset;
 
           return {
             train,
@@ -149,12 +160,8 @@ export class TrainTracker {
    * undefined if the train is not on it's main itinerary.
    */
   public getTrainPositionOnMainItinerary(trainID: string): number | undefined {
-    const train = this._infrastructure.trains.get(trainID);
-    if (train == null) {
-      throw new Error(`There's no train with ${trainID} id.`);
-    }
-
-    const report = this._reports.get(trainID);
+    const train = this._infrastructure.getOrThrow("train", trainID);
+    const report = this._reports.get(train);
     if (report == null) {
       throw new Error(`There's no report available for ${trainID}.`);
     }
@@ -272,7 +279,6 @@ export class TrainTracker {
     route: Route,
     time: number
   ): () => void {
-    console.log(`Train ${train.trainID} entered area ${area.areaID}.`);
     this._trainsInArea.get(area).add(train);
 
     return (): void => {
@@ -286,7 +292,6 @@ export class TrainTracker {
     route: Route,
     time: number
   ): () => void {
-    console.log(`Train ${train.trainID} left area ${area.areaID}.`);
     this._trainsInArea.get(area).delete(train);
 
     return (): void => {
@@ -320,15 +325,17 @@ export class TrainTracker {
       "station",
       report.stationID
     );
+    const train = this._infrastructure.getOrThrow("train", report.trainID);
 
-    this._lastStations.set(report.trainID, station);
+    this._lastStations.set(train, station);
   }
 
   private _handleTrainPositionReport(
     _name: string,
     newReport: EventPayloads["trainPositionReport"]
   ): void {
-    this._reports.set(newReport.trainID, newReport);
+    const train = this._infrastructure.getOrThrow("train", newReport.trainID);
+    this._reports.set(train, newReport);
   }
 
   private _handleRouteEntry(
@@ -340,13 +347,11 @@ export class TrainTracker {
     const route = this._infrastructure.getOrThrow("route", routeID);
     const train = this._infrastructure.getOrThrow("train", trainID);
 
-    this._lastRoutes.set(trainID, route);
-    this._trainRoutes.get(trainID).add(route);
+    this._lastRoutes.set(train, route);
+    this._trainRoutes.get(train).add(route);
 
-    for (const area of this._areasByRouteID.get(routeID)) {
-      const trainsInArea = this._trainsInArea.get(area);
-
-      if (!trainsInArea.has(train)) {
+    for (const area of this._areasByEntryRoute.get(route)) {
+      if (!this._trainsInArea.get(area).has(train)) {
         emits.push(this._enterArea(train, area, route, time));
       }
     }
@@ -365,15 +370,17 @@ export class TrainTracker {
     const route = this._infrastructure.getOrThrow("route", routeID);
     const train = this._infrastructure.getOrThrow("train", trainID);
 
-    const trainRoutes = this._trainRoutes.get(trainID);
+    const trainRoutes = this._trainRoutes.get(train);
     trainRoutes.delete(route);
 
-    for (const area of this._areasByRouteID.get(routeID)) {
+    for (const area of this._areasByRoute.get(route)) {
       if (haveIntersection(trainRoutes, area.routes)) {
         continue;
       }
 
-      emits.push(this._leaveArea(train, area, route, time));
+      if (this._trainsInArea.get(area).has(train)) {
+        emits.push(this._leaveArea(train, area, route, time));
+      }
     }
 
     for (const emit of emits) {
@@ -385,12 +392,13 @@ export class TrainTracker {
     _name: string,
     { trainID }: EventPayloads["trainDeleted"]
   ): void {
-    this._lastRoutes.delete(trainID);
-    this._lastStations.delete(trainID);
-    this._reports.delete(trainID);
-    this._trainRoutes.delete(trainID);
-
     const train = this._infrastructure.getOrThrow("train", trainID);
+
+    this._lastRoutes.delete(train);
+    this._lastStations.delete(train);
+    this._reports.delete(train);
+    this._trainRoutes.delete(train);
+
     for (const trains of this._trainsInArea.values()) {
       trains.delete(train);
     }

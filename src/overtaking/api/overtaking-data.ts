@@ -99,9 +99,12 @@ function getOvertakingAreas(infrastructure: Infrastructure): OvertakingArea[] {
 
       const routes = new Set<Route>([
         ...entryRoutes.values(),
+        ...exitRoutes.values(),
         ...[...stations.values()].flatMap((station): readonly Route[] =>
-          [...infrastructure.routes.values()].filter((route): boolean =>
-            route.stations.includes(station)
+          [...infrastructure.routes.values()].filter(
+            (route): boolean =>
+              route.stations.includes(station) ||
+              route.stationAreas.includes(station)
           )
         )
       ]);

@@ -57,3 +57,20 @@ export class MapMapSet<K1, K2, V> extends Map<K1, MapSet<K2, V>> {
     }
   }
 }
+
+export class MapMap<K1, K2, V> extends Map<K1, Map<K2, V>> {
+  public constructor() {
+    super();
+  }
+
+  public get(key: K1): Map<K2, V> {
+    const existing = super.get(key);
+    if (typeof existing !== "undefined") {
+      return existing;
+    } else {
+      const newMap = new Map<K2, V>();
+      super.set(key, newMap);
+      return newMap;
+    }
+  }
+}
