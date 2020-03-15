@@ -76,10 +76,12 @@ function getAgent(parsedURL: URL): http.Agent | https.Agent {
 }
 
 const httpKeepAliveAgent = new http.Agent({
-  keepAlive: true
+  keepAlive: true,
+  keepAliveMsecs: 60000
 });
 const httpsKeepAliveAgent = new https.Agent({
-  keepAlive: true
+  keepAlive: true,
+  keepAliveMsecs: 60000
 });
 function getKeepAliveAgent(parsedURL: URL): http.Agent | https.Agent {
   if (parsedURL.protocol == "http:") {
@@ -102,14 +104,17 @@ export async function send<Name extends keyof SendParameters>(
       body,
       headers: {
         "Content-Type": "application/xml; charset=utf-8",
-        connection: "close"
+        "Keep-Alive": "timeout=90000, max=1000",
+        Connection: config.keepAlive ? "Keep-Alive" : "Close"
       },
       method: "POST",
-      timeout: 5000
+      timeout: 90000
     });
   } catch (error) {
     console.error(
-      ["", `Failed to send request (${new Date()}):`, body, ""].join("\n")
+      ["", `Failed to send request (${new Date()}):`, body, ""].join("\n"),
+      error,
+      "\n"
     );
 
     throw error;
