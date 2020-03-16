@@ -77,11 +77,13 @@ function getAgent(parsedURL: URL): http.Agent | https.Agent {
 
 const httpKeepAliveAgent = new http.Agent({
   keepAlive: true,
-  keepAliveMsecs: 60000
+  keepAliveMsecs: 60000,
+  maxSockets: 1
 });
 const httpsKeepAliveAgent = new https.Agent({
   keepAlive: true,
-  keepAliveMsecs: 60000
+  keepAliveMsecs: 60000,
+  maxSockets: 1
 });
 function getKeepAliveAgent(parsedURL: URL): http.Agent | https.Agent {
   if (parsedURL.protocol == "http:") {
