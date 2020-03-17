@@ -1,8 +1,9 @@
+import axios from "axios";
 import http from "http";
 import https from "https";
-import axios from "axios";
 import { Config } from "../config";
 import { SendParameters } from "./parameters";
+import { retry } from "../util";
 
 export type SendPayload = Record<
   string,
@@ -69,19 +70,21 @@ export async function send<Name extends keyof SendParameters>(
   const data = buildBody(name, parsePayload(parameters));
 
   try {
-    await axios.post(getURL(config), data, {
-      httpAgent: config.keepAlive
-        ? new http.Agent({ keepAlive: true })
-        : undefined,
-      httpsAgent: config.keepAlive
-        ? new https.Agent({ keepAlive: true })
-        : undefined,
+    await retry(
+      axios.post.bind(axios, getURL(config), data, {
+        httpAgent: config.keepAlive
+          ? new http.Agent({ keepAlive: true })
+          : undefined,
+        httpsAgent: config.keepAlive
+          ? new https.Agent({ keepAlive: true })
+          : undefined,
 
-      headers: {
-        "Content-Type": "application/xml; charset=utf-8"
-      },
-      responseType: "text"
-    });
+        headers: {
+          "Content-Type": "application/xml; charset=utf-8"
+        },
+        responseType: "text"
+      })
+    );
   } catch (error) {
     console.error(
       ["", `Failed to send request (${new Date()}):`, data, ""].join("\n"),

@@ -41,3 +41,27 @@ export class RateLimiter {
     return ret;
   }
 }
+
+export async function retry<T>(
+  func: () => T,
+  limit = Number.POSITIVE_INFINITY
+): Promise<T> {
+  for (let attempt = 1; ; ++attempt) {
+    try {
+      return await func();
+    } catch (error) {
+      if (attempt >= limit) {
+        console.error(`Attempt #${attempt} failed, giving up.`, error);
+        throw error;
+      }
+
+      console.error(
+        `Attempt #${attempt} failed (${error.message}), retrying...`
+      );
+
+      await new Promise((resolve): void => {
+        setTimeout(resolve, (attempt - 1) * 1000);
+      });
+    }
+  }
+}
