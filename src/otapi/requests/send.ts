@@ -1,6 +1,6 @@
 import http from "http";
 import https from "https";
-import fetch from "node-fetch";
+import axios from "axios";
 import { Config } from "../config";
 import { SendParameters } from "./parameters";
 
@@ -61,60 +61,30 @@ function buildBody(tagName: string, attributes: SendAttribute[]): string {
 </SOAP-ENV:Envelope>`;
 }
 
-const httpAgent = new http.Agent({
-  keepAlive: false
-});
-const httpsAgent = new https.Agent({
-  keepAlive: false
-});
-function getAgent(parsedURL: URL): http.Agent | https.Agent {
-  if (parsedURL.protocol == "http:") {
-    return httpAgent;
-  } else {
-    return httpsAgent;
-  }
-}
-
-const httpKeepAliveAgent = new http.Agent({
-  keepAlive: true,
-  keepAliveMsecs: 60000,
-  maxSockets: 1
-});
-const httpsKeepAliveAgent = new https.Agent({
-  keepAlive: true,
-  keepAliveMsecs: 60000,
-  maxSockets: 1
-});
-function getKeepAliveAgent(parsedURL: URL): http.Agent | https.Agent {
-  if (parsedURL.protocol == "http:") {
-    return httpKeepAliveAgent;
-  } else {
-    return httpsKeepAliveAgent;
-  }
-}
-
 export async function send<Name extends keyof SendParameters>(
   config: Config,
   name: Name,
   parameters: SendParameters[Name]
 ): Promise<void> {
-  const body = buildBody(name, parsePayload(parameters));
+  const data = buildBody(name, parsePayload(parameters));
 
   try {
-    await fetch(getURL(config), {
-      agent: config.keepAlive ? getKeepAliveAgent : getAgent,
-      body,
+    await axios.post(getURL(config), data, {
+      httpAgent: config.keepAlive
+        ? new http.Agent({ keepAlive: true })
+        : undefined,
+      httpsAgent: config.keepAlive
+        ? new https.Agent({ keepAlive: true })
+        : undefined,
+
       headers: {
-        "Content-Type": "application/xml; charset=utf-8",
-        "Keep-Alive": "timeout=90000, max=1000",
-        Connection: config.keepAlive ? "Keep-Alive" : "Close"
+        "Content-Type": "application/xml; charset=utf-8"
       },
-      method: "POST",
-      timeout: 90000
+      responseType: "text"
     });
   } catch (error) {
     console.error(
-      ["", `Failed to send request (${new Date()}):`, body, ""].join("\n"),
+      ["", `Failed to send request (${new Date()}):`, data, ""].join("\n"),
       error,
       "\n"
     );
