@@ -3,6 +3,7 @@ import { expect } from "chai";
 
 import { ck, filterChildren, idFromXML, xmlVertexCK, OTDate } from "./common";
 import {
+  Formation,
   InfrastructureData,
   Itinerary,
   ItineraryArgs,
@@ -12,6 +13,7 @@ import {
   Timetable,
   TimetableEntry,
   Train,
+  Vehicle,
   Vertex
 } from "./types";
 import { parseItineraryArgs } from "./args";
@@ -106,38 +108,62 @@ export async function parseInfrastructure(
     xmlRollingStockDocument["railml"]["rollingstock"][0]["vehicles"][0][
       "vehicle"
     ];
-  const vehicleMaxSpeeds = xmlVehicles.reduce<Map<string, number>>(
-    (acc, xmlVehicle): Map<string, number> => {
-      acc.set(xmlVehicle.$.id, +xmlVehicle.$.speed);
-      return acc;
+  const vehicles = xmlVehicles.reduce<Map<string, Vehicle>>(
+    (acc, xmlVehicle): Map<string, Vehicle> => {
+      const vehicleID = xmlVehicle.$.id;
+      const maxSpeed = +xmlVehicle.$.speed;
+      const length = +xmlVehicle.$.length;
+
+      return acc.set(
+        vehicleID,
+        Object.freeze<Vehicle>({ length, maxSpeed, vehicleID })
+      );
     },
     new Map()
   );
 
   // }}}
-  // Formation max speeds {{{
+  // Formations {{{
 
   const xmlFormations: any[] =
     xmlRollingStockDocument["railml"]["rollingstock"][0]["formations"][0][
       "formation"
     ];
-  const formationMaxSpeeds = xmlFormations.reduce<Map<string, number>>(
-    (acc, xmlFormation): Map<string, number> => {
-      const refs: any[] = xmlFormation["trainOrder"][0]["vehicleRef"];
-      const maxSpeeds = refs.map((ref): any => {
-        const vehicleID = ref.$.vehicleRef;
-        const vehicleMaxSpeed = vehicleMaxSpeeds.get(vehicleID);
+  const formations = xmlFormations.reduce<Map<string, Formation>>(
+    (acc, xmlFormation): Map<string, Formation> => {
+      const formationID = xmlFormation.$.name;
+
+      const xmlRefs: any[] = xmlFormation["trainOrder"][0]["vehicleRef"];
+      const vehicleIDs = xmlRefs.map((xmlRef): string => xmlRef.$.vehicleRef);
+
+      const length = vehicleIDs.reduce<number>((acc, vehicleID): number => {
+        const vehicleLength = vehicles.get(vehicleID)?.length;
+
+        if (vehicleLength == null) {
+          throw new Error(`Can't find the length of vehicle ${vehicleID}.`);
+        }
+
+        return acc + vehicleLength;
+      }, 0);
+
+      const maxSpeed = vehicleIDs.reduce<number>((acc, vehicleID): number => {
+        const vehicleMaxSpeed = vehicles.get(vehicleID)?.maxSpeed;
 
         if (vehicleMaxSpeed == null) {
           throw new Error(`Can't find max speed for vehicle ${vehicleID}.`);
         }
 
-        return vehicleMaxSpeed;
-      });
-      const maxSpeed = Math.min(...maxSpeeds);
+        return Math.min(acc, vehicleMaxSpeed);
+      }, Number.POSITIVE_INFINITY);
 
-      acc.set(xmlFormation.$.name, maxSpeed);
-      return acc;
+      return acc.set(
+        formationID,
+        Object.freeze<Formation>({
+          formationID,
+          length,
+          maxSpeed
+        })
+      );
     },
     new Map()
   );
@@ -602,7 +628,12 @@ export async function parseInfrastructure(
         new Set()
       );
 
-    const maxSpeed = formationMaxSpeeds.get(xmlCourse.$.train);
+    const length = formations.get(xmlCourse.$.train)?.length;
+    if (length == null) {
+      throw new Error(`Can't find the length of train ${trainID}.`);
+    }
+
+    const maxSpeed = formations.get(xmlCourse.$.train)?.maxSpeed;
     if (maxSpeed == null) {
       throw new Error(`Can't find max speed for train ${trainID}.`);
     }
@@ -618,10 +649,11 @@ export async function parseInfrastructure(
     }
     const timetable = timetables.get(trainID)!;
 
-    acc.set(
+    return acc.set(
       trainID,
       Object.freeze<Train>({
         itineraries: trainItineraries,
+        length,
         mainItinerary: trainItineraries[0],
         maxSpeed,
         paths: trainPaths,
@@ -631,8 +663,6 @@ export async function parseInfrastructure(
         vertexes: trainVertexes
       })
     );
-
-    return acc;
   }, new Map());
 
   const mainItineraries = new Set<Itinerary>(
@@ -642,6 +672,7 @@ export async function parseInfrastructure(
   // }}}
 
   return Object.freeze<InfrastructureData>({
+    formations,
     itineraries,
     itinerariesLength,
     mainItineraries,
@@ -652,6 +683,7 @@ export async function parseInfrastructure(
     stations,
     timetables,
     trains,
+    vehicles,
     vertexes
   });
 }

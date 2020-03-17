@@ -53,8 +53,21 @@ export interface Itinerary {
   readonly vertexes: readonly Vertex[];
 }
 
+export interface Vehicle {
+  readonly length: number;
+  readonly maxSpeed: number;
+  readonly vehicleID: string;
+}
+
+export interface Formation {
+  readonly formationID: string;
+  readonly length: number;
+  readonly maxSpeed: number;
+}
+
 export interface Train {
   readonly itineraries: readonly Itinerary[];
+  readonly length: number;
   readonly mainItinerary: Itinerary;
   readonly maxSpeed: number;
   readonly paths: ReadonlySet<Path>;
@@ -65,6 +78,7 @@ export interface Train {
 }
 
 export interface InfrastructureData {
+  readonly formations: ReadonlyMap<string, Formation>;
   readonly itineraries: ReadonlyMap<string, Itinerary>;
   readonly itinerariesLength: number;
   readonly mainItineraries: ReadonlySet<Itinerary>;
@@ -75,5 +89,6 @@ export interface InfrastructureData {
   readonly stations: ReadonlyMap<string, Station>;
   readonly timetables: ReadonlyMap<string, Timetable>;
   readonly trains: ReadonlyMap<string, Train>;
+  readonly vehicles: ReadonlyMap<string, Vehicle>;
   readonly vertexes: ReadonlyMap<string, Vertex>;
 }

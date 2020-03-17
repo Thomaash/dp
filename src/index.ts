@@ -144,7 +144,27 @@ async function startOpenTrack(otapi: OTAPI): Promise<{ command: any }> {
     [
       "Infrastructure:",
 
-      `  ${infrastructure.trains.size} trains,`,
+      `  ${infrastructure.trains.size} trains ` +
+        `(${Math.min(
+          ...[...infrastructure.trains.values()].map(
+            (train): number => train.length
+          )
+        )} m shortest, ` +
+        `${Math.max(
+          ...[...infrastructure.trains.values()].map(
+            (train): number => train.length
+          )
+        )} m longest, ` +
+        `${Math.min(
+          ...[...infrastructure.trains.values()].map(
+            (train): number => train.maxSpeed
+          )
+        )} km/h slowest, ` +
+        `${Math.max(
+          ...[...infrastructure.trains.values()].map(
+            (train): number => train.maxSpeed
+          )
+        )} km/h fastest),`,
 
       `  ${infrastructure.itineraries.size} itineraries ` +
         `(${infrastructure.itinerariesLength / 1000} km, ` +

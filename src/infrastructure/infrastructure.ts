@@ -4,15 +4,17 @@ import { readFile as readFileCallback } from "fs";
 import { PriorityQueue } from "typescript-collections";
 
 import {
+  Formation,
   InfrastructureData,
   Itinerary,
   Path,
   Route,
   Station,
-  Train,
   Timetable,
-  Vertex,
-  TimetableEntry
+  TimetableEntry,
+  Train,
+  Vehicle,
+  Vertex
 } from "./types";
 
 import { parseInfrastructure, ParseInfrastructureXML } from "./parser";
@@ -55,6 +57,7 @@ export const infrastructureFactory = {
   ): Promise<Infrastructure> {
     const data = await parseInfrastructure(xml);
     return new Infrastructure(
+      data.formations,
       data.itineraries,
       data.itinerariesLength,
       data.mainItineraries,
@@ -65,6 +68,7 @@ export const infrastructureFactory = {
       data.stations,
       data.timetables,
       data.trains,
+      data.vehicles,
       data.vertexes
     );
   }
@@ -86,6 +90,7 @@ export class Infrastructure implements InfrastructureData {
   private readonly _vertexToRoutes = new MapSet<Vertex, Route>();
 
   public constructor(
+    public readonly formations: ReadonlyMap<string, Formation>,
     public readonly itineraries: ReadonlyMap<string, Itinerary>,
     public readonly itinerariesLength: number,
     public readonly mainItineraries: ReadonlySet<Itinerary>,
@@ -96,6 +101,7 @@ export class Infrastructure implements InfrastructureData {
     public readonly stations: ReadonlyMap<string, Station>,
     public readonly timetables: ReadonlyMap<string, Timetable>,
     public readonly trains: ReadonlyMap<string, Train>,
+    public readonly vehicles: ReadonlyMap<string, Vehicle>,
     public readonly vertexes: ReadonlyMap<string, Vertex>
   ) {
     for (const route of routes.values()) {
