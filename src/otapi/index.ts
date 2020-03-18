@@ -77,7 +77,7 @@ export interface OTAPIConstructorParams {
 const defaultConstructorParams: Required<OTAPIConstructorParams> = {
   host: "localhost",
   keepAlive: false,
-  maxSimultaneousRequests: Number.POSITIVE_INFINITY,
+  maxSimultaneousRequests: 10,
   portApp: 9004,
   portOT: 9002,
   protocol: "http"
