@@ -185,4 +185,8 @@ export class TrainOvertaking {
         )
     );
   }
+
+  public dumpState(): void {
+    this._blocking.dumpState();
+  }
 }

@@ -125,4 +125,24 @@ export class Blocking<
   ): BlockingEntry<Place, Blocker, Blocked>[] {
     return this._queryEntries(query);
   }
+
+  public dumpState(): void {
+    const blockedByLines: string[] = [];
+    for (const [blocked, numBlockedBy] of this._blockedBy) {
+      blockedByLines.push(
+        ["  ", blocked, " is blocked by ", numBlockedBy, " trains"].join("")
+      );
+    }
+    blockedByLines.sort();
+    console.info(["Blocked by:", ...blockedByLines, ""].join("\r\n"));
+
+    const blockingEntryLines: string[] = [];
+    for (const [, { place, blocker, blocked }] of this._entries) {
+      blockingEntryLines.push(
+        ["  ", place, ": ", blocked, " is blocked by ", blocker].join("")
+      );
+    }
+    blockingEntryLines.sort();
+    console.info(["Blocking entries:", ...blockingEntryLines, ""].join("\r\n"));
+  }
 }
