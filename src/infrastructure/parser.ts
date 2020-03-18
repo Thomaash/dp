@@ -26,13 +26,17 @@ export interface ParseInfrastructureXML {
 }
 
 interface StationsReduceAcc {
+  stationInflowRoutes: Map<Station, Set<Route>>;
+  stationOutflowRoutes: Map<Station, Set<Route>>;
   stations: Map<string, Station>;
   stationsByOCPID: Map<string, Station>;
 }
 
 export interface TempVertex {
+  readonly inflowRoutes: Set<Route>;
   readonly name: string;
   readonly neighborVertexID: string;
+  readonly outflowRoutes: Set<Route>;
   readonly vertexID: string;
 }
 
@@ -185,23 +189,36 @@ export async function parseInfrastructure(
       );
       const name = xmlVertex.$.name;
 
+      const inflowRoutes = new Set<Route>();
+      const outflowRoutes = new Set<Route>();
+
       return acc.set(vertexID, {
+        inflowRoutes,
         name,
         neighborVertexID,
+        outflowRoutes,
         vertexID
       });
     },
     new Map()
   );
+
   const vertexes = new Map<
     string,
     { -readonly [Key in keyof Vertex]: Vertex[Key] }
   >();
-  for (const tempVertex of tempVertexes.values()) {
-    vertexes.set(tempVertex.vertexID, {
-      name: tempVertex.name,
+  for (const {
+    inflowRoutes,
+    name,
+    outflowRoutes,
+    vertexID
+  } of tempVertexes.values()) {
+    vertexes.set(vertexID, {
+      inflowRoutes,
+      name,
       neighborVertex: null as any,
-      vertexID: tempVertex.vertexID
+      outflowRoutes,
+      vertexID
     });
   }
   for (const tempVertex of tempVertexes.values()) {
@@ -271,22 +288,40 @@ export async function parseInfrastructure(
     ][0],
     "ocp"
   );
-  const { stations, stationsByOCPID } = xmlOperationControlPoints.reduce<
-    StationsReduceAcc
-  >(
+  const {
+    stationInflowRoutes,
+    stationOutflowRoutes,
+    stations,
+    stationsByOCPID
+  } = xmlOperationControlPoints.reduce<StationsReduceAcc>(
     (acc, xmlOCP): StationsReduceAcc => {
-      const stationID = xmlOCP.$.code;
-      const ocpID = xmlOCP.$.id;
-      const name = xmlOCP.$.name;
+      const stationID: string = xmlOCP.$.code;
+      const ocpID: string = xmlOCP.$.id;
+      const name: string = xmlOCP.$.name;
 
-      const station = Object.freeze<Station>({ name, stationID });
+      const inflowRoutes = new Set<Route>();
+      const outflowRoutes = new Set<Route>();
 
+      const station = Object.freeze<Station>({
+        inflowRoutes,
+        name,
+        outflowRoutes,
+        stationID
+      });
+
+      acc.stationInflowRoutes.set(station, inflowRoutes);
+      acc.stationOutflowRoutes.set(station, outflowRoutes);
       acc.stations.set(stationID, station);
       acc.stationsByOCPID.set(ocpID, station);
 
       return acc;
     },
-    { stations: new Map(), stationsByOCPID: new Map() }
+    {
+      stationInflowRoutes: new Map(),
+      stationOutflowRoutes: new Map(),
+      stations: new Map(),
+      stationsByOCPID: new Map()
+    }
   );
 
   // }}}
@@ -396,45 +431,31 @@ export async function parseInfrastructure(
       }
     );
 
-    acc.set(
-      routeID,
-      Object.freeze<Route>({
-        vertexes: routeVertexes,
-        length: routeVertexes.reduce<number>((acc, vertex2, i, arr): number => {
-          if (i === 0) {
-            return acc;
-          }
+    const route = Object.freeze<Route>({
+      vertexes: routeVertexes,
+      length: routeVertexes.reduce<number>((acc, vertex2, i, arr): number => {
+        if (i === 0) {
+          return acc;
+        }
 
-          const vertex1 = arr[i - 1];
+        const vertex1 = arr[i - 1];
 
-          const distance = vertexToVertexDistances.get(
-            ck(vertex2.vertexID, vertex1.neighborVertex.vertexID)
+        const distance = vertexToVertexDistances.get(
+          ck(vertex2.vertexID, vertex1.neighborVertex.vertexID)
+        );
+        if (distance == null) {
+          throw new Error(
+            `Can't find distance between vertexes ${vertex2.vertexID} and ${vertex1.neighborVertex.vertexID}.`
           );
-          if (distance == null) {
-            throw new Error(
-              `Can't find distance between vertexes ${vertex2.vertexID} and ${vertex1.neighborVertex.vertexID}.`
-            );
-          }
+        }
 
-          return acc + distance;
-        }, 0),
-        stationAreas: filterChildren(xmlRoute, "vertex", "stationvertex")
-          .filter((xmlVertex): boolean => xmlVertex.$.station !== "")
-          .map(
-            (xmlVertex): Station => {
-              const stationID = xmlVertex.$.station;
-
-              const station = stations.get(stationID);
-              if (station == null) {
-                throw new Error(`Can't find any station called ${stationID}.`);
-              }
-
-              return station;
-            }
-          ),
-        stations: filterChildren(xmlRoute, "stationvertex").map(
-          (xmlStationVertex): Station => {
-            const stationID = xmlStationVertex.$.station;
+        return acc + distance;
+      }, 0),
+      stationAreas: filterChildren(xmlRoute, "vertex", "stationvertex")
+        .filter((xmlVertex): boolean => xmlVertex.$.station !== "")
+        .map(
+          (xmlVertex): Station => {
+            const stationID = xmlVertex.$.station;
 
             const station = stations.get(stationID);
             if (station == null) {
@@ -444,17 +465,82 @@ export async function parseInfrastructure(
             return station;
           }
         ),
-        routeID
-      })
-    );
+      stations: filterChildren(xmlRoute, "stationvertex").map(
+        (xmlStationVertex): Station => {
+          const stationID = xmlStationVertex.$.station;
 
-    return acc;
+          const station = stations.get(stationID);
+          if (station == null) {
+            throw new Error(`Can't find any station called ${stationID}.`);
+          }
+
+          return station;
+        }
+      ),
+      routeID
+    });
+
+    const entryTempVertex = tempVertexes.get(route.vertexes[0].vertexID);
+    if (entryTempVertex == null) {
+      throw new Error(`Can't find the entry vertex of ${route.routeID}.`);
+    }
+    entryTempVertex.outflowRoutes.add(route);
+
+    const exitTempVertex = tempVertexes.get(
+      route.vertexes[route.vertexes.length - 1].vertexID
+    );
+    if (exitTempVertex == null) {
+      throw new Error(`Can't find the exit vertex of ${route.routeID}.`);
+    }
+    exitTempVertex.inflowRoutes.add(route);
+
+    return acc.set(routeID, route);
   }, new Map());
 
   const routesLength = [...routes.values()].reduce<number>(
     (acc, route): number => acc + route.length,
     0
   );
+
+  // }}}
+  // Station inflow and outflow routes {{{
+
+  for (const route of routes.values()) {
+    const station = route.stations[0];
+    if (station == null) {
+      // No station on this route.
+      continue;
+    }
+
+    const inflowRoutes = stationInflowRoutes.get(station);
+    if (inflowRoutes == null) {
+      throw new Error(
+        `Can't find inflow routes for station ${station.stationID}.`
+      );
+    }
+    for (const inflowRoute of route.vertexes[0].inflowRoutes) {
+      inflowRoutes.add(inflowRoute);
+    }
+  }
+
+  for (const route of routes.values()) {
+    const station = route.stations[route.stations.length - 1];
+    if (station == null) {
+      // No station on this route.
+      continue;
+    }
+
+    const outflowRoutes = stationOutflowRoutes.get(station);
+    if (outflowRoutes == null) {
+      throw new Error(
+        `Can't find outflow routes for station ${station.stationID}.`
+      );
+    }
+    for (const outflowRoute of route.vertexes[route.vertexes.length - 1]
+      .outflowRoutes) {
+      outflowRoutes.add(outflowRoute);
+    }
+  }
 
   // }}}
   // Paths {{{

@@ -17,13 +17,17 @@ export interface Timetable {
 }
 
 export interface Station {
+  readonly inflowRoutes: ReadonlySet<Route>;
   readonly name: string;
+  readonly outflowRoutes: ReadonlySet<Route>;
   readonly stationID: string;
 }
 
 export interface Vertex {
+  readonly inflowRoutes: ReadonlySet<Route>;
   readonly name: string;
   readonly neighborVertex: Vertex;
+  readonly outflowRoutes: ReadonlySet<Route>;
   readonly vertexID: string;
 }
 
