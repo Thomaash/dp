@@ -107,19 +107,19 @@ export function overtaking({
           )
         ]
       ),
-      otapi.on(
-        "trainCreated",
-        async (_, { trainID }): Promise<void> => {
-          const train = infrastructure.getOrThrow("train", trainID);
+      otapi.on("trainCreated", (_, { trainID }): void => {
+        const train = infrastructure.getOrThrow("train", trainID);
 
-          await Promise.all(
-            [...train.routes.values()].map(
-              ({ routeID }): Promise<void> =>
-                otapi.setRouteAllowed({ routeID, trainID })
-            )
-          );
-        }
-      )
+        otapi
+          .sendInPause(({ send }): void => {
+            for (const { routeID } of train.routes) {
+              send("setRouteAllowed", { routeID, trainID });
+            }
+          })
+          .catch((error): void => {
+            console.error(`Can't allow routes for train ${trainID}.`, error);
+          });
+      })
     ]);
     cleanupCallbacks.push(...removeListeners);
   }

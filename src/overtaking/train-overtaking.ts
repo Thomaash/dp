@@ -19,51 +19,45 @@ export class TrainOvertaking {
     private readonly _otapi: OTAPI
   ) {}
 
+  private _getBlockRouteIDs(exitRouteID: string, stationID: string): string[] {
+    return [
+      exitRouteID,
+      ...[
+        ...this._infrastructure
+          .getOrThrow("station", stationID)
+          .outflowRoutes.values()
+      ].map(({ routeID }): string => routeID)
+    ];
+  }
+
   private async _sendBlockRequests(
     exitRouteID: string,
     stationID: string,
     waitingTrainID: string
   ): Promise<void> {
-    await Promise.all([
-      this._otapi.setRouteDisallowed({
-        trainID: waitingTrainID,
-        routeID: exitRouteID
-      }),
-      this._otapi.setStop({
-        stationID: stationID,
-        stopFlag: true,
-        trainID: waitingTrainID
-      }),
-      this._otapi.setDepartureTime({
-        stationID: stationID,
-        time: Number.MAX_SAFE_INTEGER,
-        trainID: waitingTrainID
-      })
-    ]);
+    await this._otapi.sendInPause(({ send }): void => {
+      for (const routeID of this._getBlockRouteIDs(exitRouteID, stationID)) {
+        send("setRouteDisallowed", {
+          trainID: waitingTrainID,
+          routeID
+        });
+      }
+    });
   }
 
   private async _sendReleaseRequests(
     exitRouteID: string,
     stationID: string,
-    waiting: Train
+    waitingTrainID: string
   ): Promise<void> {
-    await Promise.all([
-      // Unblock exit route.
-      this._otapi.setRouteAllowed({
-        routeID: exitRouteID,
-        trainID: waiting.trainID
-      }),
-      // Restore departure time.
-      this._otapi.setDepartureTime({
-        stationID: stationID,
-        time:
-          this._infrastructure.getTrainsDepartureFromStation(
-            waiting,
-            stationID
-          ) ?? 0,
-        trainID: waiting.trainID
-      })
-    ]);
+    await this._otapi.sendInPause(({ send }): void => {
+      for (const routeID of this._getBlockRouteIDs(exitRouteID, stationID)) {
+        send("setRouteAllowed", {
+          trainID: waitingTrainID,
+          routeID
+        });
+      }
+    });
   }
 
   async planOvertaking(
@@ -138,7 +132,7 @@ export class TrainOvertaking {
           this._sendReleaseRequests(
             exitRoute.routeID,
             station.stationID,
-            waiting
+            waiting.trainID
           )
       )
     );
@@ -155,31 +149,20 @@ export class TrainOvertaking {
 
     await Promise.all(
       blockedByOvertaking
-        .map(
-          ({ blocked }): Train => {
-            const train = this._infrastructure.trains.get(blocked);
-
-            if (train == null) {
-              throw new Error(`Couldn't find any train called ${blocked}.`);
-            }
-
-            return train;
-          }
-        )
         .filter(
-          (waiting): boolean =>
+          ({ blocked: waitingTrainID }): boolean =>
             !this._blocking.isBlockedQuery({
               place: station.stationID,
-              blocked: waiting.trainID
+              blocked: waitingTrainID
             })
         )
-        .flatMap((waiting): Promise<void>[] =>
+        .flatMap(({ blocked: waitingTrainID }): Promise<void>[] =>
           [...exitRoutes.values()].map(
             (exitRoute): Promise<void> =>
               this._sendReleaseRequests(
                 exitRoute.routeID,
                 station.stationID,
-                waiting
+                waitingTrainID
               )
           )
         )
