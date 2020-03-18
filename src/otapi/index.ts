@@ -83,10 +83,24 @@ const defaultConstructorParams: Required<OTAPIConstructorParams> = {
   protocol: "http"
 };
 
+export interface SendInPauseAPI {
+  send<Name extends keyof SendParameters>(
+    name: Name,
+    parameters: SendParameters[Name]
+  ): void;
+}
+
+const nextId = ((): (() => number) => {
+  let nm = 0;
+  return (): number => ++nm;
+})();
+
 export class OTAPI {
   private readonly _responseManager: ResponseManager;
   private readonly _limiter: RateLimiter;
   private readonly _callOnKill = new Set<() => void>();
+
+  private _pausedBy = 0;
 
   public readonly config: Config;
 
@@ -143,6 +157,45 @@ export class OTAPI {
         return result;
       }
     );
+  }
+
+  public async send<Name extends keyof SendParameters>(
+    name: Name,
+    parameters: SendParameters[Name]
+  ): Promise<void> {
+    return this._send(name, parameters);
+  }
+
+  public async sendInPause(
+    func: (send: SendInPauseAPI) => void | Promise<void>
+  ): Promise<void> {
+    const requests: (() => Promise<void>)[] = [];
+    await func({
+      send: (...rest): void => {
+        requests.push(this.send.bind(this, ...rest));
+      }
+    });
+
+    if (requests.length === 0) {
+      return;
+    }
+
+    const timeName = `Paused for ${requests.length} requests (#${nextId()})`;
+    console.time(timeName);
+
+    ++this._pausedBy;
+    if (this._pausedBy === 1) {
+      await this.pauseSimulation();
+    }
+
+    await Promise.all(requests.map((func): Promise<void> => func()));
+
+    --this._pausedBy;
+    if (this._pausedBy === 0) {
+      await this.startSimulation();
+    }
+
+    console.timeEnd(timeName);
   }
 
   public activateTrain(parameters: ActivateTrainParameters): Promise<void> {
