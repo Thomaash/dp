@@ -607,7 +607,7 @@ export async function parseInfrastructure(
     xmlInfrastructureDocument["trafIT"]["itineraries"][0]["itinerary"];
   const itineraries = xmlItineraries.reduce<Map<string, Itinerary>>(
     (acc, xmlItinerary): Map<string, Itinerary> => {
-      const itineraryID = xmlItinerary.$.name;
+      const itineraryID: string = xmlItinerary.$.name;
 
       const itineraryPaths = Object.freeze<Path[]>(
         filterChildren(xmlItinerary, "path").map(

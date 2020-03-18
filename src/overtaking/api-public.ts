@@ -47,6 +47,7 @@ export interface OvertakingArea extends Area {
   readonly inflowStations: ReadonlySet<Station>;
   readonly itineraries: ReadonlySet<Itinerary>;
   readonly leaveOnlyAfterDepartureFromStation: boolean;
+  readonly maxWaiting: number;
   readonly outflowStation: Station;
   readonly overtakingAreaID: string;
   readonly routes: ReadonlySet<Route>;

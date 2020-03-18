@@ -47,6 +47,28 @@ function getOvertakingAreas(infrastructure: Infrastructure): OvertakingArea[] {
         );
       }
 
+      const overtakingAreaID = [...itineraries.values()]
+        .map((itinerary): string => itinerary.itineraryID.split(" --", 1)[0])
+        .join(" + ");
+      const areaID = overtakingAreaID;
+
+      const maxWaitingRaw = [...itineraries.values()]
+        .map((itinerary): number => itinerary.args.maxWaiting)
+        .reduce<number>((acc, val): number => {
+          if (Number.isNaN(val)) {
+            return acc;
+          } else if (Number.isNaN(acc) && !Number.isNaN(val)) {
+            return val;
+          } else {
+            throw new Error(
+              `Conflicting arguments found in ${overtakingAreaID} overtaking area.`
+            );
+          }
+        }, Number.NaN);
+      const maxWaiting = Number.isNaN(maxWaitingRaw)
+        ? Number.POSITIVE_INFINITY
+        : maxWaitingRaw;
+
       const outflowStation =
         someItinerary.stations[someItinerary.stations.length - 1];
       for (const itinerary of itineraries) {
@@ -61,11 +83,6 @@ function getOvertakingAreas(infrastructure: Infrastructure): OvertakingArea[] {
           (itinerary): readonly Route[] => itinerary.routes
         )
       );
-
-      const overtakingAreaID = [...itineraries.values()]
-        .map((itinerary): string => itinerary.itineraryID.split(" --", 1)[0])
-        .join(" + ");
-      const areaID = overtakingAreaID;
 
       const entryVertexes = new Set<Vertex>(
         [...itineraries.values()].map(
@@ -118,6 +135,7 @@ function getOvertakingAreas(infrastructure: Infrastructure): OvertakingArea[] {
         inflowStations,
         itineraries,
         leaveOnlyAfterDepartureFromStation: true,
+        maxWaiting,
         outflowStation,
         overtakingAreaID,
         routes,

@@ -1,5 +1,6 @@
 export interface ItineraryArgs {
   readonly overtaking: boolean;
+  readonly maxWaiting: number;
 }
 
 export interface TimetableEntry {
