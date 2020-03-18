@@ -62,36 +62,43 @@ function buildBody(tagName: string, attributes: SendAttribute[]): string {
 </SOAP-ENV:Envelope>`;
 }
 
-export async function send<Name extends keyof SendParameters>(
+export function send<Name extends keyof SendParameters>(
   config: Config,
   name: Name,
   parameters: SendParameters[Name]
-): Promise<void> {
+): { result: Promise<void>; cancel: (error?: Error) => void } {
   const data = buildBody(name, parsePayload(parameters));
 
-  try {
-    await retry(
-      axios.post.bind(axios, getURL(config), data, {
-        httpAgent: config.keepAlive
-          ? new http.Agent({ keepAlive: true })
-          : undefined,
-        httpsAgent: config.keepAlive
-          ? new https.Agent({ keepAlive: true })
-          : undefined,
+  const { result, cancel } = retry(
+    axios.post.bind(axios, getURL(config), data, {
+      httpAgent: config.keepAlive
+        ? new http.Agent({ keepAlive: true })
+        : undefined,
+      httpsAgent: config.keepAlive
+        ? new https.Agent({ keepAlive: true })
+        : undefined,
 
-        headers: {
-          "Content-Type": "application/xml; charset=utf-8"
-        },
-        responseType: "text"
-      })
-    );
-  } catch (error) {
-    console.error(
-      ["", `Failed to send request (${new Date()}):`, data, ""].join("\n"),
-      error,
-      "\n"
-    );
+      headers: {
+        "Content-Type": "application/xml; charset=utf-8"
+      },
+      responseType: "text"
+    })
+  );
 
-    throw error;
-  }
+  return {
+    result: (async (): Promise<void> => {
+      try {
+        await result;
+      } catch (error) {
+        console.error(
+          ["", `Failed to send request (${new Date()}):`, data, ""].join("\n"),
+          error,
+          "\n"
+        );
+
+        throw error;
+      }
+    })(),
+    cancel
+  };
 }

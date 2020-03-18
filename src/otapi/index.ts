@@ -86,6 +86,7 @@ const defaultConstructorParams: Required<OTAPIConstructorParams> = {
 export class OTAPI {
   private readonly _responseManager: ResponseManager;
   private readonly _limiter: RateLimiter;
+  private readonly _callOnKill = new Set<() => void>();
 
   public readonly config: Config;
 
@@ -117,6 +118,9 @@ export class OTAPI {
     return this._responseManager.stop();
   }
   public kill(): Promise<void> {
+    for (const func of this._callOnKill) {
+      func();
+    }
     return this._responseManager.kill();
   }
 
@@ -128,7 +132,17 @@ export class OTAPI {
     name: Name,
     parameters: SendParameters[Name]
   ): Promise<void> {
-    return this._limiter.run(send, this.config, name, parameters);
+    return this._limiter.run(
+      async (): Promise<void> => {
+        const { result, cancel } = send(this.config, name, parameters);
+
+        this._callOnKill.add(cancel);
+        await result;
+        this._callOnKill.delete(cancel);
+
+        return result;
+      }
+    );
   }
 
   public activateTrain(parameters: ActivateTrainParameters): Promise<void> {

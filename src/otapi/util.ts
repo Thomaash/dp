@@ -42,26 +42,40 @@ export class RateLimiter {
   }
 }
 
-export async function retry<T>(
-  func: () => T,
+export function retry<T>(
+  func: () => T | Promise<T>,
   limit = Number.POSITIVE_INFINITY
-): Promise<T> {
-  for (let attempt = 1; ; ++attempt) {
-    try {
-      return await func();
-    } catch (error) {
-      if (attempt >= limit) {
-        console.error(`Attempt #${attempt} failed, giving up.`, error);
-        throw error;
+): { result: Promise<T>; cancel: (error?: Error) => void } {
+  let cancelError: null | Error = null;
+
+  return {
+    result: (async (): Promise<T> => {
+      for (let attempt = 1; ; ++attempt) {
+        if (cancelError != null) {
+          console.error(`Canceled after #${attempt - 1} attempts.`);
+          throw cancelError;
+        }
+
+        try {
+          return await func();
+        } catch (error) {
+          if (attempt >= limit) {
+            console.error(`Attempt #${attempt} failed, giving up.`, error);
+            throw error;
+          }
+
+          console.error(
+            `Attempt #${attempt} failed (${error.message}), retrying...`
+          );
+
+          await new Promise((resolve): void => {
+            setTimeout(resolve, (attempt - 1) * 1000);
+          });
+        }
       }
-
-      console.error(
-        `Attempt #${attempt} failed (${error.message}), retrying...`
-      );
-
-      await new Promise((resolve): void => {
-        setTimeout(resolve, (attempt - 1) * 1000);
-      });
+    })(),
+    cancel(error: Error = new Error("Canceled.")): void {
+      cancelError = error;
     }
-  }
+  };
 }
