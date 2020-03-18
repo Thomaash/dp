@@ -35,6 +35,7 @@ export class Blocking<
 > {
   private _entries = new Map<string, BlockingEntry<Place, Blocker, Blocked>>();
   private _blockedBy = new MapWithDefaultValue<Blocked, number>(0);
+  private _blockedAtPlace = new MapWithDefaultValue<Place, number>(0);
 
   private _queryEntries(
     query: BlockingQuery<Place, Blocker, Blocked>
@@ -54,6 +55,7 @@ export class Blocking<
     if (!this._entries.has(key)) {
       this._entries.set(key, Object.freeze({ place, blocker, blocked }));
       this._blockedBy.set(blocked, this._blockedBy.get(blocked) + 1);
+      this._blockedAtPlace.set(place, this._blockedAtPlace.get(place) + 1);
     }
 
     return this;
@@ -69,8 +71,10 @@ export class Blocking<
       const blockedBy = this._blockedBy.get(blocked);
       if (blockedBy > 1) {
         this._blockedBy.set(blocked, this._blockedBy.get(blocked) - 1);
+        this._blockedAtPlace.set(place, this._blockedAtPlace.get(place) - 1);
       } else {
         this._blockedBy.delete(blocked);
+        this._blockedAtPlace.delete(place);
       }
     }
 
@@ -124,6 +128,10 @@ export class Blocking<
     query: BlockingQuery<Place, Blocker, Blocked>
   ): BlockingEntry<Place, Blocker, Blocked>[] {
     return this._queryEntries(query);
+  }
+
+  public countBlockedAtPlace(place: Place): number {
+    return this._blockedAtPlace.get(place);
   }
 
   public dumpState(): void {

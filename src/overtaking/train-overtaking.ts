@@ -61,10 +61,18 @@ export class TrainOvertaking {
   }
 
   async planOvertaking(
-    { exitRoutes, outflowStation: station }: OvertakingArea,
+    { exitRoutes, outflowStation: station, maxWaiting }: OvertakingArea,
     overtaking: Train,
     waiting: Train
   ): Promise<void> {
+    if (this._blocking.countBlockedAtPlace(station.stationID) >= maxWaiting) {
+      // Too many trains waiting at the station.
+      console.info(
+        `Can't plan overtaking of ${waiting.trainID} by ${overtaking.trainID} as too man trains would be waiting at ${station.stationID}.`
+      );
+      return;
+    }
+
     if (
       this._blocking.isBlocked(
         station.stationID,
