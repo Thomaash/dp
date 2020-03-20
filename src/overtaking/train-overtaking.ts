@@ -68,7 +68,7 @@ export class TrainOvertaking {
     if (this._blocking.countBlockedAtPlace(station.stationID) >= maxWaiting) {
       // Too many trains waiting at the station.
       console.info(
-        `Can't plan overtaking of ${waiting.trainID} by ${overtaking.trainID} as too man trains would be waiting at ${station.stationID}.`
+        `Can't plan overtaking of ${waiting.trainID} by ${overtaking.trainID} as too many trains would be waiting at ${station.stationID}.`
       );
       return;
     }
