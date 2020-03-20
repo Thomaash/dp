@@ -61,6 +61,16 @@ export const decisionModule: DecisionModule = {
         nextStation
       );
 
+      if (
+        !Number.isFinite(train1DelayedArrival) ||
+        !Number.isFinite(train2DelayedArrival)
+      ) {
+        console.error(
+          "Some ETA is not a finite number, " +
+            "this is a bug as this should never happen."
+        );
+      }
+
       if (train1DelayedArrival > train2DelayedArrival) {
         console.info(
           `Overtake ${train1.trainID} by ${train2.trainID} at ${
