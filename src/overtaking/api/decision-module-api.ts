@@ -40,9 +40,7 @@ export class DecisionModuleAPIFactory {
         }
 
         const plannedArrival =
-          (entry.type === "pass"
-            ? entry.arrival ?? entry.departure
-            : entry.arrival) ?? Number.POSITIVE_INFINITY;
+          entry.arrival ?? entry.departure ?? Number.POSITIVE_INFINITY;
 
         const lastStation = this._tracker.getTrainsLastStation(train.trainID);
         const reserve = lastStation
