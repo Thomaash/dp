@@ -65,6 +65,8 @@ export {
 
 export * from "./runfile";
 
+export * from "./functions";
+
 export interface OTAPIConstructorParams {
   host?: string;
   keepAlive?: boolean;
