@@ -13,6 +13,8 @@ import { Area } from "../train-tracker";
 export { Area, Itinerary, Path, Route, Station, Train, Vertex };
 
 export interface DecisionModuleAPI {
+  formatSimulationTime(simulationTime: number, ms?: boolean): string;
+
   cancelOvertaking(overtaking: Train, waiting: Train): Promise<void>;
   planOvertaking(overtaking: Train, waiting: Train): Promise<void>;
 

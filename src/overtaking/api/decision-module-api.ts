@@ -3,6 +3,7 @@ import { TrainTracker } from "../../train-tracker";
 import { DecisionModuleAPI, OvertakingArea } from "../api-public";
 import { TrainOvertaking } from "../train-overtaking";
 import { OvertakingData } from "./overtaking-data";
+import { formatSimulationTime } from "../../otapi";
 
 export class DecisionModuleAPIFactory {
   private readonly _apiBase: Omit<
@@ -17,6 +18,8 @@ export class DecisionModuleAPIFactory {
     private readonly _trainOvertaking: TrainOvertaking
   ) {
     this._apiBase = {
+      formatSimulationTime,
+
       getTrain: (trainID): ReturnType<DecisionModuleAPI["getTrain"]> => {
         const train = this._infrastructure.trains.get(trainID);
         if (train == null) {

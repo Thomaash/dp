@@ -7,6 +7,7 @@ export const decisionModule: DecisionModule = {
   newTrainEnteredOvertakingArea(
     {
       cancelOvertaking,
+      formatSimulationTime,
       getCommonTimetableEntries,
       getOvertakingAreasByStations,
       getTrainsDelayedArrivalAtStation,
@@ -62,13 +63,13 @@ export const decisionModule: DecisionModule = {
 
       if (train1DelayedArrival > train2DelayedArrival) {
         console.info(
-          "Overtake " +
-            train1.trainID +
-            " by " +
-            train2.trainID +
-            " at " +
-            overtakingArea.outflowStation.stationID +
-            "."
+          `Overtake ${train1.trainID} by ${train2.trainID} at ${
+            overtakingArea.outflowStation.stationID
+          } (${formatSimulationTime(
+            train1DelayedArrival
+          )} vs ${formatSimulationTime(train2DelayedArrival)} at ${
+            nextStation.stationID
+          }).`
         );
 
         planOvertaking(train2, train1).catch((error): void => {
@@ -76,13 +77,13 @@ export const decisionModule: DecisionModule = {
         });
       } else {
         console.info(
-          "Don't overtake " +
-            train1.trainID +
-            " by " +
-            train2.trainID +
-            " at " +
-            overtakingArea.outflowStation.stationID +
-            "."
+          `Don't overtake ${train1.trainID} by ${train2.trainID} at ${
+            overtakingArea.outflowStation.stationID
+          }, ${formatSimulationTime(
+            train1DelayedArrival
+          )} vs ${formatSimulationTime(train2DelayedArrival)} at ${
+            nextStation.stationID
+          }.`
         );
 
         cancelOvertaking(train2, train1).catch((error): void => {
