@@ -25,6 +25,8 @@ export function overtaking({
   setup: () => Promise<void>;
   cleanup: () => Promise<void>;
 } {
+  const cleanupCallbacks: (() => void)[] = [];
+
   const modules = [maxSpeedDM, timetableGuessDM, ...customModules];
 
   const requestedDefaultModule = modules.find(
@@ -36,7 +38,6 @@ export function overtaking({
   const defaultModule: DecisionModule = requestedDefaultModule;
 
   const trainOvertaking = new TrainOvertaking(infrastructure, otapi);
-  const cleanupCallbacks: (() => void)[] = [];
 
   const overtakingData = getOvertakingData(infrastructure);
   const { overtakingAreas } = overtakingData;
