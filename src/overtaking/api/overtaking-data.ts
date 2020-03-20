@@ -59,6 +59,8 @@ function getOvertakingAreas(infrastructure: Infrastructure): OvertakingArea[] {
             return acc;
           } else if (Number.isNaN(acc) && !Number.isNaN(val)) {
             return val;
+          } else if (acc === val) {
+            return val;
           } else {
             throw new Error(
               `Conflicting arguments found in ${overtakingAreaID} overtaking area.`
