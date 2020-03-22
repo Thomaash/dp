@@ -182,9 +182,6 @@ export class OTAPI {
       return;
     }
 
-    const timeName = `Paused for ${requests.length} requests (#${nextId()})`;
-    console.time(timeName);
-
     ++this._pausedBy;
     if (this._pausedBy === 1) {
       await this.pauseSimulation();
@@ -196,8 +193,6 @@ export class OTAPI {
     if (this._pausedBy === 0) {
       await this.startSimulation();
     }
-
-    console.timeEnd(timeName);
   }
 
   public activateTrain(parameters: ActivateTrainParameters): Promise<void> {
