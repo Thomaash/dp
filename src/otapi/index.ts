@@ -45,13 +45,13 @@ import {
   StepSimulationParameters,
   TerminateApplicationParameters,
   send,
-  SendParameters
+  SendParameters,
 } from "./requests";
 import {
   EventCallback,
   EventNamePayloadPair,
   EventPayloads,
-  ResponseManager
+  ResponseManager,
 } from "./responses";
 import { Config } from "./config";
 import { RateLimiter } from "./util";
@@ -60,7 +60,7 @@ export {
   AnyEventCallback,
   EventCallback,
   EventNames,
-  EventPayloads
+  EventPayloads,
 } from "./responses";
 
 export * from "./runfile";
@@ -82,7 +82,7 @@ const defaultConstructorParams: Required<OTAPIConstructorParams> = {
   maxSimultaneousRequests: 10,
   portApp: 9004,
   portOT: 9002,
-  protocol: "http"
+  protocol: "http",
 };
 
 export interface SendInPauseAPI {
@@ -109,7 +109,7 @@ export class OTAPI {
   public constructor(constructorParams: OTAPIConstructorParams) {
     const params: Required<OTAPIConstructorParams> = Object.freeze({
       ...defaultConstructorParams,
-      ...constructorParams
+      ...constructorParams,
     });
 
     this.config = Object.freeze<Config>({
@@ -117,7 +117,7 @@ export class OTAPI {
       keepAlive: params.keepAlive,
       portApp: params.portApp,
       portOT: params.portOT,
-      protocol: params.protocol
+      protocol: params.protocol,
     });
 
     this._limiter = new RateLimiter(params.maxSimultaneousRequests);
@@ -175,7 +175,7 @@ export class OTAPI {
     await func({
       send: (...rest): void => {
         requests.push(this.send.bind(this, ...rest));
-      }
+      },
     });
 
     if (requests.length === 0) {

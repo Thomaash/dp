@@ -123,7 +123,7 @@ export class DecisionModuleAPIFactory {
         return this._overtakingData.overtakingAreasByStations
           .get(inflowStation)
           .get(station);
-      }
+      },
     };
     Object.freeze(this._apiBase);
   }
@@ -144,7 +144,7 @@ export class DecisionModuleAPIFactory {
           overtaking,
           waiting
         );
-      }
+      },
     });
   }
 }

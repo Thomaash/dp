@@ -31,7 +31,7 @@ const escapesXMLAttribute = new Map([
   ["'", "&apos;"],
   ["<", "&lt;"],
   [">", "&gt;"],
-  ['"', "&quot;"]
+  ['"', "&quot;"],
 ]);
 function escapeXMLAttribute(value: string): string {
   return value
@@ -79,9 +79,9 @@ export function send<Name extends keyof SendParameters>(
         : undefined,
 
       headers: {
-        "Content-Type": "application/xml; charset=utf-8"
+        "Content-Type": "application/xml; charset=utf-8",
       },
-      responseType: "text"
+      responseType: "text",
     })
   );
 
@@ -99,6 +99,6 @@ export function send<Name extends keyof SendParameters>(
         throw error;
       }
     })(),
-    cancel
+    cancel,
   };
 }

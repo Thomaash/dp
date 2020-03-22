@@ -14,7 +14,7 @@ import {
   TimetableEntry,
   Train,
   Vehicle,
-  Vertex
+  Vertex,
 } from "./types";
 
 import { parseInfrastructure, ParseInfrastructureXML } from "./parser";
@@ -36,19 +36,19 @@ export const infrastructureFactory = {
       courses,
       infrastructure,
       rollingStock,
-      timetables
+      timetables,
     ] = await Promise.all([
       readFile(paths.courses, "utf-8"),
       readFile(paths.infrastructure, "utf-8"),
       readFile(paths.rollingStock, "utf-8"),
-      readFile(paths.timetables, "utf-8")
+      readFile(paths.timetables, "utf-8"),
     ]);
 
     return infrastructureFactory.buildFromText({
       courses,
       infrastructure,
       rollingStock,
-      timetables
+      timetables,
     });
   },
   async buildFromText(
@@ -71,7 +71,7 @@ export const infrastructureFactory = {
       data.vehicles,
       data.vertexes
     );
-  }
+  },
 };
 
 const kindToPropName = new Map([
@@ -81,7 +81,7 @@ const kindToPropName = new Map([
   ["station", "stations"],
   ["timetable", "timetables"],
   ["train", "trains"],
-  ["vertex", "vertexes"]
+  ["vertex", "vertexes"],
 ] as const);
 
 export type CommonTimetableEntry = [TimetableEntry, TimetableEntry];
@@ -292,7 +292,7 @@ export class Infrastructure implements InfrastructureData {
       queue.enqueue({
         firstRoute: route,
         length: route.length,
-        routes: new Set([route])
+        routes: new Set([route]),
       });
     }
 
@@ -321,7 +321,7 @@ export class Infrastructure implements InfrastructureData {
         queue.enqueue({
           firstRoute: prevRoute,
           length,
-          routes
+          routes,
         });
       }
     }

@@ -21,5 +21,5 @@ module.exports.decisionModule = {
         "Hi there, I'm example decision module and I see no reason for overtaking."
       );
     }
-  }
+  },
 };

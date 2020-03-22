@@ -22,5 +22,5 @@ export const decisionModule: DecisionModule = {
         console.error("Can't plan overtaking:", error);
       });
     }
-  }
+  },
 };

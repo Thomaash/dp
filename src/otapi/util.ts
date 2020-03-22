@@ -76,6 +76,6 @@ export function retry<T>(
     })(),
     cancel(error: Error = new Error("Canceled.")): void {
       cancelError = error;
-    }
+    },
   };
 }

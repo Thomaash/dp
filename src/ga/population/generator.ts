@@ -7,7 +7,7 @@ import {
   Statement,
   StatementFactory,
   Terminal,
-  TerminalFactory
+  TerminalFactory,
 } from "../language";
 
 type FixArgsFactories = Map<

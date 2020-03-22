@@ -25,8 +25,8 @@ export class TrainOvertaking {
       ...[
         ...this._infrastructure
           .getOrThrow("station", stationID)
-          .outflowRoutes.values()
-      ].map(({ routeID }): string => routeID)
+          .outflowRoutes.values(),
+      ].map(({ routeID }): string => routeID),
     ];
   }
 
@@ -39,7 +39,7 @@ export class TrainOvertaking {
       for (const routeID of this._getBlockRouteIDs(exitRouteID, stationID)) {
         send("setRouteDisallowed", {
           trainID: waitingTrainID,
-          routeID
+          routeID,
         });
       }
     });
@@ -54,7 +54,7 @@ export class TrainOvertaking {
       for (const routeID of this._getBlockRouteIDs(exitRouteID, stationID)) {
         send("setRouteAllowed", {
           trainID: waitingTrainID,
-          routeID
+          routeID,
         });
       }
     });
@@ -127,7 +127,7 @@ export class TrainOvertaking {
     if (
       this._blocking.isBlockedQuery({
         place: station.stationID,
-        blocked: waiting.trainID
+        blocked: waiting.trainID,
       })
     ) {
       // The train is still blocked at this station.
@@ -152,7 +152,7 @@ export class TrainOvertaking {
   ): Promise<void> {
     const blockedByOvertaking = this._blocking.unblockAll({
       place: station.stationID,
-      blocker: overtaking.trainID
+      blocker: overtaking.trainID,
     });
 
     await Promise.all(
@@ -161,7 +161,7 @@ export class TrainOvertaking {
           ({ blocked: waitingTrainID }): boolean =>
             !this._blocking.isBlockedQuery({
               place: station.stationID,
-              blocked: waitingTrainID
+              blocked: waitingTrainID,
             })
         )
         .flatMap(({ blocked: waitingTrainID }): Promise<void>[] =>

@@ -10,13 +10,13 @@ const y = Yargs()
     describe:
       "Whether this itinerary should be considered an overtaking opportunity or not.",
     required: false,
-    type: "boolean"
+    type: "boolean",
   })
   .option("max-waiting", {
     default: Number.NaN,
     describe: "How many trains can wait to be overtaking.",
     required: false,
-    type: "number"
+    type: "number",
   });
 
 export function parseItineraryArgs(s: string): ItineraryArgs {
@@ -24,6 +24,6 @@ export function parseItineraryArgs(s: string): ItineraryArgs {
 
   return {
     maxWaiting: args["max-waiting"],
-    overtaking: args["overtaking"]
+    overtaking: args["overtaking"],
   };
 }

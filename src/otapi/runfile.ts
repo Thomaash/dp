@@ -1,7 +1,7 @@
 import { promisify } from "util";
 import {
   readFile as readFileCallback,
-  writeFile as writeFileCallback
+  writeFile as writeFileCallback,
 } from "fs";
 
 const readFile = promisify(readFileCallback);

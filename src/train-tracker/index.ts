@@ -42,7 +42,7 @@ export class TrainTracker {
 
   private readonly _listeners = {
     "train-entered-area": new MapSet<Area, TrainHandler>(),
-    "train-left-area": new MapSet<Area, TrainHandler>()
+    "train-left-area": new MapSet<Area, TrainHandler>(),
   };
 
   public get size(): number {
@@ -144,7 +144,7 @@ export class TrainTracker {
 
           return {
             train,
-            position
+            position,
           };
         }
       )

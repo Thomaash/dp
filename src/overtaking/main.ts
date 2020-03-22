@@ -20,7 +20,7 @@ export function overtaking({
   defaultModule: defaultModuleName,
   infrastructure,
   modules: customModules,
-  otapi
+  otapi,
 }: OvertakingParams): {
   setup: () => Promise<void>;
   cleanup: () => Promise<void>;
@@ -71,7 +71,7 @@ export function overtaking({
                     entryRoute: route,
                     newTrain: train,
                     overtakingArea,
-                    time
+                    time,
                   })
                 );
               } catch (error) {
@@ -105,7 +105,7 @@ export function overtaking({
                 );
               }
             }
-          )
+          ),
         ]
       ),
       otapi.on("trainCreated", (_, { trainID }): void => {
@@ -120,7 +120,7 @@ export function overtaking({
           .catch((error): void => {
             console.error(`Can't allow routes for train ${trainID}.`, error);
           });
-      })
+      }),
     ]);
     cleanupCallbacks.push(...removeListeners);
   }

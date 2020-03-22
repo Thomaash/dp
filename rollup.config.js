@@ -13,27 +13,27 @@ export default [
       ...builtins,
       ...Object.keys(packageJSON.dependencies || {}),
       ...Object.keys(packageJSON.peerDependencies || {}),
-      ...Object.keys(packageJSON.devDependencies || {})
+      ...Object.keys(packageJSON.devDependencies || {}),
     ],
     output: {
       file: join(process.env.DIST || "./dist", "index.js"),
       format: "cjs",
-      sourcemap: true
+      sourcemap: true,
     },
     plugins: [
       nodeResolve({
         extensions: [".ts", ".js"],
         mainFields: ["module", "main"],
-        preferBuiltins: true
+        preferBuiltins: true,
       }),
       json(),
       typescript2({ tsconfig: "./tsconfig.rollup.json" }),
       commonjs({
         namedExports: {
           "typescript-collections": ["PriorityQueue"],
-          chai: ["expect"]
-        }
-      })
-    ]
-  }
+          chai: ["expect"],
+        },
+      }),
+    ],
+  },
 ];

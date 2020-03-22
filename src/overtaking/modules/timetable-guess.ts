@@ -12,7 +12,7 @@ export const decisionModule: DecisionModule = {
       getOvertakingAreasByStations,
       getTrainsDelayedArrivalAtStation,
       getTrainsInArea,
-      planOvertaking
+      planOvertaking,
     },
     { overtakingArea }
   ): void {
@@ -25,7 +25,7 @@ export const decisionModule: DecisionModule = {
     console.info();
     for (const [
       { train: train1 },
-      { train: train2 }
+      { train: train2 },
     ] of getAllOvertakingCandidates(trainsInArea)) {
       const commonTimetableEntries = getCommonTimetableEntries(
         overtakingArea.outflowStation,
@@ -101,5 +101,5 @@ export const decisionModule: DecisionModule = {
         });
       }
     }
-  }
+  },
 };

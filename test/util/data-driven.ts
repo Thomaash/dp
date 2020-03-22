@@ -18,7 +18,7 @@ export function ddIt<T extends (...args: any[]) => any>(
   prepare: Prepare<T>,
   test: (given: Given<T>) => void
 ): void {
-  describe(name, function(): void {
+  describe(name, function (): void {
     let fun: (...args: any[]) => any;
 
     it("Prepare", async (): Promise<void> => {
@@ -30,10 +30,10 @@ export function ddIt<T extends (...args: any[]) => any>(
         expect: (ret, message): void => {
           const argsName = JSON.stringify(args).slice(1, -1);
           const retName = JSON.stringify(ret);
-          it(`(${argsName}) => ${retName}`, function(): void {
+          it(`(${argsName}) => ${retName}`, function (): void {
             expect(fun(...args)).to.equal(ret, message);
           });
-        }
+        },
       })
     );
   });

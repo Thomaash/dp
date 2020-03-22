@@ -14,7 +14,7 @@ import {
   TimetableEntry,
   Train,
   Vehicle,
-  Vertex
+  Vertex,
 } from "./types";
 import { parseItineraryArgs } from "./args";
 
@@ -46,7 +46,7 @@ const units = {
   hour: 60 * 60,
   day: 60 * 60 * 24,
   month: 60 * 60 * 24 * (365.2425 / 12),
-  year: 60 * 60 * 24 * 365.2425
+  year: 60 * 60 * 24 * 365.2425,
 };
 function parseDuration(dwellTime: string): number {
   const [
@@ -62,7 +62,7 @@ function parseDuration(dwellTime: string): number {
     ,
     minutes = 0,
     ,
-    seconds = 0
+    seconds = 0,
   ] =
     /^P((\d+)Y)?((\d+)M)?((\d+)D)?T((\d+)H)?((\d+)M)?((\d+|\d*\.\d+)S)?$/i.exec(
       dwellTime
@@ -89,7 +89,7 @@ export async function parseInfrastructure(
 ): Promise<InfrastructureData> {
   const xmlParser = new xml2js.Parser({
     explicitChildren: true,
-    preserveChildrenOrder: true
+    preserveChildrenOrder: true,
   });
 
   // XML Documents {{{
@@ -165,7 +165,7 @@ export async function parseInfrastructure(
         Object.freeze<Formation>({
           formationID,
           length,
-          maxSpeed
+          maxSpeed,
         })
       );
     },
@@ -197,7 +197,7 @@ export async function parseInfrastructure(
         name,
         neighborVertexID,
         outflowRoutes,
-        vertexID
+        vertexID,
       });
     },
     new Map()
@@ -211,14 +211,14 @@ export async function parseInfrastructure(
     inflowRoutes,
     name,
     outflowRoutes,
-    vertexID
+    vertexID,
   } of tempVertexes.values()) {
     vertexes.set(vertexID, {
       inflowRoutes,
       name,
       neighborVertex: null as any,
       outflowRoutes,
-      vertexID
+      vertexID,
     });
   }
   for (const tempVertex of tempVertexes.values()) {
@@ -292,7 +292,7 @@ export async function parseInfrastructure(
     stationInflowRoutes,
     stationOutflowRoutes,
     stations,
-    stationsByOCPID
+    stationsByOCPID,
   } = xmlOperationControlPoints.reduce<StationsReduceAcc>(
     (acc, xmlOCP): StationsReduceAcc => {
       const stationID: string = xmlOCP.$.code;
@@ -306,7 +306,7 @@ export async function parseInfrastructure(
         inflowRoutes,
         name,
         outflowRoutes,
-        stationID
+        stationID,
       });
 
       acc.stationInflowRoutes.set(station, inflowRoutes);
@@ -320,7 +320,7 @@ export async function parseInfrastructure(
       stationInflowRoutes: new Map(),
       stationOutflowRoutes: new Map(),
       stations: new Map(),
-      stationsByOCPID: new Map()
+      stationsByOCPID: new Map(),
     }
   );
 
@@ -385,7 +385,7 @@ export async function parseInfrastructure(
             minimalDwellTime,
             plannedDwellTime,
             station,
-            type
+            type,
           });
         }
       );
@@ -477,7 +477,7 @@ export async function parseInfrastructure(
           return station;
         }
       ),
-      routeID
+      routeID,
     });
 
     const entryTempVertex = tempVertexes.get(route.vertexes[0].vertexID);
@@ -588,7 +588,7 @@ export async function parseInfrastructure(
         ),
         vertexes: pathRoutes.flatMap(
           (route): readonly Vertex[] => route.vertexes
-        )
+        ),
       })
     );
 
@@ -649,7 +649,7 @@ export async function parseInfrastructure(
           ),
           vertexes: itineraryPaths.flatMap(
             (route): readonly Vertex[] => route.vertexes
-          )
+          ),
         })
       );
 
@@ -746,7 +746,7 @@ export async function parseInfrastructure(
         routes: trainRoutes,
         timetable,
         trainID,
-        vertexes: trainVertexes
+        vertexes: trainVertexes,
       })
     );
   }, new Map());
@@ -770,7 +770,7 @@ export async function parseInfrastructure(
     timetables,
     trains,
     vehicles,
-    vertexes
+    vertexes,
   });
 }
 

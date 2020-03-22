@@ -39,7 +39,7 @@ export class PopulationCompetition {
     return {
       combined: fit * penalty,
       fit,
-      penalty
+      penalty,
     };
   }
 
@@ -53,7 +53,7 @@ export class PopulationCompetition {
       return acc.set(statement, {
         combined: fit * penalty,
         fit,
-        penalty
+        penalty,
       });
     }, new Map<Statement, FitStats>());
   }

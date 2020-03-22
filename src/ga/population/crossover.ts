@@ -21,7 +21,7 @@ function crossoverOperands<A extends number, B extends number>(
 
   return {
     a: (newA as readonly Statement[]) as Tuple<Statement, A>,
-    b: (newB as readonly Statement[]) as Tuple<Statement, B>
+    b: (newB as readonly Statement[]) as Tuple<Statement, B>,
   };
 }
 
@@ -58,7 +58,7 @@ export class PopulationCrossover {
 
       return [
         a.create(operandsAfterCrossover.a),
-        b.create(operandsAfterCrossover.b)
+        b.create(operandsAfterCrossover.b),
       ];
     } else {
       // Some terminal encountered, nowhere else to go.

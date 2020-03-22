@@ -12,7 +12,7 @@ import {
   plus,
   power,
   smallIntegerConstant,
-  times
+  times,
 } from "../../../src/ga/language";
 import {
   PopulationCompetition,
@@ -20,7 +20,7 @@ import {
   PopulationGenerator,
   PopulationMutator,
   codeLengthPenalty,
-  heightPenalty
+  heightPenalty,
 } from "../../../src/ga/population";
 import { deepFreeze } from "../../../src/util/deep-freeze";
 import { createRng, testCommon, prop } from "../util";
@@ -47,16 +47,16 @@ const create = (
   return { c1, c2, c3, c4, c5, p1c1c2, p2c3c4, m1p1p2 };
 };
 
-describe("Population", function(): void {
-  describe("Generator", function(): void {
+describe("Population", function (): void {
+  describe("Generator", function (): void {
     const testOptions = deepFreeze([
       bipolarConstant,
       minus,
       plus,
-      smallIntegerConstant
+      smallIntegerConstant,
     ]);
 
-    it("Statement Factories", function(): void {
+    it("Statement Factories", function (): void {
       const generator = new PopulationGenerator("TEST", testOptions);
 
       for (let i = 0; i < 1000; ++i) {
@@ -67,7 +67,7 @@ describe("Population", function(): void {
       }
     });
 
-    it("Terminal Factories", function(): void {
+    it("Terminal Factories", function (): void {
       const generator = new PopulationGenerator("TEST", testOptions);
 
       for (let i = 0; i < 1000; ++i) {
@@ -78,7 +78,7 @@ describe("Population", function(): void {
       }
     });
 
-    it("Operator Factories", function(): void {
+    it("Operator Factories", function (): void {
       const generator = new PopulationGenerator("TEST", testOptions);
 
       for (let i = 0; i < 1000; ++i) {
@@ -89,7 +89,7 @@ describe("Population", function(): void {
       }
     });
 
-    describe("Fixed number of args operator Factories", function(): void {
+    describe("Fixed number of args operator Factories", function (): void {
       const population = deepFreeze([
         bipolarConstant,
         floor,
@@ -97,15 +97,15 @@ describe("Population", function(): void {
         minus,
         not,
         plus,
-        smallIntegerConstant
+        smallIntegerConstant,
       ]);
 
       for (const { args, operators } of [
         { args: 1, operators: [floor, not] },
         { args: 2, operators: [minus, plus] },
-        { args: 3, operators: [ifElse] }
+        { args: 3, operators: [ifElse] },
       ] as const) {
-        it(`Arguments: ${args}`, function(): void {
+        it(`Arguments: ${args}`, function (): void {
           const generator = new PopulationGenerator("TEST", population);
 
           for (let i = 0; i < 1000; ++i) {
@@ -118,9 +118,9 @@ describe("Population", function(): void {
       }
     });
 
-    describe("Full", function(): void {
+    describe("Full", function (): void {
       [1, 2, 3, 7, 10].forEach((height): void => {
-        it(`Height: ${height}`, function(): void {
+        it(`Height: ${height}`, function (): void {
           this.timeout(50000);
 
           const generator = new PopulationGenerator(
@@ -144,13 +144,13 @@ describe("Population", function(): void {
       });
     });
 
-    describe("Grow", function(): void {
+    describe("Grow", function (): void {
       [
         [1, 1],
         [1, 7],
-        [3, 9]
+        [3, 9],
       ].forEach(([min, max]): void => {
-        it(`Height: ${min}-${max}`, function(): void {
+        it(`Height: ${min}-${max}`, function (): void {
           this.timeout(10000);
 
           const generator = new PopulationGenerator(
@@ -184,10 +184,10 @@ describe("Population", function(): void {
     });
   });
 
-  describe("Mutator", function(): void {
-    describe("Subtree", function(): void {
+  describe("Mutator", function (): void {
+    describe("Subtree", function (): void {
       for (const chance of [0, 0.1, 1]) {
-        it(`Chance ${chance}`, function(): void {
+        it(`Chance ${chance}`, function (): void {
           this.timeout(4000);
 
           const { c5, m1p1p2 } = create();
@@ -237,8 +237,8 @@ describe("Population", function(): void {
     });
   });
 
-  describe("Crossover", function(): void {
-    it("Simple", function(): void {
+  describe("Crossover", function (): void {
+    it("Simple", function (): void {
       this.timeout(4000);
 
       const ancestorA = ((): Statement => {
@@ -321,8 +321,8 @@ describe("Population", function(): void {
     });
   });
 
-  describe("Competition", function(): void {
-    it("Evaluate One", function(): void {
+  describe("Competition", function (): void {
+    it("Evaluate One", function (): void {
       const c1 = smallIntegerConstant.create((): number => 1 / 100);
       const c2 = smallIntegerConstant.create((): number => 2 / 100);
       const c3 = smallIntegerConstant.create((): number => 32 / 100);

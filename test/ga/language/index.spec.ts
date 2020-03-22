@@ -18,12 +18,12 @@ import {
   or,
   plus,
   power,
-  times
+  times,
 } from "../../../src/ga/language";
 import { createRng, ddIt, numberRE, testCommon } from "../util";
 
-describe("Language", function(): void {
-  it("Code construction", function(): void {
+describe("Language", function (): void {
+  it("Code construction", function (): void {
     const rng = createRng();
 
     const c1 = integerConstant.create(rng);
@@ -45,7 +45,7 @@ describe("Language", function(): void {
     testCommon(2, "1 + 2 - (3 + 4)", m1);
   });
 
-  it("Cloning", function(): void {
+  it("Cloning", function (): void {
     const rng = createRng();
 
     const c1 = integerConstant.create(rng);
@@ -70,20 +70,12 @@ describe("Language", function(): void {
     testCommon(2, "1 + 2 - (3 + 4)", m2);
 
     // Same structure.
-    expect(m1)
-      .to.have.property("operands")
-      .that.has.lengthOf(2);
-    expect(m1.operands[0])
-      .to.have.property("operands")
-      .that.has.lengthOf(2);
-    expect(m1.operands[1])
-      .to.have.property("operands")
-      .that.has.lengthOf(2);
+    expect(m1).to.have.property("operands").that.has.lengthOf(2);
+    expect(m1.operands[0]).to.have.property("operands").that.has.lengthOf(2);
+    expect(m1.operands[1]).to.have.property("operands").that.has.lengthOf(2);
 
     // Same code.
-    expect(m2)
-      .to.have.property("code")
-      .that.equals(m1.code);
+    expect(m2).to.have.property("code").that.equals(m1.code);
 
     // Different instances.
     const a1: any = m1;
@@ -98,7 +90,7 @@ describe("Language", function(): void {
     expect(a1.operands[1].operands[1]).to.not.equal(a2.operands[1].operands[1]);
   });
 
-  it("Random Bipolar Constant", function(): void {
+  it("Random Bipolar Constant", function (): void {
     this.timeout(20000);
 
     const rng = createRng();
@@ -118,7 +110,7 @@ describe("Language", function(): void {
     });
   });
 
-  describe("Inputs", function(): void {
+  describe("Inputs", function (): void {
     ddIt(
       "Order independent",
       (): ((...args: number[]) => number) => {
@@ -165,7 +157,7 @@ describe("Language", function(): void {
     );
   });
 
-  describe("Operators", function(): void {
+  describe("Operators", function (): void {
     const configs: [OperatorFactory<PositiveInteger>, any[], string, any][] = [
       // [Divide, [0, 0], "0 / 0", Number.NaN], // TODO
       [and, [false, false], "false && false", false],
@@ -205,13 +197,13 @@ describe("Language", function(): void {
       [times, [-77, -14], "-77 * -14", 1078],
       [times, [0, 0], "0 * 0", 0],
       [times, [1, -14], "1 * -14", -14],
-      [times, [33, 456789], "33 * 456789", 15074037]
+      [times, [33, 456789], "33 * 456789", 15074037],
     ];
 
     configs.forEach(([operatorFactory, inputs, code, output]): void => {
       const name = `${operatorFactory.name}: ${JSON.stringify(inputs)})`;
 
-      it(name, function(): void {
+      it(name, function (): void {
         const operands = inputs.map((input): any => {
           switch (typeof input) {
             case "boolean":

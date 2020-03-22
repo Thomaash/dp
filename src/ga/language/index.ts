@@ -10,7 +10,7 @@ import {
   Terminal,
   TerminalFactory,
   Tuple,
-  Rng
+  Rng,
 } from "./types";
 
 // Generic {{{
@@ -80,7 +80,7 @@ function createOperatorFactory<Args extends PositiveInteger>(
       heightMin,
       name,
       operands,
-      run
+      run,
     });
   }
 
@@ -109,7 +109,7 @@ function createTerminalFactory(
         heightMax: 1,
         heightMin: 1,
         name,
-        run
+        run,
       });
     }
 
@@ -124,7 +124,7 @@ function createTerminalFactory(
       heightMax: 1,
       heightMin: 1,
       name,
-      run
+      run,
     });
   }
 
@@ -183,7 +183,7 @@ export const terminals = [
   bool,
   constant,
   integerConstant,
-  smallIntegerConstant
+  smallIntegerConstant,
 ];
 
 // }}}
@@ -218,7 +218,7 @@ export const operators = [
   plus,
   power,
   times,
-  weakEquals
+  weakEquals,
 ];
 
 // }}}

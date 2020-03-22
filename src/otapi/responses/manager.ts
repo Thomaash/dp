@@ -37,7 +37,7 @@ async function processSOAP(raw: string): Promise<Content> {
     attributes,
     name,
     raw,
-    xml
+    xml,
   };
 }
 
@@ -66,7 +66,7 @@ export class ResponseManager {
       app.use(
         bodyParser.text({
           type: (): boolean => true,
-          limit: "50mb"
+          limit: "50mb",
         })
       );
 
@@ -79,14 +79,14 @@ export class ResponseManager {
 
           [
             ...(this._manies.get(anyEvent) || []),
-            ...(this._manies.get(soap.name) || [])
+            ...(this._manies.get(soap.name) || []),
           ].forEach((callback): void => {
             callback(name, payload);
           });
 
           [
             ...(this._onces.get(anyEvent) || []).splice(0),
-            ...(this._onces.get(soap.name) || []).splice(0)
+            ...(this._onces.get(soap.name) || []).splice(0),
           ].forEach((callback): void => {
             callback(name, payload);
           });

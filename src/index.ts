@@ -3,7 +3,7 @@ import { promisify } from "util";
 import { resolve } from "path";
 import {
   readFile as readFileCallback,
-  writeFile as writeFileCallback
+  writeFile as writeFileCallback,
 } from "fs";
 import { ChildProcessWithoutNullStreams, spawn } from "child_process";
 
@@ -11,7 +11,7 @@ import {
   AnyEventCallback,
   OTAPI,
   parseRunfile,
-  randomizePortsInRunfile
+  randomizePortsInRunfile,
 } from "./otapi";
 import { Deferred } from "./util";
 import { args } from "./cli";
@@ -57,7 +57,7 @@ function spawnAndLog(
         [
           `OpenTrack exited with exit code ${code}.`,
           `STDOUT:\n${stdout}`,
-          `STDERR:\n${stderr}`
+          `STDERR:\n${stderr}`,
         ].join("\n\n")
       )
         .then(resolve.bind(null, code))
@@ -101,9 +101,9 @@ async function startOpenTrack(otapi: OTAPI): Promise<{ command: any }> {
         Promise.all([
           readyForSimulation,
           simulationServerStarted,
-          waitPort({ port: otapi.config.portOT, output: "silent" })
+          waitPort({ port: otapi.config.portOT, output: "silent" }),
         ]),
-        failed.promise
+        failed.promise,
       ]);
       await otapi.openSimulationPanel();
       console.info("OpenTrack is ready for simulation.");
@@ -137,7 +137,7 @@ async function startOpenTrack(otapi: OTAPI): Promise<{ command: any }> {
     courses: args["ot-export-courses"],
     infrastructure: args["ot-export-infrastructure"],
     rollingStock: args["ot-export-rolling-stock"],
-    timetables: args["ot-export-timetable"]
+    timetables: args["ot-export-timetable"],
   });
 
   console.info(
@@ -183,7 +183,7 @@ async function startOpenTrack(otapi: OTAPI): Promise<{ command: any }> {
       `  ${infrastructure.timetables.size} timetables.`,
 
       "",
-      ""
+      "",
     ].join("\n")
   );
 
@@ -201,14 +201,14 @@ async function startOpenTrack(otapi: OTAPI): Promise<{ command: any }> {
     defaultModule: args["overtaking-default-module"],
     infrastructure,
     modules: overtakingModules,
-    otapi
+    otapi,
   };
 
   try {
     await otapi.start();
 
     if (args["log-ot-responses"]) {
-      const debugCallback: AnyEventCallback = async function(
+      const debugCallback: AnyEventCallback = async function (
         name,
         payload
       ): Promise<void> {

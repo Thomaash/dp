@@ -25,13 +25,10 @@ function verifyPayload(
     [
       `Unexpected keys were found in the payload (${payloadText}) for ${name}:`,
       "  Actual:",
-      "    " +
-        Object.keys(attrs)
-          .sort()
-          .join(", "),
+      "    " + Object.keys(attrs).sort().join(", "),
       "  Expected (one of):",
       ...variants.map((variant): string => "    " + variant.sort().join(", ")),
-      ""
+      "",
     ].join("\n")
   );
 }
@@ -55,7 +52,7 @@ export function createPayload(
       return {
         infraPartID: attrs["infraPartID"],
         time: number(attrs["time"]),
-        trainID: attrs["trainID"]
+        trainID: attrs["trainID"],
       };
 
     case "ping":
@@ -65,7 +62,7 @@ export function createPayload(
     case "simStopped":
       verifyPayload(eventName, attrs, ["time"]);
       return {
-        time: number(attrs["time"])
+        time: number(attrs["time"]),
       };
 
     case "routePartReleased":
@@ -74,7 +71,7 @@ export function createPayload(
         partID: attrs["partID"],
         routeID: attrs["routeID"],
         time: number(attrs["time"]),
-        trainID: attrs["trainID"]
+        trainID: attrs["trainID"],
       };
 
     case "routeEntry":
@@ -85,7 +82,7 @@ export function createPayload(
       return {
         routeID: attrs["routeID"],
         time: number(attrs["time"]),
-        trainID: attrs["trainID"]
+        trainID: attrs["trainID"],
       };
 
     case "signalPassed":
@@ -99,7 +96,7 @@ export function createPayload(
           "signalID",
           "signalType",
           "time",
-          "trainID"
+          "trainID",
         ],
         [
           "routeID",
@@ -107,7 +104,7 @@ export function createPayload(
           "signalID",
           "signalType",
           "time",
-          "trainID"
+          "trainID",
         ],
         ["signalAspectMain", "signalID", "signalType", "time", "trainID"],
         ["signalID", "signalType", "time", "trainID"]
@@ -119,7 +116,7 @@ export function createPayload(
         signalID: attrs["signalID"],
         signalType: attrs["signalType"],
         time: number(attrs["time"]),
-        trainID: attrs["trainID"]
+        trainID: attrs["trainID"],
       };
 
     case "simReadyForSimulation":
@@ -134,13 +131,13 @@ export function createPayload(
         "delay",
         "stationID",
         "time",
-        "trainID"
+        "trainID",
       ]);
       return {
         delay: number(attrs["delay"]),
         stationID: attrs["stationID"],
         time: number(attrs["time"]),
-        trainID: attrs["trainID"]
+        trainID: attrs["trainID"],
       };
 
     case "trainCreated":
@@ -148,7 +145,7 @@ export function createPayload(
       verifyPayload(eventName, attrs, ["time", "trainID"]);
       return {
         time: number(attrs["time"]),
-        trainID: attrs["trainID"]
+        trainID: attrs["trainID"],
       };
 
     case "trainPositionReport":
@@ -159,7 +156,7 @@ export function createPayload(
         "routeOffset",
         "speed",
         "time",
-        "trainID"
+        "trainID",
       ]);
       return {
         acceleration: number(attrs["acceleration"]),
@@ -168,7 +165,7 @@ export function createPayload(
         routeOffset: number(attrs["routeOffset"]),
         speed: number(attrs["speed"]),
         time: number(attrs["time"]),
-        trainID: attrs["trainID"]
+        trainID: attrs["trainID"],
       };
 
     default:

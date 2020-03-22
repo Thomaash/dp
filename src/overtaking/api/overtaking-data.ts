@@ -4,7 +4,7 @@ import {
   Route,
   Vertex,
   Itinerary,
-  Station
+  Station,
 } from "../../infrastructure";
 import { MapSet, MapMapSet, Bug } from "../../util";
 import { expect } from "chai";
@@ -125,7 +125,7 @@ function getOvertakingAreas(infrastructure: Infrastructure): OvertakingArea[] {
               route.stations.includes(station) ||
               route.stationAreas.includes(station)
           )
-        )
+        ),
       ]);
 
       return Object.freeze<OvertakingArea>({
@@ -142,7 +142,7 @@ function getOvertakingAreas(infrastructure: Infrastructure): OvertakingArea[] {
         overtakingAreaID,
         routes,
         stationAreas,
-        stations
+        stations,
       });
     }
   );
@@ -185,10 +185,7 @@ function getOvertakingAreasByStations(
     const finalStation = oa.outflowStation;
 
     for (const inflowStation of oa.inflowStations) {
-      overtakingAreasByStations
-        .get(inflowStation)
-        .get(finalStation)
-        .add(oa);
+      overtakingAreasByStations.get(inflowStation).get(finalStation).add(oa);
     }
   }
 
@@ -213,6 +210,6 @@ export function getOvertakingData(
   return Object.freeze<OvertakingData>({
     overtakingAreas,
     overtakingAreasByStation,
-    overtakingAreasByStations
+    overtakingAreasByStations,
   });
 }

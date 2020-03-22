@@ -6,7 +6,7 @@ import {
   Vertex,
   Path,
   CommonTimetableEntry,
-  Timetable
+  Timetable,
 } from "../infrastructure";
 import { Area } from "../train-tracker";
 
