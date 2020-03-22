@@ -3,10 +3,24 @@ export class Deferred<T> {
   public resolve!: (value: T | PromiseLike<T>) => void;
   public reject!: (reason: Error) => void;
 
+  public pending = true;
+  public resolved = false;
+  public rejected = false;
+
   public constructor() {
     this.promise = new Promise<T>((resolve, reject) => {
-      this.resolve = resolve;
-      this.reject = reject;
+      this.resolve = (...rest): void => {
+        this.pending = false;
+        this.resolved = true;
+
+        resolve(...rest);
+      };
+      this.reject = (...rest): void => {
+        this.pending = false;
+        this.rejected = true;
+
+        reject(...rest);
+      };
     });
   }
 }
