@@ -65,8 +65,18 @@ export class TrainOvertaking {
     overtaking: Train,
     waiting: Train
   ): Promise<void> {
-    if (this._blocking.countBlockedAtPlace(station.stationID) >= maxWaiting) {
-      // Too many trains waiting at the station.
+    if (
+      // We can safely continue if the waiting train is already blocket at the
+      // station.
+      !this._blocking.isBlockedQuery({
+        place: station.stationID,
+        blocked: waiting.trainID,
+      }) &&
+      // We can safely continue only if max waiting wasn't reached yet.
+      this._blocking.countBlockedAtPlace(station.stationID) >= maxWaiting
+    ) {
+      // Too many trains waiting at the station and the train that should be
+      // overtaken here is not one of them.
       console.info(
         `Can't plan overtaking of ${waiting.trainID} by ${overtaking.trainID} as too many trains would be waiting at ${station.stationID}.`
       );
