@@ -121,6 +121,27 @@ export function overtaking({
             console.error(`Can't allow routes for train ${trainID}.`, error);
           });
       }),
+      otapi.on(
+        "trainDeleted",
+        async (_, { trainID }): Promise<void> => {
+          const train = infrastructure.getOrThrow("train", trainID);
+
+          for (const overtakingArea of overtakingAreas) {
+            try {
+              await trainOvertaking.releaseTrains(overtakingArea, train);
+            } catch (error) {
+              console.error(
+                "Failed to release trains blocked by " +
+                  train.trainID +
+                  " after overtaking in " +
+                  overtakingArea.overtakingAreaID +
+                  ".",
+                error
+              );
+            }
+          }
+        }
+      ),
     ]);
     cleanupCallbacks.push(...removeListeners);
   }
