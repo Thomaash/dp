@@ -6,6 +6,7 @@ import { DecisionModule } from "./api-public";
 import { DecisionModuleAPIFactory, getOvertakingData } from "./api";
 import { TrainOvertaking } from "./train-overtaking";
 
+import { decisionModule as doNothingDM } from "./modules/do-nothing";
 import { decisionModule as maxSpeedDM } from "./modules/max-speed";
 import { decisionModule as timetableGuessDM } from "./modules/timetable-guess";
 
@@ -27,7 +28,7 @@ export function overtaking({
 } {
   const cleanupCallbacks: (() => void)[] = [];
 
-  const modules = [maxSpeedDM, timetableGuessDM, ...customModules];
+  const modules = [doNothingDM, maxSpeedDM, timetableGuessDM, ...customModules];
 
   const requestedDefaultModule = modules.find(
     (module): boolean => module.name === defaultModuleName
@@ -36,6 +37,7 @@ export function overtaking({
     throw new Error(`There is no decision module named ${defaultModuleName}.`);
   }
   const defaultModule: DecisionModule = requestedDefaultModule;
+  console.info(`Default overtaking module: ${defaultModule.name}.`);
 
   const trainOvertaking = new TrainOvertaking(infrastructure, otapi);
 
