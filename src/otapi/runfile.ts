@@ -7,7 +7,7 @@ import {
 const readFile = promisify(readFileCallback);
 const writeFile = promisify(writeFileCallback);
 
-export type Runfile = Record<
+export type RunfileKey =
   | "Adhesion Outside"
   | "Adhesion Tunnel"
   | "Break Day Offset"
@@ -87,38 +87,76 @@ export type Runfile = Record<
   | "Use Curve Resistance"
   | "Use OTD-Communication"
   | "Use Ping"
-  | "Use Switch Time and Route Res. Time",
-  string[]
->;
+  | "Use Switch Time and Route Res. Time";
 
 const newline = /\r?\n/g;
 const comment = /^\/\//;
 
-function generatePort(): number {
-  return Math.floor(1024 + Math.random() * (65535 - 1024));
-}
+export class Runfile {
+  public constructor(private readonly _path: string) {}
 
-export async function randomizePortsInRunfile(
-  runfilePath: string
-): Promise<void> {
-  const port1 = generatePort();
-  const port2 = port1 === 1024 ? 65535 : port1 - 1;
+  public async readValue(key: RunfileKey, nth = 1): Promise<string> {
+    let found = 0;
+    const entry = (await readFile(this._path, "utf8"))
+      .split(newline)
+      .find((line): boolean => {
+        if (line.startsWith(key + "#")) {
+          ++found;
+          if (found === nth) {
+            return true;
+          }
+        }
 
-  await writeFile(
-    runfilePath,
-    (await readFile(runfilePath, "utf8"))
+        return false;
+      });
+
+    if (entry == null) {
+      throw new TypeError(`Key ${key} doesn't exist in runfile ${this._path}.`);
+    }
+
+    const value = entry.split("#")[1];
+
+    if (value == null || value == "") {
+      throw new TypeError(`Key ${key} is malformed in runfile ${this._path}.`);
+    }
+
+    return value;
+  }
+
+  public async writeValue(
+    key: RunfileKey,
+    value: number | string,
+    nth = 1
+  ): Promise<void> {
+    let found = 0;
+
+    const lines = (await readFile(this._path, "utf8"))
       .split(newline)
       .map((line): string => {
-        if (line.startsWith("OTD Server Port#")) {
-          return `OTD Server Port#${port1}#`;
-        } else if (line.startsWith("OpenTrack Server Port#")) {
-          return `OpenTrack Server Port#${port2}#`;
-        } else {
-          return line;
+        if (line.startsWith(key + "#")) {
+          ++found;
+          if (found === nth) {
+            return `${key}#${value}#`;
+          }
         }
-      })
-      .join("\n")
-  );
+
+        return line;
+      });
+
+    if (found < nth) {
+      lines.push(`${key}#${value}#`);
+    }
+
+    await writeFile(this._path, lines.join("\n"));
+  }
+
+  public async randomizePortsInRunfile(): Promise<void> {
+    const port1 = Math.floor(1024 + Math.random() * (65535 - 1024 - 1));
+    const port2 = port1 + 1;
+
+    await this.writeValue("OTD Server Port", port1);
+    await this.writeValue("OpenTrack Server Port", port2);
+  }
 }
 
 export function parseRunfile(text: string): Runfile {

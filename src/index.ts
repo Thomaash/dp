@@ -1,18 +1,10 @@
 import waitPort from "wait-port";
 import { promisify } from "util";
-import { resolve } from "path";
-import {
-  readFile as readFileCallback,
-  writeFile as writeFileCallback,
-} from "fs";
+import { resolve, sep } from "path";
+import { writeFile as writeFileCallback } from "fs";
 import { ChildProcessWithoutNullStreams, spawn } from "child_process";
 
-import {
-  AnyEventCallback,
-  OTAPI,
-  parseRunfile,
-  randomizePortsInRunfile,
-} from "./otapi";
+import { AnyEventCallback, OTAPI, Runfile } from "./otapi";
 import { Deferred } from "./util";
 import { args } from "./cli";
 import { buildChunkLogger } from "./util";
@@ -20,8 +12,9 @@ import { infrastructureFactory } from "./infrastructure";
 
 import { overtaking, OvertakingParams, DecisionModule } from "./overtaking";
 
-const readFile = promisify(readFileCallback);
 const writeFile = promisify(writeFileCallback);
+
+const cooldownMs = 10000;
 
 function spawnAndLog(
   binaryPath: string,
@@ -68,35 +61,69 @@ function spawnAndLog(
   return { child, returnCode };
 }
 
-async function startOpenTrack(otapi: OTAPI): Promise<{ command: any }> {
+async function startOpenTrackAndOTAPI({
+  runNumber,
+  runSuffix,
+  runfile,
+}: {
+  runNumber: number;
+  runSuffix: string;
+  runfile: Runfile;
+}): Promise<{
+  command: ReturnType<typeof spawnAndLog>;
+  otapi: OTAPI;
+}> {
   const otArgs = Object.freeze(["-otd", `-runfile=${args["ot-runfile"]}`]);
   console.info("OpenTrack commandline:", [args["ot-binary"], ...otArgs]);
 
   for (let attempt = 1; ; ++attempt) {
-    const readyForSimulation = otapi.once("simReadyForSimulation");
-    const simulationServerStarted = otapi.once("simServerStarted");
-
-    const failed = new Deferred();
-
-    console.info(
-      attempt === 1
-        ? "Starting OpenTrack..."
-        : `Starting OpenTrack (attempt ${attempt})...`
-    );
-    const command = spawnAndLog(
-      args["ot-binary"],
-      otArgs,
-      args["ot-log"],
-      (line): void => {
-        if (
-          line.endsWith("OTServerGenerator startPSMServer Socket NO success")
-        ) {
-          failed.reject(new Error(line));
-        }
-      }
-    );
+    const cleanupCallbacks: (() => Promise<void>)[] = [];
 
     try {
+      const otapi = await prepareForRun(runfile, runSuffix, runNumber);
+      cleanupCallbacks.push(otapi.kill.bind(otapi));
+
+      const readyForSimulation = otapi.once("simReadyForSimulation");
+      const simulationServerStarted = otapi.once("simServerStarted");
+
+      const failed = new Deferred();
+      setTimeout((): void => {
+        if (failed.pending) {
+          failed.reject(new Error("Timed out."));
+        }
+      }, 120 * 1000);
+
+      console.info(
+        attempt === 1
+          ? "Starting OpenTrack..."
+          : `Starting OpenTrack (attempt ${attempt})...`
+      );
+      const command = spawnAndLog(
+        args["ot-binary"],
+        otArgs,
+        args["ot-log"],
+        (line): void => {
+          if (
+            / OpenTrack\[\d+\] OTServerGenerator startPSMServer Socket NO success$/.test(
+              line
+            ) ||
+            / OpenTrack\[\d+\] OTPSMController Can't connect to port \d+ on host .+$/.test(
+              line
+            )
+          ) {
+            failed.reject(new Error(line));
+          }
+        }
+      );
+      cleanupCallbacks.push(
+        async (): Promise<void> => {
+          console.info("Waiting for OpenTrack process to terminate...");
+          command.child.kill("SIGTERM");
+          await command.returnCode;
+          console.info("OpenTrack terminated.");
+        }
+      );
+
       await Promise.race([
         Promise.all([
           readyForSimulation,
@@ -105,33 +132,173 @@ async function startOpenTrack(otapi: OTAPI): Promise<{ command: any }> {
         ]),
         failed.promise,
       ]);
-      await otapi.openSimulationPanel();
       console.info("OpenTrack is ready for simulation.");
+      await otapi.openSimulationPanel({ mode: "Simulation" });
+      console.info("OpenTrack responds to requests.");
 
-      return { command };
+      return { command, otapi };
     } catch (error) {
       console.error("Startup failed.");
 
-      console.info("Waiting for OpenTrack process to terminate...");
-      command.child.kill("SIGTERM");
-      await command.returnCode;
-      console.info("OpenTrack terminated.");
+      for (const callback of cleanupCallbacks.splice(0).reverse()) {
+        await callback();
+      }
 
+      await new Promise(
+        (resolve): void => void setTimeout(resolve, cooldownMs)
+      );
       console.info("Trying again...");
       console.info();
-      continue;
     }
   }
 }
 
-(async (): Promise<void> => {
-  if (args["randomize-ports"]) {
-    await randomizePortsInRunfile(args["ot-runfile"]);
+async function changeOutputPath(
+  runfile: Runfile,
+  runSuffix: string,
+  runNumber: number
+): Promise<void> {
+  const path = (await runfile.readValue("OutputPath")).split(sep);
+
+  // Remove trailing separator.
+  if (path[path.length - 1] === "") {
+    path.pop();
   }
-  const runfile = parseRunfile((await readFile(args["ot-runfile"])).toString());
-  const portOT = +runfile["OpenTrack Server Port"][0];
-  const portApp = +runfile["OTD Server Port"][0];
-  const keepAlive = runfile["Keep Connection"][0] === "1";
+
+  // Remove old run number.
+  if (/^run-\d+-/.test(path[path.length - 1])) {
+    path.pop();
+  }
+
+  // Add current run number.
+  path.push(`run-${runNumber}-${runSuffix}`);
+
+  await runfile.writeValue("OutputPath", path.join(sep));
+}
+
+async function prepareForRun(
+  runfile: Runfile,
+  runSuffix?: string,
+  runNumber?: number
+): Promise<OTAPI> {
+  for (;;) {
+    const cleanupCallbacks: (() => Promise<void>)[] = [];
+
+    try {
+      if (args["randomize-ports"]) {
+        await runfile.randomizePortsInRunfile();
+      }
+
+      if (typeof runSuffix === "string" && typeof runNumber === "number") {
+        await changeOutputPath(runfile, runSuffix, runNumber);
+        await runfile.writeValue("Delay Scenario", runNumber);
+      }
+
+      const delayScenario = await runfile.readValue("Delay Scenario");
+      const keepAlive = (await runfile.readValue("Keep Connection")) === "1";
+      const outputPath = await runfile.readValue("OutputPath");
+      const portApp = +(await runfile.readValue("OTD Server Port"));
+      const portOT = +(await runfile.readValue("OpenTrack Server Port"));
+
+      console.info(`Delay Scenario: ${delayScenario}`);
+      console.info(`Output Path: ${outputPath}`);
+      console.info(`Ports: OT ${portOT} <-> App ${portApp}`);
+      const otapi = new OTAPI({ keepAlive, portApp, portOT });
+      cleanupCallbacks.push(otapi.kill.bind(otapi));
+
+      if (args["log-ot-responses"]) {
+        const debugCallback: AnyEventCallback = async function (
+          name,
+          payload
+        ): Promise<void> {
+          process.stdout.write(
+            `\n\n===> OT: ${name}\n${JSON.stringify(payload, null, 4)}\n\n`
+          );
+        };
+
+        otapi.on(debugCallback);
+      }
+
+      await otapi.start();
+
+      return otapi;
+    } catch (error) {
+      console.error("Preparations failed.");
+
+      for (const callback of cleanupCallbacks.splice(0).reverse()) {
+        await callback();
+      }
+
+      await new Promise(
+        (resolve): void => void setTimeout(resolve, cooldownMs)
+      );
+      console.info("Trying again...");
+      console.info();
+    }
+  }
+}
+
+type OvertakingParamsBase = Omit<OvertakingParams, "otapi">;
+async function doOneRun({
+  overtakingParamsBase,
+  runNumber,
+  runfile,
+}: {
+  overtakingParamsBase: OvertakingParamsBase;
+  runNumber: number;
+  runfile: Runfile;
+}): Promise<void> {
+  console.info();
+
+  const { command, otapi } = await startOpenTrackAndOTAPI({
+    runNumber,
+    runSuffix: overtakingParamsBase.defaultModule,
+    runfile,
+  });
+  command.returnCode.catch().then(
+    async (): Promise<void> => {
+      console.info(
+        `OpenTrack exited with exit code ${await command.returnCode}.`
+      );
+      console.info("Stopping the app...");
+      otapi.kill();
+    }
+  );
+
+  try {
+    const { cleanup, setup } = overtaking({
+      ...overtakingParamsBase,
+      otapi,
+    });
+    await setup();
+
+    console.info("Starting simulation...");
+    const simulationEnd = otapi.once("simStopped");
+    const simulationStart = otapi.once("simStarted");
+    await otapi.startSimulation();
+    await simulationStart;
+    console.info("Simulating...");
+
+    await simulationEnd;
+    console.info("Simulation ended.");
+    await cleanup();
+
+    console.info("Closing OpenTrack...");
+    await otapi.terminateApplication();
+
+    // Wait for the process to finish. OpenTrack doesn't handle well when the
+    // app stops responding when it's running.
+    await command.returnCode;
+    console.info("OpenTrack closed.");
+  } finally {
+    await otapi.kill();
+    console.info("OTAPI stopped.");
+    console.info();
+  }
+}
+
+(async (): Promise<void> => {
+  const runfile = new Runfile(args["ot-runfile"]);
 
   const infrastructure = await infrastructureFactory.buildFromFiles({
     courses: args["ot-export-courses"],
@@ -187,9 +354,6 @@ async function startOpenTrack(otapi: OTAPI): Promise<{ command: any }> {
     ].join("\n")
   );
 
-  console.info(`Ports: OT ${portOT} <-> App ${portApp}`);
-  const otapi = new OTAPI({ keepAlive, portApp, portOT });
-
   const overtakingModules = await Promise.all(
     (args["overtaking-modules"] ?? []).map(
       async (path): Promise<DecisionModule> => {
@@ -197,87 +361,51 @@ async function startOpenTrack(otapi: OTAPI): Promise<{ command: any }> {
       }
     )
   );
-  const overtakingParams: OvertakingParams = {
+  const overtakingParamsBase = {
     defaultModule: args["overtaking-default-module"],
     infrastructure,
     modules: overtakingModules,
-    otapi,
   };
 
-  try {
-    await otapi.start();
-
-    if (args["log-ot-responses"]) {
-      const debugCallback: AnyEventCallback = async function (
-        name,
-        payload
-      ): Promise<void> {
-        process.stdout.write(
-          `\n\n===> OT: ${name}\n${JSON.stringify(payload, null, 4)}\n\n`
-        );
-      };
-
-      otapi.on(debugCallback);
+  if (args["manage-ot"]) {
+    for (let runNumber = 1; runNumber <= args["runs"]; ++runNumber) {
+      await doOneRun({ overtakingParamsBase, runNumber, runfile });
+      if (args["control-runs"]) {
+        await doOneRun({
+          overtakingParamsBase: {
+            ...overtakingParamsBase,
+            defaultModule: "do-nothing",
+          },
+          runNumber,
+          runfile,
+        });
+      }
     }
+  } else {
+    const otapi = await prepareForRun(runfile);
 
-    if (args["manage-ot"]) {
-      const { command } = await startOpenTrack(otapi);
-      command.returnCode.catch().then(
-        async (): Promise<void> => {
-          console.info(
-            `OpenTrack exited with exit code ${await command.returnCode}.`
-          );
-          console.info("Stopping the app...");
-          otapi.kill();
-        }
-      );
+    console.info("Waiting for OpenTrack...");
+    await waitPort({ port: otapi.config.portOT, output: "silent" });
 
-      const { cleanup, setup } = overtaking(overtakingParams);
+    for (;;) {
+      const { setup, cleanup } = overtaking({
+        ...overtakingParamsBase,
+        otapi,
+      });
       await setup();
 
-      const simulationEnd = otapi.once("simStopped");
-      console.info("Starting simulation...");
       const simulationStart = otapi.once("simStarted");
-      await otapi.startSimulation();
+
+      console.info("Simulation can be started now.");
       await simulationStart;
+      const simulationEnd = otapi.once("simStopped");
       console.info("Simulating...");
 
       await simulationEnd;
       console.info("Simulation ended.");
       await cleanup();
-
-      console.info("Closing OpenTrack...");
-      await otapi.terminateApplication();
-
-      // Wait for the process to finish. OpenTrack doesn't handle well when the
-      // app stops responding when it's running.
-      await command.returnCode;
-      console.info("OpenTrack closed.");
-    } else {
-      console.info("Waiting for OpenTrack...");
-      await waitPort({ port: portOT, output: "silent" });
-
-      for (;;) {
-        const { setup, cleanup } = overtaking(overtakingParams);
-        await setup();
-
-        const simulationStart = otapi.once("simStarted");
-
-        console.info("Simulation can be started now.");
-        await simulationStart;
-        const simulationEnd = otapi.once("simStopped");
-        console.info("Simulating...");
-
-        await simulationEnd;
-        console.info("Simulation ended.");
-        await cleanup();
-        console.info();
-      }
+      console.info();
     }
-  } finally {
-    await otapi.kill();
-    console.info("Finished.");
-    console.info();
   }
 })()
   .then((): void => {

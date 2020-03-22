@@ -77,6 +77,18 @@ const y = yargs
     default: false,
     describe: "If enabled OpenTrack will be started and terminated.",
     type: "boolean",
+  })
+  .option("runs", {
+    default: 1,
+    describe:
+      "If enabled n runs will be performed (only works with --manage-ot).",
+    type: "number",
+  })
+  .option("control-runs", {
+    default: false,
+    describe:
+      "If enabled runs will be performed with and without decision module (only works with --manage-ot).",
+    type: "boolean",
   });
 
 export const args: ReturnType<typeof y["parse"]> = y
