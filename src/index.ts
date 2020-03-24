@@ -66,7 +66,7 @@ async function startOpenTrackAndOTAPI({
   runSuffix,
   runfile,
 }: {
-  runNumber: number;
+  runNumber?: number;
   runSuffix: string;
   runfile: Runfile;
 }): Promise<{
@@ -245,7 +245,7 @@ async function doOneRun({
   runfile,
 }: {
   overtakingParamsBase: OvertakingParamsBase;
-  runNumber: number;
+  runNumber?: number;
   runfile: Runfile;
 }): Promise<void> {
   console.info();
@@ -368,18 +368,22 @@ async function doOneRun({
   };
 
   if (args["manage-ot"]) {
-    for (let runNumber = 1; runNumber <= args["runs"]; ++runNumber) {
-      await doOneRun({ overtakingParamsBase, runNumber, runfile });
-      if (args["control-runs"]) {
-        await doOneRun({
-          overtakingParamsBase: {
-            ...overtakingParamsBase,
-            defaultModule: "do-nothing",
-          },
-          runNumber,
-          runfile,
-        });
+    if (args["runs"] >= 0) {
+      for (let runNumber = 1; runNumber <= args["runs"]; ++runNumber) {
+        await doOneRun({ overtakingParamsBase, runNumber, runfile });
+        if (args["control-runs"]) {
+          await doOneRun({
+            overtakingParamsBase: {
+              ...overtakingParamsBase,
+              defaultModule: "do-nothing",
+            },
+            runNumber,
+            runfile,
+          });
+        }
       }
+    } else {
+      await doOneRun({ overtakingParamsBase, runfile });
     }
   } else {
     const otapi = await prepareForRun(runfile);

@@ -79,9 +79,9 @@ const y = yargs
     type: "boolean",
   })
   .option("runs", {
-    default: 1,
+    default: -1,
     describe:
-      "If enabled n runs will be performed (only works with --manage-ot).",
+      "If enabled n runs will be performed (only works with --manage-ot), if disabled (-1) the runfile will be respected.",
     type: "number",
   })
   .option("control-runs", {
