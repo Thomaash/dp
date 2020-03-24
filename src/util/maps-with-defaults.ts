@@ -1,3 +1,19 @@
+export class Counter {
+  public constructor(private _count = 0) {}
+
+  public inc(): this {
+    ++this._count;
+    return this;
+  }
+  public dec(): this {
+    --this._count;
+    return this;
+  }
+  public get(): number {
+    return this._count;
+  }
+}
+
 export class MapWithDefaultValueFactory<K, V> extends Map<K, V> {
   public constructor(private readonly _createDefaultValue: () => V) {
     super();
@@ -72,5 +88,11 @@ export class MapMap<K1, K2, V> extends Map<K1, Map<K2, V>> {
       super.set(key, newMap);
       return newMap;
     }
+  }
+}
+
+export class MapCounter<K> extends MapWithDefaultValueFactory<K, Counter> {
+  public constructor(initialCount = 0) {
+    super((): Counter => new Counter(initialCount));
   }
 }
