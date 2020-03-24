@@ -1,6 +1,6 @@
 export { MapWithDefaultValue, MapWithDefaultValueFactory } from "../util";
 
-import { MapWithDefaultValue } from "../util";
+import { MapCounter } from "../util";
 
 export type Key = string | number | boolean | null;
 
@@ -34,8 +34,8 @@ export class Blocking<
   Blocked extends Key = Key
 > {
   private _entries = new Map<string, BlockingEntry<Place, Blocker, Blocked>>();
-  private _blockedBy = new MapWithDefaultValue<Blocked, number>(0);
-  private _blockedAtPlace = new MapWithDefaultValue<Place, number>(0);
+  private _blockedBy = new MapCounter<Blocked>();
+  private _blockedAtPlace = new MapCounter<Place>();
 
   private _queryEntries(
     query: BlockingQuery<Place, Blocker, Blocked>
@@ -54,8 +54,8 @@ export class Blocking<
     // Do not register the same blocking multiple times.
     if (!this._entries.has(key)) {
       this._entries.set(key, Object.freeze({ place, blocker, blocked }));
-      this._blockedBy.set(blocked, this._blockedBy.get(blocked) + 1);
-      this._blockedAtPlace.set(place, this._blockedAtPlace.get(place) + 1);
+      this._blockedBy.get(blocked).inc();
+      this._blockedAtPlace.get(place).inc();
     }
 
     return this;
@@ -68,14 +68,8 @@ export class Blocking<
     if (this._entries.has(key)) {
       this._entries.delete(key);
 
-      const blockedBy = this._blockedBy.get(blocked);
-      if (blockedBy > 1) {
-        this._blockedBy.set(blocked, this._blockedBy.get(blocked) - 1);
-        this._blockedAtPlace.set(place, this._blockedAtPlace.get(place) - 1);
-      } else {
-        this._blockedBy.delete(blocked);
-        this._blockedAtPlace.delete(place);
-      }
+      this._blockedBy.get(blocked).dec();
+      this._blockedAtPlace.get(place).dec();
     }
 
     return this;
@@ -101,7 +95,7 @@ export class Blocking<
   public isBlocked(...rest: [Blocked] | [Place, Blocker, Blocked]): boolean {
     if (rest.length === 1) {
       const [blocked] = rest;
-      return this._blockedBy.get(blocked) > 0;
+      return this._blockedBy.get(blocked).get() > 0;
     } else {
       const [place, blocker, blocked] = rest;
       return this._entries.has(ck(place, blocker, blocked));
@@ -131,14 +125,14 @@ export class Blocking<
   }
 
   public countBlockedAtPlace(place: Place): number {
-    return this._blockedAtPlace.get(place);
+    return this._blockedAtPlace.get(place).get();
   }
 
   public dumpState(): void {
     const blockedByLines: string[] = [];
-    for (const [blocked, numBlockedBy] of this._blockedBy) {
+    for (const [blocked, blockedBy] of this._blockedBy) {
       blockedByLines.push(
-        ["  ", blocked, " is blocked by ", numBlockedBy, " trains"].join("")
+        ["  ", blocked, " is blocked by ", blockedBy.get(), " trains"].join("")
       );
     }
     blockedByLines.sort();
