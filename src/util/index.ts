@@ -1,4 +1,5 @@
 export * from "./arrays";
+export * from "./callback-queue";
 export * from "./deep-freeze";
 export * from "./deffered";
 export * from "./errors";
