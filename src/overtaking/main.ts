@@ -67,8 +67,11 @@ export function overtaking({
             overtakingArea,
             async ({ train, route, time }): Promise<void> => {
               try {
+                const { api, commit } = decisionModuleAPIFactory.get(
+                  overtakingArea
+                );
                 await defaultModule.newTrainEnteredOvertakingArea(
-                  decisionModuleAPIFactory.get(overtakingArea),
+                  api,
                   Object.freeze({
                     entryRoute: route,
                     newTrain: train,
@@ -76,6 +79,7 @@ export function overtaking({
                     time,
                   })
                 );
+                await commit();
               } catch (error) {
                 console.error(
                   "Overtaking decision module failed for train " +

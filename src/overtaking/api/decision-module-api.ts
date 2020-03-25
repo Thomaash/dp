@@ -4,6 +4,7 @@ import { DecisionModuleAPI, OvertakingArea } from "../api-public";
 import { TrainOvertaking } from "../train-overtaking";
 import { OvertakingData } from "./overtaking-data";
 import { formatSimulationTime } from "../../otapi";
+import { CallbackQueue } from "../../util";
 
 export class DecisionModuleAPIFactory {
   private readonly _apiBase: Omit<
@@ -128,23 +129,40 @@ export class DecisionModuleAPIFactory {
     Object.freeze(this._apiBase);
   }
 
-  public get(overtakingArea: OvertakingArea): DecisionModuleAPI {
-    return Object.freeze<DecisionModuleAPI>({
-      ...this._apiBase,
-      planOvertaking: async (overtaking, waiting): Promise<void> => {
-        this._trainOvertaking.planOvertaking(
-          overtakingArea,
-          overtaking,
-          waiting
-        );
+  public get(
+    overtakingArea: OvertakingArea
+  ): { api: DecisionModuleAPI; commit: () => Promise<void> } {
+    const plannedOvertakings = new CallbackQueue();
+    const canceledOvertakings = new CallbackQueue();
+
+    return {
+      api: Object.freeze<DecisionModuleAPI>({
+        ...this._apiBase,
+        planOvertaking: async (overtaking, waiting): Promise<void> => {
+          plannedOvertakings.plan(
+            (): Promise<void> =>
+              this._trainOvertaking.planOvertaking(
+                overtakingArea,
+                overtaking,
+                waiting
+              )
+          );
+        },
+        cancelOvertaking: async (overtaking, waiting): Promise<void> => {
+          canceledOvertakings.plan(
+            (): Promise<void> =>
+              this._trainOvertaking.cancelOvertaking(
+                overtakingArea,
+                overtaking,
+                waiting
+              )
+          );
+        },
+      }),
+      commit: async (): Promise<void> => {
+        await canceledOvertakings.executeParallel();
+        await plannedOvertakings.executeParallel();
       },
-      cancelOvertaking: async (overtaking, waiting): Promise<void> => {
-        this._trainOvertaking.cancelOvertaking(
-          overtakingArea,
-          overtaking,
-          waiting
-        );
-      },
-    });
+    };
   }
 }
