@@ -58,6 +58,15 @@ export interface EventPayloads {
     time: number;
     trainID: string;
   };
+  trainStopped: {
+    routeID: string;
+    routeOffset: number;
+    stopType: TrainStopType;
+    time: number;
+    trainID: string;
+  };
 }
+
+export type TrainStopType = "stopUnknown" | "stopUnexpected";
 
 export type EventNames = keyof EventPayloads;

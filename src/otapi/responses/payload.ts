@@ -168,6 +168,22 @@ export function createPayload(
         trainID: attrs["trainID"],
       };
 
+    case "trainStopped":
+      verifyPayload(eventName, attrs, [
+        "routeID",
+        "routeOffset",
+        "stopType",
+        "time",
+        "trainID",
+      ]);
+      return {
+        routeID: attrs["routeID"],
+        routeOffset: number(attrs["routeOffset"]),
+        stopType: attrs["stopType"],
+        time: number(attrs["time"]),
+        trainID: attrs["trainID"],
+      };
+
     default:
       const never: never = eventName;
       throw new TypeError(
