@@ -70,3 +70,43 @@ export interface EventPayloads {
 export type TrainStopType = "stopUnknown" | "stopUnexpected";
 
 export type EventNames = keyof EventPayloads;
+
+export const eventGroupNames = [
+  "InfraPart",
+  "Route",
+  "Server",
+  "Signal",
+  "Simulation",
+  "Timetable",
+  "Train Position Report",
+  "Train",
+] as const;
+export type EventGroup = typeof eventGroupNames[number];
+export const eventGroups: {
+  [EventName in keyof EventPayloads]: EventGroup;
+} = {
+  infraPartEntry: "InfraPart",
+  infraPartExit: "InfraPart",
+  infraPartReleased: "InfraPart",
+  infraPartReserved: "InfraPart",
+  ping: "Simulation",
+  routeEntry: "Route",
+  routeExit: "Route",
+  routePartReleased: "Route",
+  routeReleased: "Route",
+  routeReserved: "Route",
+  signalPassed: "Signal",
+  simContinued: "Simulation",
+  simPaused: "Simulation",
+  simReadyForSimulation: "Simulation",
+  simServerStarted: "Server",
+  simStarted: "Simulation",
+  simStopped: "Simulation",
+  trainArrival: "Timetable",
+  trainCreated: "Train",
+  trainDeleted: "Train",
+  trainDeparture: "Timetable",
+  trainPass: "Timetable",
+  trainPositionReport: "Train Position Report",
+  trainStopped: "Train",
+};
