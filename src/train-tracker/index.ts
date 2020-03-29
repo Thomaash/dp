@@ -23,6 +23,13 @@ export interface Area {
   readonly routes: ReadonlySet<Route>;
 }
 
+interface SingletonData {
+  infrastructure: Infrastructure;
+  otapi: OTAPI;
+  singleton: TrainTracker;
+  areas: Iterable<Area>;
+}
+
 export class TrainTracker {
   private readonly _cleanupCallbacks: (() => void)[] = [];
 
@@ -75,6 +82,26 @@ export class TrainTracker {
       for (const route of area.exitRoutes) {
         this._areasByExitRoute.get(route).add(area);
       }
+    }
+  }
+
+  private static readonly _singletons = new WeakMap<OTAPI, SingletonData>();
+
+  public static getSingleton(
+    otapi: OTAPI,
+    infrastructure: Infrastructure,
+    areas: Iterable<Area> = []
+  ): TrainTracker {
+    const data = this._singletons.get(otapi);
+
+    if (data == null) {
+      const singleton = new TrainTracker(otapi, infrastructure, areas);
+      this._singletons.set(otapi, { singleton, otapi, infrastructure, areas });
+      return singleton;
+    } else if ((data.infrastructure !== infrastructure, data.areas !== areas)) {
+      throw new Error("All singletons have to have the same arguments.");
+    } else {
+      return data.singleton;
     }
   }
 
