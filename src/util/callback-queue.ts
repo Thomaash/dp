@@ -13,8 +13,8 @@ export class CallbackQueue {
       : this._callbacks.splice(0);
   }
 
-  public plan(callback: VoidCallback): void {
-    this._callbacks.push(callback);
+  public plan(...callback: VoidCallback[]): void {
+    this._callbacks.push(...callback);
   }
 
   public execute(): void {
