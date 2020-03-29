@@ -95,6 +95,14 @@ const comment = /^\/\//;
 export class Runfile {
   public constructor(private readonly _path: string) {}
 
+  public async readTimeValue(key: RunfileKey, nth = 1): Promise<number> {
+    const [hh, mm, ss] = (await this.readValue(key, nth))
+      .split(":")
+      .map((digits): number => Number.parseInt(digits, 10));
+
+    return hh * 60 * 60 + mm * 60 + ss;
+  }
+
   public async readValue(key: RunfileKey, nth = 1): Promise<string> {
     let found = 0;
     const entry = (await readFile(this._path, "utf8"))
