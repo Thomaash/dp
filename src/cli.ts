@@ -56,6 +56,13 @@ const y = yargs
     required: true,
     type: "string",
   })
+  .option("communication-log", {
+    describe:
+      "The file into which the communcation with OpenTrack will be written.",
+    required: false,
+    type: "string",
+    default: null,
+  })
   .option("ot-runfile", {
     describe:
       "The location of the runfile that will be used by both this app and OpenTrack.",

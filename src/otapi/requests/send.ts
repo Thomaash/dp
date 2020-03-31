@@ -69,6 +69,8 @@ export function send<Name extends keyof SendParameters>(
 ): { result: Promise<void>; cancel: (error?: Error) => void } {
   const data = buildBody(name, parsePayload(parameters));
 
+  config.communicationLog.logRequest(data);
+
   const { result, cancel } = retry(
     axios.post.bind(axios, getURL(config), data, {
       httpAgent: config.keepAlive

@@ -73,6 +73,8 @@ export class ResponseManager {
       app.all(
         "*",
         async (req): Promise<void> => {
+          this._config.communicationLog.logResponse(req.body);
+
           const soap = await processSOAP(req.body);
           const name: EventNames = soap.name as any;
           const payload = createPayload(name, soap);

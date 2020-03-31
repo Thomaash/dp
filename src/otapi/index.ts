@@ -55,6 +55,10 @@ import {
 } from "./responses";
 import { Config } from "./config";
 import { RateLimiter } from "./util";
+import {
+  CommunicationDumpsterLogger,
+  CommunicationFileLogger,
+} from "./communication-logger";
 
 export {
   AnyEventCallback,
@@ -68,15 +72,17 @@ export * from "./runfile";
 export * from "./functions";
 
 export interface OTAPIConstructorParams {
-  host?: string;
-  keepAlive?: boolean;
-  maxSimultaneousRequests?: number;
-  portApp?: number;
-  portOT?: number;
-  protocol?: "http" | "https";
+  communicationLog?: null | string | Config["communicationLog"];
+  host?: Config["host"];
+  keepAlive?: Config["keepAlive"];
+  maxSimultaneousRequests?: Config["maxSimultaneousRequests"];
+  portApp?: Config["portApp"];
+  portOT?: Config["portOT"];
+  protocol?: Config["protocol"];
 }
 
 const defaultConstructorParams: Required<OTAPIConstructorParams> = {
+  communicationLog: null,
   host: "localhost",
   keepAlive: false,
   maxSimultaneousRequests: 10,
@@ -107,20 +113,20 @@ export class OTAPI {
   public readonly config: Config;
 
   public constructor(constructorParams: OTAPIConstructorParams) {
-    const params: Required<OTAPIConstructorParams> = Object.freeze({
-      ...defaultConstructorParams,
-      ...constructorParams,
-    });
+    const communicationLog =
+      typeof constructorParams.communicationLog === "string"
+        ? new CommunicationFileLogger(constructorParams.communicationLog)
+        : constructorParams.communicationLog
+        ? constructorParams.communicationLog
+        : new CommunicationDumpsterLogger();
 
     this.config = Object.freeze<Config>({
-      host: params.host,
-      keepAlive: params.keepAlive,
-      portApp: params.portApp,
-      portOT: params.portOT,
-      protocol: params.protocol,
+      ...defaultConstructorParams,
+      ...constructorParams,
+      communicationLog,
     });
 
-    this._limiter = new RateLimiter(params.maxSimultaneousRequests);
+    this._limiter = new RateLimiter(this.config.maxSimultaneousRequests);
     this._responseManager = new ResponseManager(this.config);
   }
 

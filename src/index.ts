@@ -207,6 +207,7 @@ async function prepareForRun(
         await runfile.readValue("Stop Time")
       );
 
+      const communicationLog = args["communication-log"];
       const delayScenario = await runfile.readValue("Delay Scenario");
       const endTime = await runfile.readTimeValue("Stop Time");
       const keepAlive = (await runfile.readValue("Keep Connection")) === "1";
@@ -217,7 +218,12 @@ async function prepareForRun(
       console.info(`Delay Scenario: ${delayScenario}`);
       console.info(`Output Path: ${outputPath}`);
       console.info(`Ports: OT ${portOT} <-> App ${portApp}`);
-      const otapi = new OTAPI({ keepAlive, portApp, portOT });
+      const otapi = new OTAPI({
+        communicationLog,
+        keepAlive,
+        portApp,
+        portOT,
+      });
       cleanupCallbacks.plan(otapi.kill.bind(otapi));
 
       const trainCounter = new TrainCounter(otapi);
