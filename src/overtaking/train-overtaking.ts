@@ -1,4 +1,4 @@
-import { Infrastructure, Train } from "../infrastructure";
+import { Infrastructure, Train, Station, Route } from "../infrastructure";
 import { OTAPI } from "../otapi";
 
 import { Blocking } from "./util";
@@ -19,42 +19,50 @@ export class TrainOvertaking {
     private readonly _otapi: OTAPI
   ) {}
 
-  private _getBlockRouteIDs(exitRouteID: string, stationID: string): string[] {
+  private _getBlockRoutes(
+    exitRoute: Route,
+    station: Station,
+    train: Train
+  ): Route[] {
     return [
-      exitRouteID,
-      ...[
-        ...this._infrastructure
-          .getOrThrow("station", stationID)
-          .outflowRoutes.values(),
-      ].map(({ routeID }): string => routeID),
-    ];
+      exitRoute,
+      ...[...station.outflowRoutes.values()],
+    ].filter((route): boolean => train.routes.has(route));
   }
 
   private async _sendBlockRequests(
-    exitRouteID: string,
-    stationID: string,
-    waitingTrainID: string
+    exitRoute: Route,
+    station: Station,
+    waitingTrain: Train
   ): Promise<void> {
     await this._otapi.sendInPause(({ send }): void => {
-      for (const routeID of this._getBlockRouteIDs(exitRouteID, stationID)) {
+      for (const route of this._getBlockRoutes(
+        exitRoute,
+        station,
+        waitingTrain
+      )) {
         send("setRouteDisallowed", {
-          trainID: waitingTrainID,
-          routeID,
+          trainID: waitingTrain.trainID,
+          routeID: route.routeID,
         });
       }
     });
   }
 
   private async _sendReleaseRequests(
-    exitRouteID: string,
-    stationID: string,
-    waitingTrainID: string
+    exitRoute: Route,
+    station: Station,
+    waitingTrain: Train
   ): Promise<void> {
     await this._otapi.sendInPause(({ send }): void => {
-      for (const routeID of this._getBlockRouteIDs(exitRouteID, stationID)) {
+      for (const route of this._getBlockRoutes(
+        exitRoute,
+        station,
+        waitingTrain
+      )) {
         send("setRouteAllowed", {
-          trainID: waitingTrainID,
-          routeID,
+          trainID: waitingTrain.trainID,
+          routeID: route.routeID,
         });
       }
     });
@@ -103,11 +111,7 @@ export class TrainOvertaking {
     await Promise.all(
       [...exitRoutes.values()].map(
         (exitRoute): Promise<void> =>
-          this._sendBlockRequests(
-            exitRoute.routeID,
-            station.stationID,
-            waiting.trainID
-          )
+          this._sendBlockRequests(exitRoute, station, waiting)
       )
     );
   }
@@ -147,11 +151,7 @@ export class TrainOvertaking {
     await Promise.all(
       [...exitRoutes.values()].map(
         (exitRoute): Promise<void> =>
-          this._sendReleaseRequests(
-            exitRoute.routeID,
-            station.stationID,
-            waiting.trainID
-          )
+          this._sendReleaseRequests(exitRoute, station, waiting)
       )
     );
   }
@@ -178,9 +178,9 @@ export class TrainOvertaking {
           [...exitRoutes.values()].map(
             (exitRoute): Promise<void> =>
               this._sendReleaseRequests(
-                exitRoute.routeID,
-                station.stationID,
-                waitingTrainID
+                exitRoute,
+                station,
+                this._infrastructure.getOrThrow("train", waitingTrainID)
               )
           )
         )
