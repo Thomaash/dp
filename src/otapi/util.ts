@@ -1,3 +1,5 @@
+import { createIDGenerator } from "../util";
+
 export class Semaphore {
   private readonly _queue: (() => void)[] = [];
 
@@ -42,17 +44,20 @@ export class RateLimiter {
   }
 }
 
+const nextRetryID = createIDGenerator("R");
+
 export function retry<T>(
   func: () => T | Promise<T>,
   limit = Number.POSITIVE_INFINITY
 ): { result: Promise<T>; cancel: (error?: Error) => void } {
+  const id = nextRetryID();
   let cancelError: null | Error = null;
 
   return {
     result: (async (): Promise<T> => {
       for (let attempt = 1; ; ++attempt) {
         if (cancelError != null) {
-          console.error(`Canceled after #${attempt - 1} attempts.`);
+          console.error(`${id}: Canceled after #${attempt - 1} attempts.`);
           throw cancelError;
         }
 
@@ -60,12 +65,15 @@ export function retry<T>(
           return await func();
         } catch (error) {
           if (attempt >= limit) {
-            console.error(`Attempt #${attempt} failed, giving up.`, error);
+            console.error(
+              `${id}: Attempt #${attempt} failed, giving up.`,
+              error
+            );
             throw error;
           }
 
           console.error(
-            `Attempt #${attempt} failed (${error.message}), retrying...`
+            `${id}: Attempt #${attempt} failed (${error.message}), retrying...`
           );
 
           await new Promise((resolve): void => {
