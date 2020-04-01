@@ -30,7 +30,7 @@ function spawnAndLog(
     let stderr = "";
 
     const logStdout = buildChunkLogger("OT", "info", onLogLine);
-    const logStderr = buildChunkLogger("OT", "error", onLogLine);
+    const logStderr = buildChunkLogger("OT", "info", onLogLine);
 
     child.stdout.on("data", (chunk): void => {
       const string: string = chunk.toString();
