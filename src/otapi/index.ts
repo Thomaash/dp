@@ -98,11 +98,6 @@ export interface SendInPauseAPI {
   ): void;
 }
 
-const nextId = ((): (() => number) => {
-  let nm = 0;
-  return (): number => ++nm;
-})();
-
 export class OTAPI {
   private readonly _responseManager: ResponseManager;
   private readonly _limiter: RateLimiter;
