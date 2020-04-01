@@ -3,6 +3,8 @@ import { OTAPI } from "../otapi";
 
 import { Blocking } from "./util";
 import { OvertakingArea, DecisionModule } from "./api-public";
+import { TrainTracker } from "src/train-tracker";
+import { logFailure } from "../util";
 
 export interface OvertakingParams {
   defaultModule: string;
@@ -16,8 +18,18 @@ export class TrainOvertaking {
 
   public constructor(
     private readonly _infrastructure: Infrastructure,
-    private readonly _otapi: OTAPI
-  ) {}
+    private readonly _otapi: OTAPI,
+    private readonly _trainTracker: TrainTracker
+  ) {
+    // Possible workaround for one the countless bugs in OpenTrack.
+    this._otapi.on("routeReserved", (_, { routeID, trainID }): void => {
+      this._otapi
+        .setRouteAllowed({ routeID, trainID })
+        .catch(
+          logFailure("Failed to allow reserved route.", { routeID, trainID })
+        );
+    });
+  }
 
   private _getBlockRoutes(
     exitRoute: Route,
@@ -41,6 +53,13 @@ export class TrainOvertaking {
         station,
         waitingTrain
       )) {
+        if (this._trainTracker.isReservedBy(waitingTrain, route)) {
+          console.warn(
+            `Can't block route ${route.routeID} for train ${waitingTrain.trainID} because it's already reserved by this train.`
+          );
+          continue;
+        }
+
         send("setRouteDisallowed", {
           trainID: waitingTrain.trainID,
           routeID: route.routeID,

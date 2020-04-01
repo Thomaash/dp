@@ -39,8 +39,6 @@ export function overtaking({
   const defaultModule: DecisionModule = requestedDefaultModule;
   console.info(`Default overtaking module: ${defaultModule.name}.`);
 
-  const trainOvertaking = new TrainOvertaking(infrastructure, otapi);
-
   const overtakingData = getOvertakingData(infrastructure);
   const { overtakingAreas } = overtakingData;
 
@@ -50,6 +48,8 @@ export function overtaking({
     overtakingAreas
   ).startTracking(1);
   cleanupCallbacks.push(tracker.stopTraking.bind(tracker));
+
+  const trainOvertaking = new TrainOvertaking(infrastructure, otapi, tracker);
 
   const decisionModuleAPIFactory = new DecisionModuleAPIFactory(
     infrastructure,
@@ -62,7 +62,7 @@ export function overtaking({
     const removeListeners = await Promise.all([
       ...[...overtakingAreas.values()].flatMap(
         (overtakingArea): (() => void)[] => [
-          tracker.on(
+          tracker.onArea(
             "train-entered-area",
             overtakingArea,
             async ({ train, route, time }): Promise<void> => {
@@ -94,7 +94,7 @@ export function overtaking({
               }
             }
           ),
-          tracker.on(
+          tracker.onArea(
             "train-left-area",
             overtakingArea,
             async ({ train }): Promise<void> => {

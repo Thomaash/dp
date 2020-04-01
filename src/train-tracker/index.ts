@@ -10,11 +10,11 @@ export interface TrainPositionInArea {
   position: number;
 }
 
-export type TrainHandler = (payload: {
-  train: Train;
-  route: Route;
-  time: number;
-}) => void;
+export type TrainTrackerListeners = {
+  [Name in keyof TrainTrackerEvents]: (
+    payload: TrainTrackerEvents[Name]
+  ) => void;
+};
 
 export interface Area {
   readonly areaID: string;
@@ -30,6 +30,34 @@ interface SingletonData {
   areas: Iterable<Area>;
 }
 
+export interface TrainTrackerAreaEvents {
+  "train-entered-area": {
+    train: Train;
+    route: Route;
+    time: number;
+  };
+  "train-left-area": {
+    train: Train;
+    route: Route;
+    time: number;
+  };
+}
+export interface TrainTrackerOtherEvents {
+  "train-reserved-route": {
+    train: Train;
+    route: Route;
+    time: number;
+  };
+  "train-released-route": {
+    train: Train;
+    route: Route;
+    time: number;
+  };
+}
+export interface TrainTrackerEvents
+  extends TrainTrackerAreaEvents,
+    TrainTrackerOtherEvents {}
+
 export class TrainTracker {
   private readonly _cleanupCallbacks: (() => void)[] = [];
 
@@ -43,13 +71,26 @@ export class TrainTracker {
   private readonly _lastRoutes = new Map<Train, Route>();
   private readonly _lastStations = new Map<Train, Station>();
   private readonly _reports = new Map<Train, Report>();
-  private readonly _trainRoutes = new MapSet<Train, Route>();
+  private readonly _trainOccupiedRoutes = new MapSet<Train, Route>();
+  private readonly _trainReservedRoutes = new MapSet<Train, Route>();
 
   private readonly _trainsInArea = new MapSet<Area, Train>();
 
   private readonly _listeners = {
-    "train-entered-area": new MapSet<Area, TrainHandler>(),
-    "train-left-area": new MapSet<Area, TrainHandler>(),
+    "train-entered-area": new MapSet<
+      Area,
+      TrainTrackerListeners["train-entered-area"]
+    >(),
+    "train-left-area": new MapSet<
+      Area,
+      TrainTrackerListeners["train-left-area"]
+    >(),
+    "train-released-route": new Set<
+      TrainTrackerListeners["train-released-route"]
+    >(),
+    "train-reserved-route": new Set<
+      TrainTrackerListeners["train-reserved-route"]
+    >(),
   };
 
   public get size(): number {
@@ -122,7 +163,7 @@ export class TrainTracker {
   }
 
   public getTrainsRoutes(train: Train | string): ReadonlySet<Route> {
-    return this._trainRoutes.get(
+    return this._trainOccupiedRoutes.get(
       typeof train === "string"
         ? this._infrastructure.getOrThrow("train", train)
         : train
@@ -131,6 +172,22 @@ export class TrainTracker {
 
   public getDelay(train: Train | string): number {
     return this.getReport(train)?.delay ?? 0;
+  }
+
+  public isReservedBy(train: Train | string, route: Route | string): boolean {
+    return (
+      this._trainReservedRoutes
+        .get(
+          typeof train === "string"
+            ? this._infrastructure.getOrThrow("train", train)
+            : train
+        )
+        ?.has(
+          typeof route === "string"
+            ? this._infrastructure.getOrThrow("route", route)
+            : route
+        ) ?? false
+    );
   }
 
   /**
@@ -258,7 +315,10 @@ export class TrainTracker {
       this._otapi.on("trainPass", this._handleTrainPass.bind(this)),
 
       this._otapi.on("routeEntry", this._handleRouteEntry.bind(this)),
-      this._otapi.on("routeExit", this._handleRouteExit.bind(this))
+      this._otapi.on("routeExit", this._handleRouteExit.bind(this)),
+
+      this._otapi.on("routeReserved", this._handleRouteReserved.bind(this)),
+      this._otapi.on("routeReleased", this._handleRouteReleased.bind(this))
     );
 
     return this;
@@ -272,10 +332,10 @@ export class TrainTracker {
     return this;
   }
 
-  public on(
-    eventName: "train-entered-area" | "train-left-area",
+  public onArea<Name extends keyof TrainTrackerAreaEvents>(
+    eventName: Name,
     area: Area,
-    handler: TrainHandler
+    handler: TrainTrackerListeners[Name]
   ): () => void {
     if (!this._areas.has(area)) {
       throw new Error("No such area.");
@@ -288,7 +348,18 @@ export class TrainTracker {
     };
   }
 
-  public _emit(
+  public on<Name extends keyof TrainTrackerOtherEvents>(
+    eventName: Name,
+    handler: TrainTrackerListeners[Name]
+  ): () => void {
+    this._listeners[eventName].add(handler);
+
+    return (): void => {
+      this._listeners[eventName].delete(handler);
+    };
+  }
+
+  public _emitAreaEvent(
     eventName: "train-entered-area" | "train-left-area",
     area: Area,
     train: Train,
@@ -297,6 +368,15 @@ export class TrainTracker {
   ): void {
     for (const handler of this._listeners[eventName].get(area).values()) {
       handler({ train, route, time });
+    }
+  }
+
+  public _emitEvent<Name extends keyof TrainTrackerOtherEvents>(
+    eventName: Name,
+    payload: TrainTrackerOtherEvents[Name]
+  ): void {
+    for (const handler of this._listeners[eventName]) {
+      handler(payload);
     }
   }
 
@@ -309,7 +389,7 @@ export class TrainTracker {
     this._trainsInArea.get(area).add(train);
 
     return (): void => {
-      this._emit("train-entered-area", area, train, route, time);
+      this._emitAreaEvent("train-entered-area", area, train, route, time);
     };
   }
 
@@ -322,7 +402,7 @@ export class TrainTracker {
     this._trainsInArea.get(area).delete(train);
 
     return (): void => {
-      this._emit("train-left-area", area, train, route, time);
+      this._emitAreaEvent("train-left-area", area, train, route, time);
     };
   }
 
@@ -375,7 +455,7 @@ export class TrainTracker {
     const train = this._infrastructure.getOrThrow("train", trainID);
 
     this._lastRoutes.set(train, route);
-    this._trainRoutes.get(train).add(route);
+    this._trainOccupiedRoutes.get(train).add(route);
 
     for (const area of this._areasByEntryRoute.get(route)) {
       if (!this._trainsInArea.get(area).has(train)) {
@@ -397,7 +477,7 @@ export class TrainTracker {
     const route = this._infrastructure.getOrThrow("route", routeID);
     const train = this._infrastructure.getOrThrow("train", trainID);
 
-    const trainRoutes = this._trainRoutes.get(train);
+    const trainRoutes = this._trainOccupiedRoutes.get(train);
     trainRoutes.delete(route);
 
     for (const area of this._areasByRoute.get(route)) {
@@ -415,6 +495,30 @@ export class TrainTracker {
     }
   }
 
+  private _handleRouteReserved(
+    _name: string,
+    { trainID, routeID, time }: EventPayloads["routeReserved"]
+  ): void {
+    const route = this._infrastructure.getOrThrow("route", routeID);
+    const train = this._infrastructure.getOrThrow("train", trainID);
+
+    this._trainReservedRoutes.get(train).add(route);
+
+    this._emitEvent("train-reserved-route", { train, route, time });
+  }
+
+  private _handleRouteReleased(
+    _name: string,
+    { trainID, routeID, time }: EventPayloads["routeReleased"]
+  ): void {
+    const route = this._infrastructure.getOrThrow("route", routeID);
+    const train = this._infrastructure.getOrThrow("train", trainID);
+
+    this._trainReservedRoutes.get(train).delete(route);
+
+    this._emitEvent("train-released-route", { train, route, time });
+  }
+
   private _handleTrainDeleted(
     _name: string,
     { trainID }: EventPayloads["trainDeleted"]
@@ -424,7 +528,7 @@ export class TrainTracker {
     this._lastRoutes.delete(train);
     this._lastStations.delete(train);
     this._reports.delete(train);
-    this._trainRoutes.delete(train);
+    this._trainOccupiedRoutes.delete(train);
 
     for (const trains of this._trainsInArea.values()) {
       trains.delete(train);
