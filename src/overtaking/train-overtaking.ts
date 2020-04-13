@@ -1,10 +1,10 @@
 import { Infrastructure, Train, Station, Route } from "../infrastructure";
 import { OTAPI } from "../otapi";
+import { curryCatch, CurryLog } from "../curry-log";
 
 import { Blocking } from "./util";
 import { OvertakingArea, DecisionModule } from "./api-public";
 import { TrainTracker } from "src/train-tracker";
-import { logFailure } from "../util";
 
 export interface OvertakingParams {
   defaultModule: string;
@@ -14,20 +14,26 @@ export interface OvertakingParams {
 }
 
 export class TrainOvertaking {
-  private readonly _blocking = new Blocking<string, string, string>();
+  private readonly _blocking: Blocking<string, string, string>;
 
   public constructor(
+    private readonly _log: CurryLog,
     private readonly _infrastructure: Infrastructure,
     private readonly _otapi: OTAPI,
     private readonly _trainTracker: TrainTracker
   ) {
+    this._blocking = new Blocking<string, string, string>(
+      this._log("blocking")
+    );
+
     // Possible workaround for one the countless bugs in OpenTrack.
     this._otapi.on("routeReserved", (_, { routeID, trainID }): void => {
-      this._otapi
-        .setRouteAllowed({ routeID, trainID })
-        .catch(
-          logFailure("Failed to allow reserved route.", { routeID, trainID })
-        );
+      this._otapi.setRouteAllowed({ routeID, trainID }).catch(
+        curryCatch(this._log, "Failed to allow reserved route.", {
+          routeID,
+          trainID,
+        })
+      );
     });
   }
 
@@ -54,7 +60,7 @@ export class TrainOvertaking {
         waitingTrain
       )) {
         if (this._trainTracker.isReservedBy(waitingTrain, route)) {
-          console.warn(
+          this._log.warn(
             `Can't block route ${route.routeID} for train ${waitingTrain.trainID} because it's already reserved by this train.`
           );
           continue;
@@ -66,6 +72,7 @@ export class TrainOvertaking {
         });
       }
     });
+    this._blocking.dumpState();
   }
 
   private async _sendReleaseRequests(
@@ -85,6 +92,7 @@ export class TrainOvertaking {
         });
       }
     });
+    this._blocking.dumpState();
   }
 
   async planOvertaking(
@@ -104,7 +112,7 @@ export class TrainOvertaking {
     ) {
       // Too many trains waiting at the station and the train that should be
       // overtaken here is not one of them.
-      console.info(
+      this._log.info(
         `Can't plan overtaking of ${waiting.trainID} by ${overtaking.trainID} as too many trains would be waiting at ${station.stationID}.`
       );
       return;
@@ -183,6 +191,29 @@ export class TrainOvertaking {
       place: station.stationID,
       blocker: overtaking.trainID,
     });
+
+    await Promise.all(
+      blockedByOvertaking
+        .filter(
+          ({ blocked: waitingTrainID }): boolean =>
+            !this._blocking.isBlockedQuery({
+              place: station.stationID,
+              blocked: waitingTrainID,
+            })
+        )
+        .flatMap(({ blocked: waitingTrainID }): Promise<void>[] =>
+          [...exitRoutes.values()].map(
+            (exitRoute): Promise<void> =>
+              this._sendReleaseRequests(
+                exitRoute,
+                station,
+                this._infrastructure.getOrThrow("train", waitingTrainID)
+              )
+          )
+        )
+    );
+
+    await new Promise((resolve): void => void setTimeout(resolve, 10000));
 
     await Promise.all(
       blockedByOvertaking

@@ -5,6 +5,7 @@ import { TrainOvertaking } from "../train-overtaking";
 import { OvertakingData } from "./overtaking-data";
 import { formatSimulationTime } from "../../otapi";
 import { CallbackQueue } from "../../util";
+import { CurryLog } from "../../curry-log";
 
 export class DecisionModuleAPIFactory {
   private readonly _apiBase: Omit<
@@ -16,9 +17,12 @@ export class DecisionModuleAPIFactory {
     private readonly _infrastructure: Infrastructure,
     private readonly _overtakingData: OvertakingData,
     private readonly _tracker: TrainTracker,
-    private readonly _trainOvertaking: TrainOvertaking
+    private readonly _trainOvertaking: TrainOvertaking,
+    log: CurryLog
   ) {
     this._apiBase = {
+      log,
+
       formatSimulationTime,
 
       getTrain: (trainID): ReturnType<DecisionModuleAPI["getTrain"]> => {

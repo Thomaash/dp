@@ -1,6 +1,7 @@
 import { EventPayloads, OTAPI } from "../otapi";
 import { Infrastructure, Route, Station, Train } from "../infrastructure";
-import { MapSet, haveIntersection, MapMap } from "../util";
+import { curryLog, CurryLog } from "../curry-log";
+import { MapSet, haveIntersection, MapMap, MapArray } from "../util";
 import { Bug } from "../util";
 
 export type Report = EventPayloads["trainPositionReport"];
@@ -71,6 +72,8 @@ export class TrainTracker {
   private readonly _lastRoutes = new Map<Train, Route>();
   private readonly _lastStations = new Map<Train, Station>();
   private readonly _reports = new Map<Train, Report>();
+  private readonly _trainEnteredAreas = new MapArray<Train, Area>();
+  private readonly _trainLeftAreas = new MapArray<Train, Area>();
   private readonly _trainOccupiedRoutes = new MapSet<Train, Route>();
   private readonly _trainReservedRoutes = new MapSet<Train, Route>();
 
@@ -102,6 +105,7 @@ export class TrainTracker {
   }
 
   public constructor(
+    private readonly _log: CurryLog,
     private readonly _otapi: OTAPI,
     private readonly _infrastructure: Infrastructure,
     areas: Iterable<Area> = []
@@ -136,7 +140,12 @@ export class TrainTracker {
     const data = this._singletons.get(otapi);
 
     if (data == null) {
-      const singleton = new TrainTracker(otapi, infrastructure, areas);
+      const singleton = new TrainTracker(
+        curryLog().get("train-tracker-singleton"),
+        otapi,
+        infrastructure,
+        areas
+      );
       this._singletons.set(otapi, { singleton, otapi, infrastructure, areas });
       return singleton;
     } else if ((data.infrastructure !== infrastructure, data.areas !== areas)) {
@@ -156,6 +165,22 @@ export class TrainTracker {
 
   public getTrainsLastStation(train: Train | string): Station | undefined {
     return this._lastStations.get(
+      typeof train === "string"
+        ? this._infrastructure.getOrThrow("train", train)
+        : train
+    );
+  }
+
+  public getTrainsEnteredAreas(train: Train | string): readonly Area[] {
+    return this._trainEnteredAreas.get(
+      typeof train === "string"
+        ? this._infrastructure.getOrThrow("train", train)
+        : train
+    );
+  }
+
+  public getTrainsLeftAreas(train: Train | string): readonly Area[] {
+    return this._trainLeftAreas.get(
       typeof train === "string"
         ? this._infrastructure.getOrThrow("train", train)
         : train
@@ -387,6 +412,7 @@ export class TrainTracker {
     time: number
   ): () => void {
     this._trainsInArea.get(area).add(train);
+    this._trainEnteredAreas.get(train).push(area);
 
     return (): void => {
       this._emitAreaEvent("train-entered-area", area, train, route, time);
@@ -400,6 +426,7 @@ export class TrainTracker {
     time: number
   ): () => void {
     this._trainsInArea.get(area).delete(train);
+    this._trainLeftAreas.get(train).push(area);
 
     return (): void => {
       this._emitAreaEvent("train-left-area", area, train, route, time);
@@ -413,12 +440,12 @@ export class TrainTracker {
   ): void {
     this._otapi
       .setSendPositionReports({ trainID, flag: true, time: frequency })
-      .catch(
-        console.error.bind(
-          console,
+      .catch((error): void => {
+        this._log.error(
+          error,
           `Failed to request position reports for ${trainID}.`
-        )
-      );
+        );
+      });
   }
 
   private _handleTrainPass(

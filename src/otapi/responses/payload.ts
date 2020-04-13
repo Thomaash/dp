@@ -1,3 +1,5 @@
+import { CurryLog } from "../../curry-log";
+
 import { Content } from "./manager";
 import { EventNames, EventPayloads } from "./events";
 
@@ -7,6 +9,7 @@ function number(input: string): number | undefined {
 
 // TODO: Strip this in production build.
 function verifyPayload(
+  log: CurryLog,
   name: string,
   attrs: object,
   ...variants: string[][]
@@ -21,7 +24,7 @@ function verifyPayload(
   }
 
   const payloadText = JSON.stringify(attrs);
-  console.error(
+  log.warn(
     [
       `Unexpected keys were found in the payload (${payloadText}) for ${name}:`,
       "  Actual:",
@@ -34,21 +37,25 @@ function verifyPayload(
 }
 
 export function createPayload<EventName extends EventNames>(
+  log: CurryLog,
   eventName: EventName,
   content: Content
 ): EventPayloads[EventName];
 export function createPayload(
+  log: CurryLog,
   eventName: EventNames,
   content: Content
 ): EventPayloads[EventNames] {
   const attrs = content.attributes;
+
+  const verify = verifyPayload.bind(null, log);
 
   switch (eventName) {
     case "infraPartEntry":
     case "infraPartExit":
     case "infraPartReleased":
     case "infraPartReserved":
-      verifyPayload(eventName, attrs, ["infraPartID", "time", "trainID"]);
+      verify(eventName, attrs, ["infraPartID", "time", "trainID"]);
       return {
         infraPartID: attrs["infraPartID"],
         time: number(attrs["time"]),
@@ -60,13 +67,13 @@ export function createPayload(
     case "simPaused":
     case "simStarted":
     case "simStopped":
-      verifyPayload(eventName, attrs, ["time"]);
+      verify(eventName, attrs, ["time"]);
       return {
         time: number(attrs["time"]),
       };
 
     case "routePartReleased":
-      verifyPayload(eventName, attrs, ["partID", "routeID", "time", "trainID"]);
+      verify(eventName, attrs, ["partID", "routeID", "time", "trainID"]);
       return {
         partID: attrs["partID"],
         routeID: attrs["routeID"],
@@ -78,7 +85,7 @@ export function createPayload(
     case "routeExit":
     case "routeReleased":
     case "routeReserved":
-      verifyPayload(eventName, attrs, ["routeID", "time", "trainID"]);
+      verify(eventName, attrs, ["routeID", "time", "trainID"]);
       return {
         routeID: attrs["routeID"],
         time: number(attrs["time"]),
@@ -86,7 +93,7 @@ export function createPayload(
       };
 
     case "signalPassed":
-      verifyPayload(
+      verify(
         eventName,
         attrs,
         [
@@ -121,18 +128,13 @@ export function createPayload(
 
     case "simReadyForSimulation":
     case "simServerStarted":
-      verifyPayload(eventName, attrs, []);
+      verify(eventName, attrs, []);
       return {};
 
     case "trainArrival":
     case "trainDeparture":
     case "trainPass":
-      verifyPayload(eventName, attrs, [
-        "delay",
-        "stationID",
-        "time",
-        "trainID",
-      ]);
+      verify(eventName, attrs, ["delay", "stationID", "time", "trainID"]);
       return {
         delay: number(attrs["delay"]),
         stationID: attrs["stationID"],
@@ -142,14 +144,14 @@ export function createPayload(
 
     case "trainCreated":
     case "trainDeleted":
-      verifyPayload(eventName, attrs, ["time", "trainID"]);
+      verify(eventName, attrs, ["time", "trainID"]);
       return {
         time: number(attrs["time"]),
         trainID: attrs["trainID"],
       };
 
     case "trainPositionReport":
-      verifyPayload(eventName, attrs, [
+      verify(eventName, attrs, [
         "acceleration",
         "delay",
         "routeID",
@@ -169,7 +171,7 @@ export function createPayload(
       };
 
     case "trainStopped":
-      verifyPayload(eventName, attrs, [
+      verify(eventName, attrs, [
         "routeID",
         "routeOffset",
         "stopType",

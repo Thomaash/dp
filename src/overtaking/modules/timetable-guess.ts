@@ -1,6 +1,10 @@
 import { DecisionModule, Station } from "../";
 
-import { getAllOvertakingCandidates, getConsecutivePairs } from "../../util";
+import {
+  getAllOvertakingCandidates,
+  getConsecutivePairs,
+  Bug,
+} from "../../util";
 
 export const decisionModule: DecisionModule = {
   name: "timetable-guess",
@@ -12,6 +16,7 @@ export const decisionModule: DecisionModule = {
       getOvertakingAreasByStations,
       getTrainsDelayedArrivalAtStation,
       getTrainsInArea,
+      log,
       planOvertaking,
     },
     { overtakingArea }
@@ -22,7 +27,7 @@ export const decisionModule: DecisionModule = {
       return;
     }
 
-    console.info();
+    log.info();
     for (const [
       { train: train1 },
       { train: train2 },
@@ -65,14 +70,11 @@ export const decisionModule: DecisionModule = {
         !Number.isFinite(train1DelayedArrival) ||
         !Number.isFinite(train2DelayedArrival)
       ) {
-        console.error(
-          "Some ETA is not a finite number, " +
-            "this is a bug as this should never happen."
-        );
+        log.error(new Bug("ETA of some train is not a finite number."));
       }
 
       if (train1DelayedArrival > train2DelayedArrival) {
-        console.info(
+        log.info(
           `Overtake ${train1.trainID} by ${train2.trainID} at ${
             overtakingArea.outflowStation.stationID
           } (${formatSimulationTime(
@@ -83,10 +85,10 @@ export const decisionModule: DecisionModule = {
         );
 
         planOvertaking(train2, train1).catch((error): void => {
-          console.error("Can't plan overtaking:", error);
+          log.error(error, "Can't plan overtaking.");
         });
       } else {
-        console.info(
+        log.info(
           `Don't overtake ${train1.trainID} by ${train2.trainID} at ${
             overtakingArea.outflowStation.stationID
           }, ${formatSimulationTime(
@@ -97,7 +99,7 @@ export const decisionModule: DecisionModule = {
         );
 
         cancelOvertaking(train2, train1).catch((error): void => {
-          console.error("Can't plan overtaking:", error);
+          log.error(error, "Can't plan overtaking:");
         });
       }
     }

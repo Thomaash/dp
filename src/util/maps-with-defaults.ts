@@ -40,6 +40,23 @@ export class MapWithDefaultValue<K, V> extends Map<K, V> {
   }
 }
 
+export class MapArray<K, V> extends Map<K, V[]> {
+  public constructor() {
+    super();
+  }
+
+  public get(key: K): V[] {
+    const existing = super.get(key);
+    if (typeof existing !== "undefined") {
+      return existing;
+    } else {
+      const newArray: V[] = [];
+      super.set(key, newArray);
+      return newArray;
+    }
+  }
+}
+
 export class MapSet<K, V> extends Map<K, Set<V>> {
   public constructor() {
     super();

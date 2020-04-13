@@ -1,6 +1,8 @@
 // Header {{{
 // vim:fdm=marker
 
+/* eslint-disable no-console */
+
 console.log("==> PLAYGROUND");
 Object.entries(process.versions)
   .sort(([a], [b]): number => a.localeCompare(b))

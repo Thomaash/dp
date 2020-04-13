@@ -1,6 +1,9 @@
 import bodyParser from "body-parser";
 import express from "express";
 import xml2js from "xml2js";
+
+import { CurryLog } from "../../curry-log";
+
 import { Config } from "../config";
 import { EventNames, EventPayloads } from "./events";
 import { Server } from "http";
@@ -57,7 +60,10 @@ export class ResponseManager {
 
   private _server: null | Server = null;
 
-  public constructor(private _config: Config) {}
+  public constructor(
+    private readonly _log: CurryLog,
+    private _config: Config
+  ) {}
 
   public async start(): Promise<void> {
     return new Promise((resolve, reject): void => {
@@ -77,7 +83,7 @@ export class ResponseManager {
 
           const soap = await processSOAP(req.body);
           const name: EventNames = soap.name as any;
-          const payload = createPayload(name, soap);
+          const payload = createPayload(this._log, name, soap);
 
           [
             ...(this._manies.get(anyEvent) || []),

@@ -55,6 +55,7 @@ import {
 } from "./responses";
 import { Config } from "./config";
 import { RateLimiter } from "./util";
+import { curryLog, CurryLog } from "../curry-log";
 import {
   CommunicationDumpsterLogger,
   CommunicationFileLogger,
@@ -75,6 +76,7 @@ export interface OTAPIConstructorParams {
   communicationLog?: null | string | Config["communicationLog"];
   host?: Config["host"];
   keepAlive?: Config["keepAlive"];
+  log?: CurryLog;
   maxSimultaneousRequests?: Config["maxSimultaneousRequests"];
   portApp?: Config["portApp"];
   portOT?: Config["portOT"];
@@ -85,7 +87,8 @@ const defaultConstructorParams: Required<OTAPIConstructorParams> = {
   communicationLog: null,
   host: "localhost",
   keepAlive: false,
-  maxSimultaneousRequests: 10,
+  log: curryLog().get("OTAPI"),
+  maxSimultaneousRequests: 1,
   portApp: 9004,
   portOT: 9002,
   protocol: "http",
@@ -108,21 +111,33 @@ export class OTAPI {
   public readonly config: Config;
 
   public constructor(constructorParams: OTAPIConstructorParams) {
+    const constructorParamsWithDefaults: Required<OTAPIConstructorParams> = {
+      ...defaultConstructorParams,
+      ...constructorParams,
+    };
+
+    const log = constructorParamsWithDefaults.log;
+
     const communicationLog =
       typeof constructorParams.communicationLog === "string"
-        ? new CommunicationFileLogger(constructorParams.communicationLog)
+        ? new CommunicationFileLogger(
+            log("communication"),
+            constructorParams.communicationLog
+          )
         : constructorParams.communicationLog
         ? constructorParams.communicationLog
         : new CommunicationDumpsterLogger();
 
     this.config = Object.freeze<Config>({
-      ...defaultConstructorParams,
-      ...constructorParams,
+      ...constructorParamsWithDefaults,
       communicationLog,
     });
 
     this._limiter = new RateLimiter(this.config.maxSimultaneousRequests);
-    this._responseManager = new ResponseManager(this.config);
+    this._responseManager = new ResponseManager(
+      log("response-manager"),
+      this.config
+    );
   }
 
   /*

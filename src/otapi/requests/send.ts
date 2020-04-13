@@ -72,6 +72,7 @@ export function send<Name extends keyof SendParameters>(
   config.communicationLog.logRequest(data);
 
   const { result, cancel } = retry(
+    config.log("send"),
     axios.post.bind(axios, getURL(config), data, {
       httpAgent: config.keepAlive
         ? new http.Agent({ keepAlive: true })
@@ -92,11 +93,12 @@ export function send<Name extends keyof SendParameters>(
       try {
         await result;
       } catch (error) {
-        console.error(
-          ["", `Failed to send request (${new Date()}):`, data, ""].join("\n"),
-          error,
-          "\n"
-        );
+        config
+          .log("send")
+          .error(
+            error,
+            [`Failed to send request (${new Date()}):`, data].join("\n")
+          );
 
         throw error;
       }

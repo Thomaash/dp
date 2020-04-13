@@ -3,7 +3,7 @@ import { DecisionModule } from "../";
 export const decisionModule: DecisionModule = {
   name: "max-speed",
   newTrainEnteredOvertakingArea(
-    { getTrainsInArea, planOvertaking },
+    { getTrainsInArea, log, planOvertaking },
     { overtakingArea }
   ): void {
     const trainsOnItinerary = getTrainsInArea(overtakingArea);
@@ -19,7 +19,7 @@ export const decisionModule: DecisionModule = {
         trainsOnItinerary[1].train,
         trainsOnItinerary[0].train
       ).catch((error): void => {
-        console.error("Can't plan overtaking:", error);
+        log.error(error, "Can't plan overtaking.");
       });
     }
   },

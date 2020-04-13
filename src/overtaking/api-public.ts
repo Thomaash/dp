@@ -9,10 +9,13 @@ import {
   Timetable,
 } from "../infrastructure";
 import { Area } from "../train-tracker";
+import { CurryLog } from "../curry-log";
 
 export { Area, Itinerary, Path, Route, Station, Train, Vertex };
 
 export interface DecisionModuleAPI {
+  log: CurryLog;
+
   formatSimulationTime(simulationTime: number, ms?: boolean): string;
 
   cancelOvertaking(overtaking: Train, waiting: Train): Promise<void>;

@@ -1,6 +1,7 @@
 import xml2js from "xml2js";
 import { expect } from "chai";
 
+import { CurryLog } from "../curry-log";
 import { ck, filterChildren, idFromXML, xmlVertexCK, OTDate } from "./common";
 import {
   Formation,
@@ -48,7 +49,7 @@ const units = {
   month: 60 * 60 * 24 * (365.2425 / 12),
   year: 60 * 60 * 24 * 365.2425,
 };
-function parseDuration(dwellTime: string): number {
+function parseDuration(log: CurryLog, dwellTime: string): number {
   const [
     ,
     ,
@@ -69,7 +70,7 @@ function parseDuration(dwellTime: string): number {
     ) ?? [];
 
   if (years !== 0 || months !== 0) {
-    console.warn(
+    log.warn(
       "The implementation of years and months for time durations is most likely wrong."
     );
   }
@@ -85,6 +86,7 @@ function parseDuration(dwellTime: string): number {
 }
 
 export async function parseInfrastructure(
+  log: CurryLog,
   xml: ParseInfrastructureXML
 ): Promise<InfrastructureData> {
   const xmlParser = new xml2js.Parser({
@@ -361,6 +363,7 @@ export async function parseInfrastructure(
             : undefined;
 
           const minimalDwellTime = parseDuration(
+            log,
             xmlOCPTT?.["stopDescription"]?.[0]?.["stopTimes"]?.[0]?.$
               ?.minimalTime ?? "PT0S"
           );
@@ -725,7 +728,7 @@ export async function parseInfrastructure(
     }
 
     if (!timetables.has(trainID)) {
-      console.warn(
+      log.warn(
         `Can't find any timetable for train ${trainID}. Empty one was created.`
       );
       timetables.set(

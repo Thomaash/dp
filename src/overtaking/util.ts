@@ -1,6 +1,9 @@
-export { MapWithDefaultValue, MapWithDefaultValueFactory } from "../util";
+import { EOL } from "os";
 
+import { CurryLog } from "../curry-log";
 import { MapCounter } from "../util";
+
+export { MapWithDefaultValue, MapWithDefaultValueFactory } from "../util";
 
 export type Key = string | number | boolean | null;
 
@@ -47,6 +50,8 @@ export class Blocking<
         (query.blocked == null || entry.blocked === query.blocked)
     );
   }
+
+  public constructor(private readonly _log: CurryLog) {}
 
   public block(place: Place, blocker: Blocker, blocked: Blocked): this {
     const key = ck(place, blocker, blocked);
@@ -136,7 +141,7 @@ export class Blocking<
       );
     }
     blockedByLines.sort();
-    console.info(["Blocked by:", ...blockedByLines, ""].join("\r\n"));
+    this._log.info(["Blocked by:", ...blockedByLines, ""].join(EOL));
 
     const blockingEntryLines: string[] = [];
     for (const [, { place, blocker, blocked }] of this._entries) {
@@ -145,6 +150,6 @@ export class Blocking<
       );
     }
     blockingEntryLines.sort();
-    console.info(["Blocking entries:", ...blockingEntryLines, ""].join("\r\n"));
+    this._log.info(["Blocking entries:", ...blockingEntryLines, ""].join(EOL));
   }
 }

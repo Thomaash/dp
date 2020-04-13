@@ -70,6 +70,12 @@ const y = yargs
     type: "string",
   })
 
+  .option("log-file", {
+    describe: "The file into which the log (stdout/stderr) will be written.",
+    required: false,
+    type: "string",
+    default: null,
+  })
   .option("log-ot-responses", {
     default: false,
     describe: "If enabled OpenTrack responses will be logged to the console.",

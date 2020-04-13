@@ -1,12 +1,28 @@
+import { CurryLog } from "../curry-log";
+
 export function buildChunkLogger(
-  prefix: string,
-  ...methods: (((line: string) => void) | "log" | "info" | "warn" | "error")[]
+  log: CurryLog,
+  ...methods: (
+    | ((line: string) => void)
+    | "log"
+    | "trace"
+    | "debug"
+    | "info"
+    | "warn"
+    | "error"
+  )[]
 ): (chunk: string) => void {
   let text = "";
 
-  const consumers = methods.map((method): ((line: string) => void) =>
-    typeof method === "function" ? method : console[method].bind(console)
-  );
+  const consumers = methods.map((method): ((line: string) => void) => {
+    if (typeof method === "function") {
+      return method;
+    } else if (method === "error") {
+      return log[method].bind(log, new Error("A chunk of error output."));
+    } else {
+      return log[method].bind(log);
+    }
+  });
 
   return (chunk): void => {
     text += chunk;
@@ -20,9 +36,7 @@ export function buildChunkLogger(
     }
 
     parts.forEach((part): void => {
-      consumers.forEach(
-        (consumer): void => void consumer(`${prefix}: ${part}`)
-      );
+      consumers.forEach((consumer): void => void consumer(part));
     });
   };
 }

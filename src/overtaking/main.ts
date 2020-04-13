@@ -1,6 +1,7 @@
 import { Infrastructure } from "../infrastructure";
 import { OTAPI } from "../otapi";
 import { TrainTracker } from "../train-tracker";
+import { CurryLog } from "../curry-log";
 
 import { DecisionModule } from "./api-public";
 import { DecisionModuleAPIFactory, getOvertakingData } from "./api";
@@ -13,6 +14,7 @@ import { decisionModule as timetableGuessDM } from "./modules/timetable-guess";
 export interface OvertakingParams {
   defaultModule: string;
   infrastructure: Infrastructure;
+  log: CurryLog;
   modules: DecisionModule[];
   otapi: OTAPI;
 }
@@ -20,6 +22,7 @@ export interface OvertakingParams {
 export function overtaking({
   defaultModule: defaultModuleName,
   infrastructure,
+  log,
   modules: customModules,
   otapi,
 }: OvertakingParams): {
@@ -37,25 +40,32 @@ export function overtaking({
     throw new Error(`There is no decision module named ${defaultModuleName}.`);
   }
   const defaultModule: DecisionModule = requestedDefaultModule;
-  console.info(`Default overtaking module: ${defaultModule.name}.`);
+  log.info(`Default overtaking module: ${defaultModule.name}.`);
 
   const overtakingData = getOvertakingData(infrastructure);
   const { overtakingAreas } = overtakingData;
 
   const tracker = new TrainTracker(
+    log("train-tracker"),
     otapi,
     infrastructure,
     overtakingAreas
   ).startTracking(1);
   cleanupCallbacks.push(tracker.stopTraking.bind(tracker));
 
-  const trainOvertaking = new TrainOvertaking(infrastructure, otapi, tracker);
+  const trainOvertaking = new TrainOvertaking(
+    log("train-overtaking"),
+    infrastructure,
+    otapi,
+    tracker
+  );
 
   const decisionModuleAPIFactory = new DecisionModuleAPIFactory(
     infrastructure,
     overtakingData,
     tracker,
-    trainOvertaking
+    trainOvertaking,
+    log("api")
   );
 
   async function setup(): Promise<void> {
@@ -81,7 +91,8 @@ export function overtaking({
                 );
                 await commit();
               } catch (error) {
-                console.error(
+                log.error(
+                  error,
                   "Overtaking decision module failed for train " +
                     train.trainID +
                     " which just entered " +
@@ -97,11 +108,17 @@ export function overtaking({
           tracker.onArea(
             "train-left-area",
             overtakingArea,
-            async ({ train }): Promise<void> => {
+            async ({ train, time }): Promise<void> => {
               try {
+                log.log(
+                  "--A-- Release trains blocked by " +
+                    train.trainID +
+                    `(${time}).`
+                );
                 await trainOvertaking.releaseTrains(overtakingArea, train);
               } catch (error) {
-                console.error(
+                log.error(
+                  error,
                   "Failed to release trains blocked by " +
                     train.trainID +
                     " after overtaking in " +
@@ -124,27 +141,30 @@ export function overtaking({
             }
           })
           .catch((error): void => {
-            console.error(`Can't allow routes for train ${trainID}.`, error);
+            log.error(error, `Can't allow routes for train ${trainID}.`, error);
           });
       }),
       otapi.on(
         "trainDeleted",
-        async (_, { trainID }): Promise<void> => {
+        async (_, { trainID, time }): Promise<void> => {
           const train = infrastructure.getOrThrow("train", trainID);
 
+          log.log("--D-- Release trains blocked by " + trainID + `(${time}).`);
+
           for (const overtakingArea of overtakingAreas) {
-            try {
-              await trainOvertaking.releaseTrains(overtakingArea, train);
-            } catch (error) {
-              console.error(
-                "Failed to release trains blocked by " +
-                  train.trainID +
-                  " after overtaking in " +
-                  overtakingArea.overtakingAreaID +
-                  ".",
-                error
-              );
-            }
+            trainOvertaking
+              .releaseTrains(overtakingArea, train)
+              .catch((error): void => {
+                log.error(
+                  error,
+                  "Failed to release trains blocked by " +
+                    train.trainID +
+                    " after overtaking in " +
+                    overtakingArea.overtakingAreaID +
+                    ".",
+                  error
+                );
+              });
           }
         }
       ),

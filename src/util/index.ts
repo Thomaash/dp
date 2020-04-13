@@ -2,7 +2,6 @@ export * from "./arrays";
 export * from "./callback-queue";
 export * from "./deep-freeze";
 export * from "./deffered";
-export * from "./error-handling";
 export * from "./errors";
 export * from "./logging";
 export * from "./maps-with-defaults";

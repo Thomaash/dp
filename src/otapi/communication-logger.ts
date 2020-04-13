@@ -1,4 +1,5 @@
 import { WriteStream, createWriteStream } from "fs";
+import { CurryLog } from "../curry-log";
 
 export interface CommunicationLogger {
   logRequest(body: string): this;
@@ -25,7 +26,10 @@ export class CommunicationFileLogger implements CommunicationLogger {
   private _reses = 0;
   private readonly _file: WriteStream;
 
-  public constructor(private readonly _filePath: string) {
+  public constructor(
+    private readonly _log: CurryLog,
+    private readonly _filePath: string
+  ) {
     this._file = createWriteStream(this._filePath, {
       encoding: "UTF-8",
       flags: "w",
@@ -42,11 +46,10 @@ export class CommunicationFileLogger implements CommunicationLogger {
       "UTF-8",
       (error): void => {
         if (error != null) {
-          console.error(`Failed to write a header into the log.`, {
+          this._log.error(error, `Failed to write a header into the log.`, {
             logFile: this._filePath,
             date,
           });
-          console.error(error);
         }
       }
     );
@@ -61,7 +64,8 @@ export class CommunicationFileLogger implements CommunicationLogger {
       "UTF-8",
       (error): void => {
         if (error != null) {
-          console.error(
+          this._log.error(
+            error,
             `Failed to write a ${LOG_WORDS[type]} ${number} into the log.`,
             {
               logFile: this._filePath,
@@ -69,7 +73,6 @@ export class CommunicationFileLogger implements CommunicationLogger {
               body,
             }
           );
-          console.error(error);
         }
       }
     );

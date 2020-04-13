@@ -1,3 +1,4 @@
+import { CurryLog } from "../curry-log";
 import { createIDGenerator } from "../util";
 
 export class Semaphore {
@@ -47,6 +48,7 @@ export class RateLimiter {
 const nextRetryID = createIDGenerator("R");
 
 export function retry<T>(
+  log: CurryLog,
   func: () => T | Promise<T>,
   limit = Number.POSITIVE_INFINITY
 ): { result: Promise<T>; cancel: (error?: Error) => void } {
@@ -57,7 +59,10 @@ export function retry<T>(
     result: (async (): Promise<T> => {
       for (let attempt = 1; ; ++attempt) {
         if (cancelError != null) {
-          console.error(`${id}: Canceled after #${attempt - 1} attempts.`);
+          log("retry").error(
+            cancelError,
+            `${id}: Canceled after #${attempt - 1} attempts.`
+          );
           throw cancelError;
         }
 
@@ -65,14 +70,15 @@ export function retry<T>(
           return await func();
         } catch (error) {
           if (attempt >= limit) {
-            console.error(
-              `${id}: Attempt #${attempt} failed, giving up.`,
-              error
+            log("retry").error(
+              error,
+              `${id}: Attempt #${attempt} failed, giving up.`
             );
             throw error;
           }
 
-          console.error(
+          log("retry").error(
+            error,
             `${id}: Attempt #${attempt} failed (${error.message}), retrying...`
           );
 

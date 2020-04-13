@@ -3,6 +3,8 @@ import { readFile as readFileCallback } from "fs";
 
 import { PriorityQueue } from "typescript-collections";
 
+import { CurryLog } from "src/curry-log";
+
 import {
   Formation,
   InfrastructureData,
@@ -25,6 +27,7 @@ const readFile = promisify(readFileCallback);
 export const infrastructureFactory = {
   async buildFromFiles(
     this: unknown,
+    log: CurryLog,
     paths: {
       courses: string;
       infrastructure: string;
@@ -44,7 +47,7 @@ export const infrastructureFactory = {
       readFile(paths.timetables, "utf-8"),
     ]);
 
-    return infrastructureFactory.buildFromText({
+    return infrastructureFactory.buildFromText(log, {
       courses,
       infrastructure,
       rollingStock,
@@ -53,9 +56,10 @@ export const infrastructureFactory = {
   },
   async buildFromText(
     this: unknown,
+    log: CurryLog,
     xml: ParseInfrastructureXML
   ): Promise<Infrastructure> {
-    const data = await parseInfrastructure(xml);
+    const data = await parseInfrastructure(log, xml);
     return new Infrastructure(
       data.formations,
       data.itineraries,
