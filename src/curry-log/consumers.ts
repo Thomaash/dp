@@ -92,7 +92,7 @@ export function createCurryLogFileConsumer(path: string): CurryLogConsumer {
     writeStream.write(
       [
         `➤ ${levelLetters[level]} /${path} - ${formatISO9075(time)}`,
-        ...(error != null ? [inspect(error)] : []),
+        ...(error != null ? [error.stack ?? inspect(error)] : []),
         ...messages.map((message): string =>
           typeof message === "string"
             ? message
