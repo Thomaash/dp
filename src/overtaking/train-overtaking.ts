@@ -96,10 +96,48 @@ export class TrainOvertaking {
   }
 
   async planOvertaking(
-    { exitRoutes, outflowStation: station, maxWaiting }: OvertakingArea,
+    overtakingArea: OvertakingArea,
     overtaking: Train,
     waiting: Train
   ): Promise<void> {
+    const { exitRoutes, outflowStation: station, maxWaiting } = overtakingArea;
+
+    if (
+      this._blocking.isBlocked(
+        station.stationID,
+        overtaking.trainID,
+        waiting.trainID
+      )
+    ) {
+      // Already planned.
+      return;
+    }
+
+    if (
+      this._blocking.isBlocked(
+        station.stationID,
+        waiting.trainID,
+        overtaking.trainID
+      )
+    ) {
+      // Already planned the other way around. Cancel the previous one.
+      this._log.warn(
+        "Deadlock overtaking between " +
+          waiting.trainID +
+          " and " +
+          overtaking.trainID +
+          " requested at " +
+          station.stationID +
+          ". " +
+          "Overtaking " +
+          waiting.trainID +
+          " by " +
+          overtaking.trainID +
+          "."
+      );
+      await this.cancelOvertaking(overtakingArea, waiting, overtaking);
+    }
+
     if (
       // We can safely continue if the waiting train is already blocket at the
       // station.
@@ -113,19 +151,14 @@ export class TrainOvertaking {
       // Too many trains waiting at the station and the train that should be
       // overtaken here is not one of them.
       this._log.info(
-        `Can't plan overtaking of ${waiting.trainID} by ${overtaking.trainID} as too many trains would be waiting at ${station.stationID}.`
+        "Can't plan overtaking of " +
+          waiting.trainID +
+          " by " +
+          overtaking.trainID +
+          " as too many trains would be waiting at " +
+          station.stationID +
+          "."
       );
-      return;
-    }
-
-    if (
-      this._blocking.isBlocked(
-        station.stationID,
-        overtaking.trainID,
-        waiting.trainID
-      )
-    ) {
-      // Already planned.
       return;
     }
 

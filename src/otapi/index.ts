@@ -198,12 +198,27 @@ export class OTAPI {
       return;
     }
 
+    this.pauseFor(
+      async (): Promise<void> => {
+        await Promise.all(requests.map((func): Promise<void> => func()));
+      }
+    );
+  }
+
+  public async pauseFor(func: () => void | Promise<void>): Promise<void> {
     ++this._pausedBy;
     if (this._pausedBy === 1) {
       await this.pauseSimulation();
     }
 
-    await Promise.all(requests.map((func): Promise<void> => func()));
+    try {
+      await func();
+    } catch (error) {
+      this.config.log.error(
+        error,
+        "OpenTrack was pause for this function but it throw an error."
+      );
+    }
 
     --this._pausedBy;
     if (this._pausedBy === 0) {

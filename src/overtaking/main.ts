@@ -76,63 +76,76 @@ export function overtaking({
             "train-entered-area",
             overtakingArea,
             async ({ train, route, time }): Promise<void> => {
-              try {
-                const { api, commit } = decisionModuleAPIFactory.get(
-                  overtakingArea
-                );
-                await defaultModule.newTrainEnteredOvertakingArea(
-                  api,
-                  Object.freeze({
-                    entryRoute: route,
-                    newTrain: train,
-                    overtakingArea,
-                    time,
-                  })
-                );
-                await commit();
-              } catch (error) {
-                log.error(
-                  error,
-                  "Overtaking decision module failed for train " +
-                    train.trainID +
-                    " which just entered " +
-                    overtakingArea.overtakingAreaID +
-                    " through " +
-                    route.routeID +
-                    ".",
-                  error
-                );
-              }
+              otapi.pauseFor(
+                async (): Promise<void> => {
+                  try {
+                    const { api, commit } = decisionModuleAPIFactory.get(
+                      overtakingArea
+                    );
+                    await defaultModule.newTrainEnteredOvertakingArea(
+                      api,
+                      Object.freeze({
+                        entryRoute: route,
+                        newTrain: train,
+                        overtakingArea,
+                        time,
+                      })
+                    );
+                    await commit();
+                  } catch (error) {
+                    log.error(
+                      error,
+                      "Overtaking decision module failed for train " +
+                        train.trainID +
+                        " which just entered " +
+                        overtakingArea.overtakingAreaID +
+                        " through " +
+                        route.routeID +
+                        ".",
+                      error
+                    );
+                  }
+                }
+              );
             }
           ),
           tracker.onArea(
             "train-left-area",
             overtakingArea,
-            async ({ train, time }): Promise<void> => {
-              try {
-                log.log(
-                  "--A-- Release trains blocked by " +
-                    train.trainID +
-                    `(${time}).`
-                );
-                await trainOvertaking.releaseTrains(overtakingArea, train);
-              } catch (error) {
-                log.error(
-                  error,
-                  "Failed to release trains blocked by " +
-                    train.trainID +
-                    " after overtaking in " +
-                    overtakingArea.overtakingAreaID +
-                    ".",
-                  error
-                );
-              }
+            async ({ train }): Promise<void> => {
+              otapi.pauseFor(
+                async (): Promise<void> => {
+                  try {
+                    log.info(
+                      "Train " +
+                        train.trainID +
+                        " left area " +
+                        overtakingArea.overtakingAreaID +
+                        ", release blocked trains."
+                    );
+
+                    await trainOvertaking.releaseTrains(overtakingArea, train);
+                  } catch (error) {
+                    log.error(
+                      error,
+                      "Failed to release trains blocked by " +
+                        train.trainID +
+                        " after overtaking in " +
+                        overtakingArea.overtakingAreaID +
+                        ".",
+                      error
+                    );
+                  }
+                }
+              );
             }
           ),
         ]
       ),
       otapi.on("trainCreated", (_, { trainID }): void => {
         const train = infrastructure.getOrThrow("train", trainID);
+
+        log.info(`Train ${trainID} was created, enable it's routes.`);
 
         otapi
           .sendInPause(({ send }): void => {
@@ -146,26 +159,33 @@ export function overtaking({
       }),
       otapi.on(
         "trainDeleted",
-        async (_, { trainID, time }): Promise<void> => {
-          const train = infrastructure.getOrThrow("train", trainID);
+        async (_, { trainID }): Promise<void> => {
+          otapi.pauseFor(
+            async (): Promise<void> => {
+              const train = infrastructure.getOrThrow("train", trainID);
 
-          log.log("--D-- Release trains blocked by " + trainID + `(${time}).`);
+              log.info(`Train ${trainID} was deleted, release blocked trains.`);
 
-          for (const overtakingArea of overtakingAreas) {
-            trainOvertaking
-              .releaseTrains(overtakingArea, train)
-              .catch((error): void => {
-                log.error(
-                  error,
-                  "Failed to release trains blocked by " +
-                    train.trainID +
-                    " after overtaking in " +
-                    overtakingArea.overtakingAreaID +
-                    ".",
-                  error
-                );
-              });
-          }
+              await Promise.all(
+                overtakingAreas.map(
+                  (overtakingArea): Promise<void> =>
+                    trainOvertaking
+                      .releaseTrains(overtakingArea, train)
+                      .catch((error): void => {
+                        log.error(
+                          error,
+                          "Failed to release trains blocked by " +
+                            train.trainID +
+                            " after overtaking in " +
+                            overtakingArea.overtakingAreaID +
+                            ".",
+                          error
+                        );
+                      })
+                )
+              );
+            }
+          );
         }
       ),
     ]);
