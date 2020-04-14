@@ -1,5 +1,3 @@
-import { EOL } from "os";
-
 import { CurryLog } from "../curry-log";
 import { MapCounter } from "../util";
 
@@ -141,7 +139,6 @@ export class Blocking<
       );
     }
     blockedByLines.sort();
-    this._log.info(["Blocked by:", ...blockedByLines, ""].join(EOL));
 
     const blockingEntryLines: string[] = [];
     for (const [, { place, blocker, blocked }] of this._entries) {
@@ -150,6 +147,15 @@ export class Blocking<
       );
     }
     blockingEntryLines.sort();
-    this._log.info(["Blocking entries:", ...blockingEntryLines, ""].join(EOL));
+
+    this._log.info(
+      [
+        "Blocked by:",
+        ...blockedByLines,
+        "",
+        "Blocking entries:",
+        ...blockingEntryLines,
+      ].join("\n")
+    );
   }
 }

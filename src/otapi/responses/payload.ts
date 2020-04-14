@@ -31,7 +31,6 @@ function verifyPayload(
       "    " + Object.keys(attrs).sort().join(", "),
       "  Expected (one of):",
       ...variants.map((variant): string => "    " + variant.sort().join(", ")),
-      "",
     ].join("\n")
   );
 }

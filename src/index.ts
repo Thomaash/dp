@@ -11,10 +11,10 @@ import { buildChunkLogger } from "./util";
 import { infrastructureFactory } from "./infrastructure";
 import { TrainCounter } from "./train-counter";
 import {
-  curryLog,
   CurryLog,
-  curryLogNoPathConsoleConsumer,
   createCurryLogFileConsumer,
+  curryLog,
+  curryLogCleanConsoleConsumer,
 } from "./curry-log";
 
 import { overtaking, OvertakingParams, DecisionModule } from "./overtaking";
@@ -234,6 +234,7 @@ async function prepareForRun(
       const otapi = new OTAPI({
         communicationLog,
         keepAlive,
+        log: log("OTAPI"),
         portApp,
         portOT,
       });
@@ -354,7 +355,7 @@ async function doOneRun(
 
 const logFilePath = args["log-file"];
 const log = curryLog(
-  curryLogNoPathConsoleConsumer,
+  curryLogCleanConsoleConsumer,
   ...(logFilePath != null ? [createCurryLogFileConsumer(logFilePath)] : [])
 ).get("index");
 

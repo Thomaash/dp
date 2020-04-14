@@ -56,6 +56,20 @@ export function curryLogNoPathConsoleConsumer({
   }
 }
 
+export function curryLogCleanConsoleConsumer({
+  error,
+  level,
+  messages,
+}: CurryLogConsumerParams): void {
+  if (error != null) {
+    /* eslint-disable-next-line no-console */
+    console[level](error);
+  }
+
+  /* eslint-disable-next-line no-console */
+  console[level](...messages);
+}
+
 const levelLetters = Object.freeze<Record<CurryLogLevel, string>>({
   debug: "d",
   error: "e",
