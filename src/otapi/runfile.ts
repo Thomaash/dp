@@ -1,9 +1,11 @@
 import { promisify } from "util";
 import {
+  copyFile as copyFileCallback,
   readFile as readFileCallback,
   writeFile as writeFileCallback,
 } from "fs";
 
+const copyFile = promisify(copyFileCallback);
 const readFile = promisify(readFileCallback);
 const writeFile = promisify(writeFileCallback);
 
@@ -90,10 +92,13 @@ export type RunfileKey =
   | "Use Switch Time and Route Res. Time";
 
 const newline = /\r?\n/g;
-const comment = /^\/\//;
 
 export class Runfile {
   public constructor(private readonly _path: string) {}
+
+  public get path(): string {
+    return this._path;
+  }
 
   public async readTimeValue(key: RunfileKey, nth = 1): Promise<number> {
     const [hh, mm, ss] = (await this.readValue(key, nth))
@@ -133,7 +138,7 @@ export class Runfile {
 
   public async writeValue(
     key: RunfileKey,
-    value: number | string,
+    value: string,
     nth = 1
   ): Promise<void> {
     let found = 0;
@@ -162,20 +167,12 @@ export class Runfile {
     const port1 = Math.floor(1024 + Math.random() * (65535 - 1024 - 1));
     const port2 = port1 + 1;
 
-    await this.writeValue("OTD Server Port", port1);
-    await this.writeValue("OpenTrack Server Port", port2);
+    await this.writeValue("OTD Server Port", "" + port1);
+    await this.writeValue("OpenTrack Server Port", "" + port2);
   }
 }
 
-export function parseRunfile(text: string): Runfile {
-  return text
-    .split(newline)
-    .filter((line): boolean => !comment.test(line))
-    .map((line): string[] => line.split("#"))
-    .reduce(
-      (acc: any, [key, val]): Runfile => (
-        (acc[key] = acc[key] || []).push(val), acc
-      ),
-      {}
-    );
+export async function cloneRunfile(src: string, dst: string): Promise<Runfile> {
+  await copyFile(src, dst);
+  return new Runfile(dst);
 }

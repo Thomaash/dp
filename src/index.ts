@@ -4,7 +4,7 @@ import { promisify } from "util";
 import { resolve, sep } from "path";
 import { writeFile as writeFileCallback } from "fs";
 
-import { AnyEventCallback, OTAPI, Runfile } from "./otapi";
+import { AnyEventCallback, OTAPI, Runfile, cloneRunfile } from "./otapi";
 import { CallbackQueue, Deferred } from "./util";
 import { args } from "./cli";
 import { buildChunkLogger } from "./util";
@@ -85,7 +85,7 @@ async function startOpenTrackAndOTAPI(
   otapi: OTAPI;
   trainCounter: TrainCounter;
 }> {
-  const otArgs = Object.freeze(["-otd", `-runfile=${args["ot-runfile"]}`]);
+  const otArgs = Object.freeze(["-otd", `-runfile=${runfile.path}`]);
   log.info("OpenTrack commandline:", [args["ot-binary"], ...otArgs]);
 
   for (let attempt = 1; ; ++attempt) {
@@ -210,7 +210,7 @@ async function prepareForRun(
 
       if (typeof runSuffix === "string" && typeof runNumber === "number") {
         await changeOutputPath(runfile, runSuffix, runNumber);
-        await runfile.writeValue("Delay Scenario", runNumber);
+        await runfile.writeValue("Delay Scenario", "" + runNumber);
       }
 
       // The simulation has to be stopped right before it ends to detect and
@@ -219,6 +219,9 @@ async function prepareForRun(
         "Break Time",
         await runfile.readValue("Stop Time")
       );
+
+      // Force enable OTD.
+      await runfile.writeValue("Use OTD-Communication", "1");
 
       const communicationLog = args["communication-log"];
       const delayScenario = await runfile.readValue("Delay Scenario");
@@ -360,7 +363,10 @@ const log = curryLog(
 ).get("index");
 
 (async (): Promise<void> => {
-  const runfile = new Runfile(args["ot-runfile"]);
+  const runfile = await cloneRunfile(
+    args["ot-runfile"],
+    args["ot-runfile"] + ".tmp.txt"
+  );
 
   const infrastructure = await infrastructureFactory.buildFromFiles(
     log("infrastructure"),
