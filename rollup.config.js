@@ -27,7 +27,15 @@ export default [
         preferBuiltins: true,
       }),
       json(),
-      typescript2({ tsconfig: "./tsconfig.rollup.json" }),
+      typescript2({
+        tsconfig: "./tsconfig.rollup.json",
+        tsconfigOverride: {
+          compilerOptions: {
+            declaration: !process.env.NO_TYPES,
+            declarationMap: !process.env.NO_TYPES,
+          },
+        },
+      }),
       commonjs({
         namedExports: {
           "typescript-collections": ["PriorityQueue"],

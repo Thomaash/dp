@@ -6,6 +6,7 @@
   "types": "dist/types",
   "scripts": {
     "build": "rollup --config rollup.config.js",
+    "build:no-types": "NO_TYPES=1 rollup --config rollup.config.js",
     "lint": "eslint --ext js,ts .",
     "playground": "ts-node --project tsconfig.start.json playground.ts",
     "playground:inspect": "TS_NODE_PROJECT=tsconfig.start.json node -r ts-node/register --debug playground.ts",
