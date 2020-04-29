@@ -216,7 +216,7 @@ export class OTAPI {
     } catch (error) {
       this.config.log.error(
         error,
-        "OpenTrack was pause for this function but it throw an error."
+        "OpenTrack was paused for this function but it thrown an error."
       );
     }
 
