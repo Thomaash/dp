@@ -63,7 +63,7 @@ export function curryLogCleanConsoleConsumer({
 }: CurryLogConsumerParams): void {
   if (error != null) {
     /* eslint-disable-next-line no-console */
-    console[level](error);
+    console[level]("#", error.name, error.message);
   }
 
   /* eslint-disable-next-line no-console */
