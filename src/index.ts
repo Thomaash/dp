@@ -378,7 +378,9 @@ const log = curryLog(
 (async (): Promise<void> => {
   const runfile = await cloneRunfile(
     args["ot-runfile"],
-    args["ot-runfile"] + ".tmp.txt"
+    args["ot-runfile"].endsWith(".txt")
+      ? args["ot-runfile"].slice(0, -4) + ".tmp.txt"
+      : args["ot-runfile"] + ".tmp.txt"
   );
 
   const infrastructure = await infrastructureFactory.buildFromFiles(
