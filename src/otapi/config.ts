@@ -4,11 +4,11 @@ import { CommunicationLogger } from "./communication-logger";
 
 export interface Config {
   communicationLog: CommunicationLogger;
-  host: string;
+  hostOT: string;
   keepAlive: boolean;
   log: CurryLog;
   maxSimultaneousRequests: number;
   portApp: number;
   portOT: number;
-  protocol: "http" | "https";
+  protocolOT: "http" | "https";
 }

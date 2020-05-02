@@ -23,7 +23,7 @@ function isntOptAttribute(value: SendOptAttribute): value is SendAttribute {
 }
 
 function getURL(config: Config): string {
-  return `${config.protocol}://${config.host}:${config.portOT}/otd`;
+  return `${config.protocolOT}://${config.hostOT}:${config.portOT}/otd`;
 }
 
 const escapesXMLAttribute = new Map([

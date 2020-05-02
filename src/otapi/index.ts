@@ -74,24 +74,24 @@ export * from "./functions";
 
 export interface OTAPIConstructorParams {
   communicationLog?: null | string | Config["communicationLog"];
-  host?: Config["host"];
+  hostOT?: Config["hostOT"];
   keepAlive?: Config["keepAlive"];
   log?: CurryLog;
   maxSimultaneousRequests?: Config["maxSimultaneousRequests"];
   portApp?: Config["portApp"];
   portOT?: Config["portOT"];
-  protocol?: Config["protocol"];
+  protocolOT?: Config["protocolOT"];
 }
 
 const defaultConstructorParams: Required<OTAPIConstructorParams> = {
   communicationLog: null,
-  host: "localhost",
+  hostOT: "localhost",
   keepAlive: false,
   log: curryLog().get("OTAPI"),
   maxSimultaneousRequests: 1,
   portApp: 9004,
   portOT: 9002,
-  protocol: "http",
+  protocolOT: "http",
 };
 
 export interface SendInPauseAPI {

@@ -240,6 +240,7 @@ async function prepareForRun(
       log.info(`Ports: OT ${portOT} <-> App ${portApp}`);
       const otapi = new OTAPI({
         communicationLog,
+        hostOT,
         keepAlive,
         log: log("OTAPI"),
         portApp,

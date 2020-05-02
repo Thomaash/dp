@@ -26,6 +26,12 @@ const y = yargs
     required: true,
     type: "string",
   })
+  .option("ot-host", {
+    describe:
+      "OpenTrack host (e.g. IP or domain of the server OpenTrack runs on).",
+    required: true,
+    type: "string",
+  })
   .option("ot-export-courses", {
     describe:
       "OpenTrack -> Functions -> Exchange Timetable Data -> Export Courses (trafIT-Format).",
