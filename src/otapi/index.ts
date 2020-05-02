@@ -46,6 +46,7 @@ import {
   TerminateApplicationParameters,
   send,
   SendParameters,
+  createAxios,
 } from "./requests";
 import {
   EventCallback,
@@ -130,6 +131,7 @@ export class OTAPI {
 
     this.config = Object.freeze<Config>({
       ...constructorParamsWithDefaults,
+      axios: createAxios(constructorParamsWithDefaults),
       communicationLog,
     });
 
@@ -162,11 +164,17 @@ export class OTAPI {
 
   private _send<Name extends keyof SendParameters>(
     name: Name,
-    parameters: SendParameters[Name]
+    parameters: SendParameters[Name],
+    retryFailed: boolean
   ): Promise<void> {
     return this._limiter.run(
       async (): Promise<void> => {
-        const { result, cancel } = send(this.config, name, parameters);
+        const { result, cancel } = send(
+          this.config,
+          name,
+          parameters,
+          retryFailed
+        );
 
         this._callOnKill.add(cancel);
         await result;
@@ -179,9 +187,10 @@ export class OTAPI {
 
   public async send<Name extends keyof SendParameters>(
     name: Name,
-    parameters: SendParameters[Name]
+    parameters: SendParameters[Name],
+    retryFailed = true
   ): Promise<void> {
-    return this._send(name, parameters);
+    return this._send(name, parameters, retryFailed);
   }
 
   public async sendInPause(
@@ -231,199 +240,199 @@ export class OTAPI {
   }
 
   public activateTrain(parameters: ActivateTrainParameters): Promise<void> {
-    return this._send("activateTrain", parameters);
+    return this.send("activateTrain", parameters);
   }
   public addTimetableEntry(
     parameters: AddTimetableEntryParameters
   ): Promise<void> {
-    return this._send("addTimetableEntry", parameters);
+    return this.send("addTimetableEntry", parameters);
   }
   public addTrain(parameters: AddTrainParameters): Promise<void> {
-    return this._send("addTrain", parameters);
+    return this.send("addTrain", parameters);
   }
   public cancelConnection(
     parameters: CancelConnectionParameters
   ): Promise<void> {
-    return this._send("cancelConnection", parameters);
+    return this.send("cancelConnection", parameters);
   }
   public cancelRoute(parameters: CancelRouteParameters): Promise<void> {
-    return this._send("cancelRoute", parameters);
+    return this.send("cancelRoute", parameters);
   }
   public deactivateTrain(parameters: DeactivateTrainParameters): Promise<void> {
-    return this._send("deactivateTrain", parameters);
+    return this.send("deactivateTrain", parameters);
   }
   public endSimulation(
     parameters: EndSimulationParameters = {}
   ): Promise<void> {
-    return this._send("endSimulation", parameters);
+    return this.send("endSimulation", parameters);
   }
   public infoPanel(parameters: InfoPanelParameters = {}): Promise<void> {
-    return this._send("infoPanel", parameters);
+    return this.send("infoPanel", parameters);
   }
   public openSimulationPanel(
     parameters: OpenSimulationPanelParameters = {}
   ): Promise<void> {
-    return this._send("openSimulationPanel", parameters);
+    return this.send("openSimulationPanel", parameters);
   }
   public pauseSimulation(
     parameters: PauseSimulationParameters = {}
   ): Promise<void> {
-    return this._send("pauseSimulation", parameters);
+    return this.send("pauseSimulation", parameters);
   }
   public removeTrain(parameters: RemoveTrainParameters): Promise<void> {
-    return this._send("removeTrain", parameters);
+    return this.send("removeTrain", parameters);
   }
   public resetMovementAuthority(
     parameters: ResetMovementAuthorityParameters
   ): Promise<void> {
-    return this._send("resetMovementAuthority", parameters);
+    return this.send("resetMovementAuthority", parameters);
   }
   public resetRequestedDeceleration(
     parameters: ResetRequestedDecelerationParameters
   ): Promise<void> {
-    return this._send("resetRequestedDeceleration", parameters);
+    return this.send("resetRequestedDeceleration", parameters);
   }
   public resetRequestedSpeed(
     parameters: ResetRequestedSpeedParameters
   ): Promise<void> {
-    return this._send("resetRequestedSpeed", parameters);
+    return this.send("resetRequestedSpeed", parameters);
   }
   public resetTimetable(
     parameters: ResetTimetableParameters = {}
   ): Promise<void> {
-    return this._send("resetTimetable", parameters);
+    return this.send("resetTimetable", parameters);
   }
   public setArrivalTime(parameters: SetArrivalTimeParameters): Promise<void> {
-    return this._send("setArrivalTime", parameters);
+    return this.send("setArrivalTime", parameters);
   }
   public setConnection(parameters: SetConnectionParameters): Promise<void> {
-    return this._send("setConnection", parameters);
+    return this.send("setConnection", parameters);
   }
   public setDelayScenario(
     parameters: SetDelayScenarioParameters
   ): Promise<void> {
-    return this._send("setDelayScenario", parameters);
+    return this.send("setDelayScenario", parameters);
   }
   public setDepartureCommand(
     parameters: SetDepartureCommandParameters
   ): Promise<void> {
-    return this._send("setDepartureCommand", parameters);
+    return this.send("setDepartureCommand", parameters);
   }
   public setDepartureTime(
     parameters: SetDepartureTimeParameters
   ): Promise<void> {
-    return this._send("setDepartureTime", parameters);
+    return this.send("setDepartureTime", parameters);
   }
   public setDwellTime(parameters: SetDwellTimeParameters): Promise<void> {
-    return this._send("setDwellTime", parameters);
+    return this.send("setDwellTime", parameters);
   }
   public setEngineSwitch(parameters: SetEngineSwitchParameters): Promise<void> {
-    return this._send("setEngineSwitch", parameters);
+    return this.send("setEngineSwitch", parameters);
   }
   public setMovementAuthority(
     parameters: SetMovementAuthorityParameters
   ): Promise<void> {
-    return this._send("setMovementAuthority", parameters);
+    return this.send("setMovementAuthority", parameters);
   }
   public setPassingTime(parameters: SetPassingTimeParameters): Promise<void> {
-    return this._send("setPassingTime", parameters);
+    return this.send("setPassingTime", parameters);
   }
   public setPerformance(parameters: SetPerformanceParameters): Promise<void> {
-    return this._send("setPerformance", parameters);
+    return this.send("setPerformance", parameters);
   }
   public setPositionCoasting(
     parameters: SetPositionCoastingParameters
   ): Promise<void> {
-    return this._send("setPositionCoasting", parameters);
+    return this.send("setPositionCoasting", parameters);
   }
   public setPositionSpeed(
     parameters: SetPositionSpeedParameters
   ): Promise<void> {
-    return this._send("setPositionSpeed", parameters);
+    return this.send("setPositionSpeed", parameters);
   }
   public setPriorityOfStartItinerary(
     parameters: SetPriorityOfStartItineraryParameters
   ): Promise<void> {
-    return this._send("setPriorityOfStartItinerary", parameters);
+    return this.send("setPriorityOfStartItinerary", parameters);
   }
   public setRequestedDeceleration(
     parameters: SetRequestedDecelerationParameters
   ): Promise<void> {
-    return this._send("setRequestedDeceleration", parameters);
+    return this.send("setRequestedDeceleration", parameters);
   }
   public setRequestedSpeed(
     parameters: SetRequestedSpeedParameters
   ): Promise<void> {
-    return this._send("setRequestedSpeed", parameters);
+    return this.send("setRequestedSpeed", parameters);
   }
   public setRouteAllowed(parameters: SetRouteAllowedParameters): Promise<void> {
-    return this._send("setRouteAllowed", parameters);
+    return this.send("setRouteAllowed", parameters);
   }
   public setRouteDisallowed(
     parameters: SetRouteDisallowedParameters
   ): Promise<void> {
-    return this._send("setRouteDisallowed", parameters);
+    return this.send("setRouteDisallowed", parameters);
   }
   public setRouteReserve(parameters: SetRouteReserveParameters): Promise<void> {
-    return this._send("setRouteReserve", parameters);
+    return this.send("setRouteReserve", parameters);
   }
   public setSendPositionReports(
     parameters: SetSendPositionReportsParameters
   ): Promise<void> {
-    return this._send("setSendPositionReports", parameters);
+    return this.send("setSendPositionReports", parameters);
   }
   public setSimulationEndTime(
     parameters: SetSimulationEndTimeParameters
   ): Promise<void> {
-    return this._send("setSimulationEndTime", parameters);
+    return this.send("setSimulationEndTime", parameters);
   }
   public setSimulationPauseTime(
     parameters: SetSimulationPauseTimeParameters
   ): Promise<void> {
-    return this._send("setSimulationPauseTime", parameters);
+    return this.send("setSimulationPauseTime", parameters);
   }
   public setSimulationRate(
     parameters: SetSimulationRateParameters
   ): Promise<void> {
-    return this._send("setSimulationRate", parameters);
+    return this.send("setSimulationRate", parameters);
   }
   public setSimulationStartTime(
     parameters: SetSimulationStartTimeParameters
   ): Promise<void> {
-    return this._send("setSimulationStartTime", parameters);
+    return this.send("setSimulationStartTime", parameters);
   }
   public setSimulationStep(
     parameters: SetSimulationStepParameters
   ): Promise<void> {
-    return this._send("setSimulationStep", parameters);
+    return this.send("setSimulationStep", parameters);
   }
   public setStop(parameters: SetStopParameters): Promise<void> {
-    return this._send("setStop", parameters);
+    return this.send("setStop", parameters);
   }
   public setTerminalStation(
     parameters: SetTerminalStationParameters
   ): Promise<void> {
-    return this._send("setTerminalStation", parameters);
+    return this.send("setTerminalStation", parameters);
   }
   public setWaitForDepartureCommand(
     parameters: SetWaitForDepartureCommandParameters
   ): Promise<void> {
-    return this._send("setWaitForDepartureCommand", parameters);
+    return this.send("setWaitForDepartureCommand", parameters);
   }
   public startSimulation(
     parameters: StartSimulationParameters = {}
   ): Promise<void> {
-    return this._send("startSimulation", parameters);
+    return this.send("startSimulation", parameters);
   }
   public stepSimulation(
     parameters: StepSimulationParameters = {}
   ): Promise<void> {
-    return this._send("stepSimulation", parameters);
+    return this.send("stepSimulation", parameters);
   }
   public terminateApplication(
     parameters: TerminateApplicationParameters = {}
   ): Promise<void> {
-    return this._send("terminateApplication", parameters);
+    return this.send("terminateApplication", parameters);
   }
 
   /*

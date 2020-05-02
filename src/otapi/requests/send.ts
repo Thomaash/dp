@@ -1,6 +1,11 @@
-import axios from "axios";
-import http from "http";
-import https from "https";
+import axiosStatic, { AxiosInstance } from "axios";
+import {
+  HttpOptions as HTTPAgentOptions,
+  HttpsAgent as HTTPSAgent,
+  HttpsOptions as HTTPSAgentOptions,
+  default as HTTPAgent,
+} from "agentkeepalive";
+
 import { Config } from "../config";
 import { SendParameters } from "./parameters";
 import { retry } from "../util";
@@ -65,44 +70,84 @@ function buildBody(tagName: string, attributes: SendAttribute[]): string {
 export function send<Name extends keyof SendParameters>(
   config: Config,
   name: Name,
-  parameters: SendParameters[Name]
+  parameters: SendParameters[Name],
+  retryFailed: boolean
 ): { result: Promise<void>; cancel: (error?: Error) => void } {
   const data = buildBody(name, parsePayload(parameters));
 
   config.communicationLog.logRequest(data);
 
-  const { result, cancel } = retry(
-    config.log("send"),
-    axios.post.bind(axios, getURL(config), data, {
-      httpAgent: config.keepAlive
-        ? new http.Agent({ keepAlive: true })
-        : undefined,
-      httpsAgent: config.keepAlive
-        ? new https.Agent({ keepAlive: true })
-        : undefined,
+  if (retryFailed) {
+    const { result, cancel } = retry(
+      config.log("send"),
+      config.axios.post.bind(config.axios, getURL(config), data)
+    );
 
-      headers: {
-        "Content-Type": "application/xml; charset=utf-8",
-      },
-      responseType: "text",
-    })
-  );
+    return {
+      result: (async (): Promise<void> => {
+        try {
+          await result;
+        } catch (error) {
+          config
+            .log("send")
+            .error(
+              error,
+              [`Failed to send request (${new Date()}):`, data].join("\n")
+            );
 
-  return {
-    result: (async (): Promise<void> => {
-      try {
-        await result;
-      } catch (error) {
-        config
-          .log("send")
-          .error(
-            error,
-            [`Failed to send request (${new Date()}):`, data].join("\n")
-          );
+          throw error;
+        }
+      })(),
+      cancel,
+    };
+  } else {
+    return {
+      result: (async (): Promise<void> => {
+        await config.axios.post(getURL(config), data);
+      })(),
+      cancel(): void {},
+    };
+  }
+}
 
-        throw error;
-      }
-    })(),
-    cancel,
+export function createAxios({
+  keepAlive,
+  maxSimultaneousRequests: maxSockets,
+}: {
+  keepAlive: boolean;
+  maxSimultaneousRequests: number;
+}): AxiosInstance {
+  const timeout = 15 * 1000;
+
+  const agentOptions: HTTPAgentOptions & HTTPSAgentOptions = {
+    keepAlive,
+    maxSockets,
+    timeout,
   };
+
+  const keepAliveHeaders = keepAlive
+    ? {
+        Connection: "keep-alive",
+        "Keep-Alive": `timeout=${Math.ceil(timeout / 1000 + 15)}, max=${
+          Number.MAX_SAFE_INTEGER
+        }`,
+      }
+    : {
+        Connection: "close",
+      };
+
+  const axios = axiosStatic.create({
+    httpAgent: new HTTPAgent(agentOptions),
+    httpsAgent: new HTTPSAgent(agentOptions),
+
+    timeout,
+
+    headers: {
+      "Content-Type": "application/xml; charset=utf-8",
+      ...keepAliveHeaders,
+    },
+    responseType: "text",
+  });
+
+  return axios;
 }
