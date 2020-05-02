@@ -321,14 +321,11 @@ async function doOneRun(
 ): Promise<void> {
   log.info();
 
-  const { command, otapi, trainCounter } = await startOpenTrackAndOTAPI(
-    log("startup"),
-    {
-      runNumber,
-      runSuffix: overtakingParamsBase.defaultModule,
-      runfile,
-    }
-  );
+  const { command, otapi } = await startOpenTrackAndOTAPI(log("startup"), {
+    runNumber,
+    runSuffix: overtakingParamsBase.defaultModule,
+    runfile,
+  });
   command.returnCode.catch().then(
     async (): Promise<void> => {
       log.info(`OpenTrack exited with exit code ${await command.returnCode}.`);
@@ -519,10 +516,7 @@ const log = curryLog(
       await doOneRun(log("run"), { overtakingParamsBase, runfile });
     }
   } else {
-    const { otapi, trainCounter } = await prepareForRun(
-      log("preparations"),
-      runfile
-    );
+    const { otapi } = await prepareForRun(log("preparations"), runfile);
 
     log.info("Waiting for OpenTrack...");
     await waitPort({ port: otapi.config.portOT, output: "silent" });
