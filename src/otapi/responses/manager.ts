@@ -105,6 +105,11 @@ export class ResponseManager {
         this._config.portApp,
         (error): void => void (error ? reject(error) : resolve())
       );
+
+      this._server.keepAliveTimeout = 125 * 1000;
+      this._server.headersTimeout = Math.ceil(
+        this._server.keepAliveTimeout + 5 * 1000
+      );
     });
   }
 
