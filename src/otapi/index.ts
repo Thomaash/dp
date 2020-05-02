@@ -208,7 +208,9 @@ export class OTAPI {
   public async pauseFor(func: () => void | Promise<void>): Promise<void> {
     ++this._pausedBy;
     if (this._pausedBy === 1) {
+      const paused = this.once("simPaused");
       await this.pauseSimulation();
+      await paused;
     }
 
     try {
@@ -222,7 +224,9 @@ export class OTAPI {
 
     --this._pausedBy;
     if (this._pausedBy === 0) {
+      const continued = this.once("simContinued");
       await this.startSimulation();
+      await continued;
     }
   }
 
