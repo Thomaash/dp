@@ -227,6 +227,8 @@ async function prepareForRun(
       const communicationLog = args["communication-log"];
       const delayScenario = await runfile.readValue("Delay Scenario");
       const endTime = await runfile.readTimeValue("Stop Time");
+      const hostApp = await runfile.readValue("OTD Server");
+      const hostOT = args["ot-host"];
       const keepAlive = (await runfile.readValue("Keep Connection")) === "1";
       const outputPath = await runfile.readValue("OutputPath");
       const portApp = +(await runfile.readValue("OTD Server Port"));
@@ -234,6 +236,7 @@ async function prepareForRun(
 
       log.info(`Delay Scenario: ${delayScenario}`);
       log.info(`Output Path: ${outputPath}`);
+      log.info(`Hosts: OT ${hostOT} <-> App ${hostApp}`);
       log.info(`Ports: OT ${portOT} <-> App ${portApp}`);
       const otapi = new OTAPI({
         communicationLog,
