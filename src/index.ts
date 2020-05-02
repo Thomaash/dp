@@ -519,7 +519,11 @@ const log = curryLog(
     const { otapi } = await prepareForRun(log("preparations"), runfile);
 
     log.info("Waiting for OpenTrack...");
-    await waitPort({ port: otapi.config.portOT, output: "silent" });
+    await waitPort({
+      host: otapi.config.hostOT,
+      output: "dots",
+      port: otapi.config.portOT,
+    });
 
     for (;;) {
       const { setup, cleanup } = overtaking({
