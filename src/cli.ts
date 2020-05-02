@@ -113,6 +113,21 @@ const y = yargs
     describe:
       "If enabled runs will be performed with and without decision module (only works with --manage-ot).",
     type: "boolean",
+  })
+
+  .option("test-connection-serial", {
+    default: 0,
+    describe:
+      "Send n requests in series to test the connection (sends requests one by one regardless of max-simultaneous-requests).",
+    hidden: true,
+    type: "number",
+  })
+  .option("test-connection-parallel", {
+    default: 0,
+    describe:
+      "Send n requests in parrallel to test the connection (respects max-simultaneous-requests, even if that means sending them in series).",
+    hidden: true,
+    type: "number",
   });
 
 export const args: ReturnType<typeof y["parse"]> = y

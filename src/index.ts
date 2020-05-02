@@ -10,6 +10,7 @@ import { args } from "./cli";
 import { buildChunkLogger } from "./util";
 import { infrastructureFactory } from "./infrastructure";
 import { TrainCounter } from "./train-counter";
+import { testConnection } from "./connection-test";
 import {
   CurryLog,
   createCurryLogFileConsumer,
@@ -448,7 +449,52 @@ const log = curryLog(
     modules: overtakingModules,
   };
 
-  if (args["manage-ot"]) {
+  if (
+    args["test-connection-serial"] > 0 ||
+    args["test-connection-parallel"] > 0
+  ) {
+    if (args["manage-ot"]) {
+      const { command, otapi } = await startOpenTrackAndOTAPI(log("startup"), {
+        runNumber: 1,
+        runSuffix: "connection-test",
+        runfile,
+      });
+      command.returnCode.catch().then(
+        async (): Promise<void> => {
+          log.error(
+            new Error("Process unexpectedly terminated."),
+            `OpenTrack unexpectedly exited with exit code ${await command.returnCode}.`
+          );
+        }
+      );
+
+      await testConnection(
+        log("connection-test"),
+        otapi,
+        args["test-connection-serial"],
+        args["test-connection-parallel"]
+      );
+
+      log.info("Closing OpenTrack...");
+      await otapi.terminateApplication();
+    } else {
+      const { otapi } = await prepareForRun(log("preparations"), runfile);
+
+      log.info("Waiting for OpenTrack...");
+      await waitPort({
+        host: otapi.config.hostOT,
+        output: "dots",
+        port: otapi.config.portOT,
+      });
+
+      await testConnection(
+        log("connection-test"),
+        otapi,
+        args["test-connection-serial"],
+        args["test-connection-parallel"]
+      );
+    }
+  } else if (args["manage-ot"]) {
     if (args["runs"] >= 0) {
       for (let runNumber = 1; runNumber <= args["runs"]; ++runNumber) {
         await doOneRun(log("run", "" + runNumber), {
