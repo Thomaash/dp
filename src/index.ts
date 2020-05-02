@@ -230,6 +230,7 @@ async function prepareForRun(
       const hostApp = await runfile.readValue("OTD Server");
       const hostOT = args["ot-host"];
       const keepAlive = (await runfile.readValue("Keep Connection")) === "1";
+      const maxSimultaneousRequests = args["max-simultaneous-requests"];
       const outputPath = await runfile.readValue("OutputPath");
       const portApp = +(await runfile.readValue("OTD Server Port"));
       const portOT = +(await runfile.readValue("OpenTrack Server Port"));
@@ -243,6 +244,7 @@ async function prepareForRun(
         hostOT,
         keepAlive,
         log: log("OTAPI"),
+        maxSimultaneousRequests,
         portApp,
         portOT,
       });

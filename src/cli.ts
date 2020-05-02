@@ -87,6 +87,11 @@ const y = yargs
     describe: "If enabled OpenTrack responses will be logged to the console.",
     type: "boolean",
   })
+  .option("max-simultaneous-requests", {
+    default: 1,
+    describe: "How many requests to send in parallel.",
+    type: "number",
+  })
   .option("randomize-ports", {
     default: false,
     describe: "Put random pair of ports into the runfile.",
