@@ -211,6 +211,7 @@ async function prepareForRun(
       if (typeof runSuffix === "string" && typeof runNumber === "number") {
         await changeOutputPath(runfile, runSuffix, runNumber);
         await runfile.writeValue("Delay Scenario", "" + runNumber);
+        await runfile.writeValue("Route Setting and Reservation Mode", "2");
       }
 
       // The simulation has to be stopped right before it ends to detect and
