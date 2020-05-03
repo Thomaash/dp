@@ -246,8 +246,6 @@ export class TrainOvertaking {
         )
     );
 
-    await new Promise((resolve): void => void setTimeout(resolve, 10000));
-
     await Promise.all(
       blockedByOvertaking
         .filter(
