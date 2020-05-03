@@ -108,6 +108,7 @@ export class OTAPI {
   private readonly _callOnKill = new Set<() => void>();
 
   private _pausedBy = 0;
+  private _paused: null | Promise<unknown> = null;
 
   public readonly config: Config;
 
@@ -217,10 +218,10 @@ export class OTAPI {
   public async pauseFor(func: () => void | Promise<void>): Promise<void> {
     ++this._pausedBy;
     if (this._pausedBy === 1) {
-      const paused = this.once("simPaused");
+      this._paused = this.once("simPaused");
       await this.pauseSimulation();
-      await paused;
     }
+    await this._paused;
 
     try {
       await func();
@@ -233,9 +234,8 @@ export class OTAPI {
 
     --this._pausedBy;
     if (this._pausedBy === 0) {
-      const continued = this.once("simContinued");
+      this._paused = null;
       await this.startSimulation();
-      await continued;
     }
   }
 
