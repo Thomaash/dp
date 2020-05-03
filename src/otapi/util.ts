@@ -39,9 +39,11 @@ export class RateLimiter {
     ...rest: Rest
   ): Promise<Ret> {
     await this._semaphore.enter();
-    const ret = await func(...rest);
-    this._semaphore.leave();
-    return ret;
+    try {
+      return await func(...rest);
+    } finally {
+      this._semaphore.leave();
+    }
   }
 }
 
