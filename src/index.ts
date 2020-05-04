@@ -212,7 +212,6 @@ async function prepareForRun(
       if (typeof runSuffix === "string" && typeof runNumber === "number") {
         await changeOutputPath(runfile, runSuffix, runNumber);
         await runfile.writeValue("Delay Scenario", "" + runNumber);
-        await runfile.writeValue("Route Setting and Reservation Mode", "2");
       }
 
       // The simulation has to be stopped right before it ends to detect and
@@ -224,6 +223,7 @@ async function prepareForRun(
 
       // Force enable OTD.
       await runfile.writeValue("Use OTD-Communication", "1");
+      await runfile.writeValue("Route Setting and Reservation Mode", "2");
 
       // No matter what I do OpenTrack will close each connection right
       // after receiving the second request on it.
