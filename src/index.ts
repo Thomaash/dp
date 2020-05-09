@@ -494,8 +494,23 @@ const log = curryLog(
       );
     }
   } else if (args["manage-ot"]) {
-    if (args["runs"] >= 0) {
-      for (let runNumber = 1; runNumber <= args["runs"]; ++runNumber) {
+    const firstRunDelayScenario = args["delay-scenario-first"];
+    const lastRunDelayScenario = args["delay-scenario-last"];
+
+    if (firstRunDelayScenario === -1 && lastRunDelayScenario === -1) {
+      await doOneRun(log("run"), { overtakingParamsBase, runfile });
+    } else if (
+      Number.isInteger(firstRunDelayScenario) &&
+      Number.isInteger(lastRunDelayScenario) &&
+      1 <= firstRunDelayScenario &&
+      firstRunDelayScenario <= lastRunDelayScenario &&
+      lastRunDelayScenario <= 200
+    ) {
+      for (
+        let runNumber = firstRunDelayScenario;
+        runNumber <= lastRunDelayScenario;
+        ++runNumber
+      ) {
         await doOneRun(log("run", "" + runNumber), {
           overtakingParamsBase,
           runNumber,
@@ -513,7 +528,9 @@ const log = curryLog(
         }
       }
     } else {
-      await doOneRun(log("run"), { overtakingParamsBase, runfile });
+      throw new TypeError(
+        "First and last run options have to be in <1, 200> integer range and first run has to be smaller."
+      );
     }
   } else {
     const { otapi } = await prepareForRun(log("preparations"), runfile);

@@ -102,10 +102,14 @@ const y = yargs
     describe: "If enabled OpenTrack will be started and terminated.",
     type: "boolean",
   })
-  .option("runs", {
+  .option("delay-scenario-first", {
     default: -1,
-    describe:
-      "If enabled n runs will be performed (only works with --manage-ot), if disabled (-1) the runfile will be respected.",
+    describe: "The delay scenario to start with (inclusive).",
+    type: "number",
+  })
+  .option("delay-scenario-last", {
+    default: -1,
+    describe: "The delay scenario to end with (inclusive).",
     type: "number",
   })
   .option("control-runs", {
