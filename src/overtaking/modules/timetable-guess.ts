@@ -6,6 +6,9 @@ import {
   Bug,
 } from "../../util";
 
+// TODO: This should be configurable, not hardcoded.
+const threshold = 15;
+
 export const decisionModule: DecisionModule = {
   name: "timetable-guess",
   newTrainEnteredOvertakingArea(
@@ -65,6 +68,7 @@ export const decisionModule: DecisionModule = {
         train2,
         nextStation
       );
+      const difference = train1DelayedArrival - train2DelayedArrival;
 
       if (
         !Number.isFinite(train1DelayedArrival) ||
@@ -73,7 +77,7 @@ export const decisionModule: DecisionModule = {
         log.error(new Bug("ETA of some train is not a finite number."));
       }
 
-      if (train1DelayedArrival > train2DelayedArrival) {
+      if (difference > threshold) {
         log.info(
           `Overtake ${train1.trainID} by ${train2.trainID} at ${
             overtakingArea.outflowStation.stationID
@@ -88,6 +92,10 @@ export const decisionModule: DecisionModule = {
           log.error(error, "Can't plan overtaking.");
         });
       } else {
+        if (0 < difference && difference <= threshold) {
+          console.count("-- -- -- -- THRESHOLD -- -- -- --");
+        }
+
         log.info(
           `Don't overtake ${train1.trainID} by ${train2.trainID} at ${
             overtakingArea.outflowStation.stationID
