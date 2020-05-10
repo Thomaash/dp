@@ -278,9 +278,9 @@ async function prepareForRun(
             // This simulation run failed.
             log.warn(`${trainCounter.size} stuck trains.`);
 
+            // TODO: Implement proper hang on stuck trains feature.
             // Let's debug if a debugger is attached.
-            // eslint-disable-next-line no-debugger
-            debugger;
+            // debugger;
           }
 
           // Continue.
