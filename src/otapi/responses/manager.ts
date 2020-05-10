@@ -126,16 +126,14 @@ export class ResponseManager {
     });
   }
 
-  public async kill(): Promise<void> {
+  public async kill(error: Error): Promise<void> {
     try {
       await this.stop();
     } finally {
       this._manies.clear();
       this._onces.clear();
 
-      this._rejectOnKill.forEach((reject): void =>
-        reject(new Error("This OTAPI session has been killed."))
-      );
+      this._rejectOnKill.forEach((reject): void => reject(error));
       this._rejectOnKill.clear();
     }
   }

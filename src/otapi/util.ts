@@ -51,7 +51,7 @@ const nextRetryID = createIDGenerator("R");
 
 export function retry<T>(
   log: CurryLog,
-  func: () => T | Promise<T>,
+  func: (args: { attempt: number }) => T | Promise<T>,
   limit = Number.POSITIVE_INFINITY
 ): { result: Promise<T>; cancel: (error?: Error) => void } {
   const id = nextRetryID();
@@ -69,7 +69,7 @@ export function retry<T>(
         }
 
         try {
-          return await func();
+          return await func({ attempt });
         } catch (error) {
           if (attempt >= limit) {
             log("retry").error(

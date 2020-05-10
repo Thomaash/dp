@@ -92,6 +92,11 @@ const y = yargs
     describe: "How many requests to send in parallel.",
     type: "number",
   })
+  .option("max-retries", {
+    default: 5,
+    describe: "How many times to retry a request before declaring failure.",
+    type: "number",
+  })
   .option("randomize-ports", {
     default: false,
     describe: "Put random pair of ports into the runfile.",

@@ -82,6 +82,7 @@ export interface OTAPIConstructorParams {
   portApp?: Config["portApp"];
   portOT?: Config["portOT"];
   protocolOT?: Config["protocolOT"];
+  retry?: number;
 }
 
 const defaultConstructorParams: Required<OTAPIConstructorParams> = {
@@ -93,6 +94,7 @@ const defaultConstructorParams: Required<OTAPIConstructorParams> = {
   portApp: 9004,
   portOT: 9002,
   protocolOT: "http",
+  retry: 5,
 };
 
 export interface SendInPauseAPI {
@@ -102,13 +104,23 @@ export interface SendInPauseAPI {
   ): void;
 }
 
+export class OTAPIKilledError extends Error {
+  public constructor(msg: string) {
+    super(msg);
+  }
+}
+
 export class OTAPI {
   private readonly _responseManager: ResponseManager;
   private readonly _limiter: RateLimiter;
   private readonly _callOnKill = new Set<() => void>();
 
+  private readonly _failureCallbacks = new Map<symbol, () => void>();
+
   private _pausedBy = 0;
   private _paused: null | Promise<unknown> = null;
+
+  private _killed: null | Error = null;
 
   public readonly config: Config;
 
@@ -147,16 +159,29 @@ export class OTAPI {
    * Lifecycle
    */
   public start(): Promise<void> {
+    this._throwIfKilled();
+
     return this._responseManager.start();
   }
   public stop(): Promise<void> {
+    this._throwIfKilled();
+
     return this._responseManager.stop();
   }
-  public kill(): Promise<void> {
+  public kill(
+    error = new OTAPIKilledError("This OTAPI session has been killed.")
+  ): Promise<void> {
+    this._killed = error;
+
     for (const func of this._callOnKill) {
       func();
     }
-    return this._responseManager.kill();
+    return this._responseManager.kill(error);
+  }
+  private _throwIfKilled(): void | never {
+    if (this._killed) {
+      throw this._killed;
+    }
   }
 
   /*
@@ -170,6 +195,10 @@ export class OTAPI {
   ): Promise<void> {
     return this._limiter.run(
       async (): Promise<void> => {
+        // If a request was planned before kill but didn't start yet, it
+        // shouldn't be started at all.
+        this._throwIfKilled();
+
         const { result, cancel } = send(
           this.config,
           name,
@@ -178,7 +207,16 @@ export class OTAPI {
         );
 
         this._callOnKill.add(cancel);
-        await result;
+        try {
+          await result;
+        } catch (error) {
+          if (this._killed == null) {
+            for (const callback of this._failureCallbacks.values()) {
+              callback();
+            }
+          }
+          throw error;
+        }
         this._callOnKill.delete(cancel);
 
         return result;
@@ -191,12 +229,16 @@ export class OTAPI {
     parameters: SendParameters[Name],
     retryFailed = true
   ): Promise<void> {
+    this._throwIfKilled();
+
     return this._send(name, parameters, retryFailed);
   }
 
   public async sendInPause(
     func: (send: SendInPauseAPI) => void | Promise<void>
   ): Promise<void> {
+    this._throwIfKilled();
+
     const requests: (() => Promise<void>)[] = [];
     await func({
       send: (...rest): void => {
@@ -216,6 +258,8 @@ export class OTAPI {
   }
 
   public async pauseFor(func: () => void | Promise<void>): Promise<void> {
+    this._throwIfKilled();
+
     ++this._pausedBy;
     if (this._pausedBy === 1) {
       this._paused = this.once("simPaused");
@@ -454,16 +498,32 @@ export class OTAPI {
     callback: EventCallback<EventName>
   ): () => void;
   public on(...rest: [any] | [any | any]): () => void {
+    this._throwIfKilled();
+
     return this._responseManager.on(...rest);
   }
 
   public once<EventName extends keyof EventPayloads>(
     eventName?: EventName
   ): Promise<EventNamePayloadPair> {
+    this._throwIfKilled();
+
     if (eventName != null) {
       return this._responseManager.once(eventName);
     } else {
       return this._responseManager.once();
     }
+  }
+
+  public onFailure(callback: () => void): () => void {
+    this._throwIfKilled();
+
+    const id = Symbol();
+
+    this._failureCallbacks.set(id, callback);
+
+    return (): void => {
+      this._failureCallbacks.delete(id);
+    };
   }
 }

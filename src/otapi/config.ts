@@ -14,4 +14,5 @@ export interface Config {
   portApp: number;
   portOT: number;
   protocolOT: "http" | "https";
+  retry: number;
 }

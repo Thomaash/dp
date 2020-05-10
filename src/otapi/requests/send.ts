@@ -80,7 +80,10 @@ export function send<Name extends keyof SendParameters>(
   if (retryFailed) {
     const { result, cancel } = retry(
       config.log("send"),
-      config.axios.post.bind(config.axios, getURL(config), data)
+      async (): Promise<void> => {
+        await config.axios.post(getURL(config), data);
+      },
+      config.retry
     );
 
     return {

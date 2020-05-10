@@ -45,31 +45,31 @@ export function overtaking({
   const overtakingData = getOvertakingData(infrastructure);
   const { overtakingAreas } = overtakingData;
 
-  const tracker = new TrainTracker(
-    log("train-tracker"),
-    otapi,
-    infrastructure,
-    overtakingAreas
-  ).startTracking(1);
-  cleanupCallbacks.push(tracker.stopTraking.bind(tracker));
-
-  const trainOvertaking = new TrainOvertaking(
-    log("train-overtaking"),
-    infrastructure,
-    otapi,
-    tracker
-  );
-
-  const decisionModuleAPIFactory = new DecisionModuleAPIFactory(
-    infrastructure,
-    overtakingData,
-    tracker,
-    trainOvertaking,
-    log("api")
-  );
-
   async function setup(): Promise<void> {
-    const removeListeners = await Promise.all([
+    const tracker = new TrainTracker(
+      log("train-tracker"),
+      otapi,
+      infrastructure,
+      overtakingAreas
+    ).startTracking(1);
+    cleanupCallbacks.push(tracker.stopTraking.bind(tracker));
+
+    const trainOvertaking = new TrainOvertaking(
+      log("train-overtaking"),
+      infrastructure,
+      otapi,
+      tracker
+    );
+
+    const decisionModuleAPIFactory = new DecisionModuleAPIFactory(
+      infrastructure,
+      overtakingData,
+      tracker,
+      trainOvertaking,
+      log("api")
+    );
+
+    const removeListeners = [
       ...[...overtakingAreas.values()].flatMap(
         (overtakingArea): (() => void)[] => [
           tracker.onArea(
@@ -188,7 +188,7 @@ export function overtaking({
           );
         }
       ),
-    ]);
+    ];
     cleanupCallbacks.push(...removeListeners);
   }
 

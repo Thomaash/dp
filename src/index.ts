@@ -19,6 +19,7 @@ import {
 } from "./curry-log";
 
 import { overtaking, OvertakingParams, DecisionModule } from "./overtaking";
+import { retry } from "./otapi/util";
 
 const writeFile = promisify(writeFileCallback);
 
@@ -134,12 +135,23 @@ async function startOpenTrackAndOTAPI(
           }
         }
       );
-      cleanupCallbacks.push(
+
+      const killOpenTrack = async (): Promise<void> => {
+        log.info("Waiting for OpenTrack process to terminate...");
+        command.child.kill("SIGTERM");
+        await command.returnCode;
+        log.info("OpenTrack terminated.");
+      };
+
+      cleanupCallbacks.push(killOpenTrack);
+      otapi.onFailure(
         async (): Promise<void> => {
-          log.info("Waiting for OpenTrack process to terminate...");
-          command.child.kill("SIGTERM");
-          await command.returnCode;
-          log.info("OpenTrack terminated.");
+          log.error(
+            new Error("Communication failure"),
+            "Communication failed, killing current run."
+          );
+          await killOpenTrack();
+          await otapi.kill();
         }
       );
 
@@ -240,6 +252,7 @@ async function prepareForRun(
       const outputPath = await runfile.readValue("OutputPath");
       const portApp = +(await runfile.readValue("OTD Server Port"));
       const portOT = +(await runfile.readValue("OpenTrack Server Port"));
+      const retry = args["max-retries"];
 
       log.info(`Delay Scenario: ${delayScenario}`);
       log.info(`Output Path: ${outputPath}`);
@@ -253,6 +266,7 @@ async function prepareForRun(
         maxSimultaneousRequests,
         portApp,
         portOT,
+        retry,
       });
       cleanupCallbacks.plan(otapi.kill.bind(otapi));
 
@@ -319,51 +333,63 @@ async function doOneRun(
     runfile: Runfile;
   }
 ): Promise<void> {
-  log.info();
+  return retry(
+    log,
+    async ({ attempt }): Promise<void> => {
+      if (attempt > 1) {
+        log.warn(`Starting rerun (attempt ${attempt})...`);
+      } else {
+        log.info("Starting run...");
+      }
 
-  const { command, otapi } = await startOpenTrackAndOTAPI(log("startup"), {
-    runNumber,
-    runSuffix: overtakingParamsBase.defaultModule,
-    runfile,
-  });
-  command.returnCode.catch().then(
-    async (): Promise<void> => {
-      log.info(`OpenTrack exited with exit code ${await command.returnCode}.`);
-      log.info("Stopping the app...");
-      otapi.kill();
+      const { command, otapi } = await startOpenTrackAndOTAPI(log("startup"), {
+        runNumber,
+        runSuffix: overtakingParamsBase.defaultModule,
+        runfile,
+      });
+      command.returnCode.catch().then(
+        async (): Promise<void> => {
+          log.info(
+            `OpenTrack exited with exit code ${await command.returnCode}.`
+          );
+          log.info("Stopping the app...");
+          otapi.kill();
+        }
+      );
+
+      const { cleanup, setup } = overtaking({
+        ...overtakingParamsBase,
+        otapi,
+      });
+      try {
+        await setup();
+
+        log.info("Starting simulation...");
+        const simulationEnd = otapi.once("simStopped");
+        const simulationStart = otapi.once("simStarted");
+        await otapi.startSimulation();
+        await simulationStart;
+        log.info("Simulating...");
+
+        await simulationEnd;
+        log.info("Simulation ended.");
+        await cleanup();
+
+        log.info("Closing OpenTrack...");
+        await otapi.terminateApplication();
+
+        // Wait for the process to finish. OpenTrack doesn't handle well when the
+        // app stops responding when it's running.
+        await command.returnCode;
+        log.info("OpenTrack closed.");
+      } finally {
+        await cleanup();
+        await otapi.kill();
+        log.info("OTAPI stopped.");
+        log.info();
+      }
     }
-  );
-
-  try {
-    const { cleanup, setup } = overtaking({
-      ...overtakingParamsBase,
-      otapi,
-    });
-    await setup();
-
-    log.info("Starting simulation...");
-    const simulationEnd = otapi.once("simStopped");
-    const simulationStart = otapi.once("simStarted");
-    await otapi.startSimulation();
-    await simulationStart;
-    log.info("Simulating...");
-
-    await simulationEnd;
-    log.info("Simulation ended.");
-    await cleanup();
-
-    log.info("Closing OpenTrack...");
-    await otapi.terminateApplication();
-
-    // Wait for the process to finish. OpenTrack doesn't handle well when the
-    // app stops responding when it's running.
-    await command.returnCode;
-    log.info("OpenTrack closed.");
-  } finally {
-    await otapi.kill();
-    log.info("OTAPI stopped.");
-    log.info();
-  }
+  ).result;
 }
 
 const logFilePath = args["log-file"];
