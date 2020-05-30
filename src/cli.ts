@@ -123,6 +123,12 @@ const y = yargs
       "If enabled runs will be performed with and without decision module (only works with --manage-ot).",
     type: "boolean",
   })
+  .option("pause-with-stuck-trains", {
+    default: false,
+    describe:
+      "If enabled pauses the simulation and waits for resume when there are stuck trains at the end of a run.",
+    type: "boolean",
+  })
 
   .option("test-connection-serial", {
     default: 0,

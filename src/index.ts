@@ -277,16 +277,23 @@ async function prepareForRun(
           if (trainCounter.size > 0) {
             // This simulation run failed.
             log.warn(`${trainCounter.size} stuck trains.`);
-
-            // TODO: Implement proper hang on stuck trains feature.
-            // Let's debug if a debugger is attached.
-            // debugger;
           }
 
-          // Continue.
-          otapi.startSimulation().catch((error): void => {
-            log.error(error, "Failed to resume simulation.");
-          });
+          // Continue only if:
+          if (
+            // No trains are stuck in the model.
+            trainCounter.size === 0 ||
+            // The user doesn't want to pause and inspect the situation.
+            args["pause-with-stuck-trains"] === false
+          ) {
+            otapi.startSimulation().catch((error): void => {
+              log.error(error, "Failed to resume simulation.");
+            });
+          } else {
+            // Otherwise wait for the user to click the resume button in
+            // OpenTrack on their own.
+            log.info("Resume in OpenTrack to continue...");
+          }
         }
       });
 
