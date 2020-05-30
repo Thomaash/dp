@@ -36,12 +36,7 @@ export default [
           },
         },
       }),
-      commonjs({
-        namedExports: {
-          "typescript-collections": ["PriorityQueue"],
-          chai: ["expect"],
-        },
-      }),
+      commonjs(),
     ],
   },
 ];

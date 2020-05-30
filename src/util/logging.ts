@@ -24,7 +24,7 @@ export function buildChunkLogger(
     }
   });
 
-  return (chunk): void => {
+  return (chunk: string): void => {
     text += chunk;
     const parts = text.split("\n");
 

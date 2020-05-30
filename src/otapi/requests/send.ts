@@ -45,8 +45,8 @@ function escapeXMLAttribute(value: string): string {
     .join("");
 }
 
-function parsePayload(payload: object): SendAttribute[] {
-  return Object.entries(payload)
+function parsePayload(payload: any): SendAttribute[] {
+  return Object.entries<SendOptAttribute["value"]>(payload)
     .map(([name, value]): SendOptAttribute => ({ name, value }))
     .filter(isntOptAttribute);
 }
