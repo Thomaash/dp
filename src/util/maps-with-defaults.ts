@@ -28,6 +28,24 @@ export class MapWithDefaultValueFactory<K, V> extends Map<K, V> {
       return value;
     }
   }
+
+  public dropEmpty(): void {
+    for (const [key, value] of this.entries()) {
+      if (Array.isArray(value)) {
+        if (value.length === 0) {
+          this.delete(key);
+        }
+      } else if (value instanceof Map || value instanceof Set) {
+        if (value.size === 0) {
+          this.delete(key);
+        }
+      } else if (value instanceof Counter) {
+        if (value.get() === 0) {
+          this.delete(key);
+        }
+      }
+    }
+  }
 }
 
 export class MapWithDefaultValue<K, V> extends Map<K, V> {
@@ -109,7 +127,11 @@ export class MapMap<K1, K2, V> extends Map<K1, Map<K2, V>> {
 }
 
 export class MapCounter<K> extends MapWithDefaultValueFactory<K, Counter> {
-  public constructor(initialCount = 0) {
-    super((): Counter => new Counter(initialCount));
+  public constructor(keys: Iterable<K> = []) {
+    super((): Counter => new Counter(0));
+
+    for (const key of keys) {
+      this.get(key).inc();
+    }
   }
 }
