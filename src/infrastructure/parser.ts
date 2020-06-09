@@ -18,6 +18,7 @@ import {
   Vertex,
 } from "./types";
 import { parseItineraryArgs } from "./args";
+import { MapCounter } from "../util";
 
 export interface ParseInfrastructureXML {
   courses: string;
@@ -83,6 +84,23 @@ function parseDuration(log: CurryLog, dwellTime: string): number {
     +months * units.month +
     +years * units.year
   );
+}
+
+function throwIfNotUniqe(
+  values: Iterable<unknown>,
+  msg = "Expected all values to be unique"
+): void {
+  const dupes = new MapCounter(values);
+
+  dupes.dropEmpty();
+  for (const counter of dupes.values()) {
+    counter.dec();
+  }
+  dupes.dropEmpty();
+
+  if (dupes.size) {
+    throw new Error(msg + ": " + JSON.stringify([...dupes.keys()]));
+  }
 }
 
 export async function parseInfrastructure(
@@ -406,11 +424,9 @@ export async function parseInfrastructure(
 
   const xmlRoutes: any[] =
     xmlInfrastructureDocument["trafIT"]["routes"][0]["route"];
-  const routeNames = new Set(
-    xmlRoutes.map((xmlRoute): string => idFromXML(xmlRoute))
-  );
-  expect(routeNames, "All route names have to be unique").have.lengthOf(
-    xmlRoutes.length
+  throwIfNotUniqe(
+    xmlRoutes.map((xmlRoute): string => idFromXML(xmlRoute)),
+    "All route names have to be unique"
   );
   const routes = xmlRoutes.reduce<Map<string, Route>>((acc, xmlRoute): Map<
     string,
@@ -550,11 +566,9 @@ export async function parseInfrastructure(
 
   const xmlPaths: any[] =
     xmlInfrastructureDocument["trafIT"]["paths"][0]["path"];
-  const pathNames = new Set(
-    xmlPaths.map((xmlPath): string => idFromXML(xmlPath))
-  );
-  expect(pathNames, "All path names have to be unique").have.lengthOf(
-    xmlPaths.length
+  throwIfNotUniqe(
+    xmlPaths.map((xmlPath): string => idFromXML(xmlPath)),
+    "All path names have to be unique"
   );
   const paths = xmlPaths.reduce<Map<string, Path>>((acc, xmlPath): Map<
     string,
