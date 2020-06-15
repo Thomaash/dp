@@ -6,11 +6,12 @@ import {
   Operator,
   OperatorFactory,
   PositiveInteger,
+  Rng,
   Statement,
+  StatementFactory,
   Terminal,
   TerminalFactory,
   Tuple,
-  Rng,
 } from "./types";
 
 // Generic {{{
@@ -178,13 +179,13 @@ export const smallIntegerConstant = createTerminalFactory(
   (rng: Rng): string => "" + Math.floor(rng() * 100)
 );
 
-export const terminals = [
+export const terminals = Object.freeze<TerminalFactory>([
   bipolarConstant,
   bool,
   constant,
   integerConstant,
   smallIntegerConstant,
-];
+]);
 
 // }}}
 // Operators {{{
@@ -204,7 +205,7 @@ export const power = createOperatorFactory("Power", 2, "", "**", "");
 export const times = createOperatorFactory("Times", 2, "", "*", "");
 export const weakEquals = createOperatorFactory("WeakEquals", 2, "", "==", "");
 
-export const operators = [
+export const operators = Object.freeze<OperatorFactory<1 | 2 | 3>>([
   and,
   divide,
   equals,
@@ -219,12 +220,15 @@ export const operators = [
   power,
   times,
   weakEquals,
-];
+]);
 
 // }}}
 // Other {{{
 
-export const statements = [...operators, ...terminals];
+export const statements = Object.freeze<StatementFactory[]>([
+  ...operators,
+  ...terminals,
+]);
 
 // }}}
 
