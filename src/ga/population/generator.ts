@@ -19,13 +19,15 @@ export class PopulationGenerator {
   private readonly _rng: Rng;
 
   private readonly _fixedArgsOperatorFactories: FixArgsFactories;
-  private readonly _operatorFactories: OperatorFactory<PositiveInteger>[];
-  private readonly _statementFactories: StatementFactory[];
-  private readonly _terminalFactories: TerminalFactory[];
+  private readonly _operatorFactories: readonly OperatorFactory<
+    PositiveInteger
+  >[];
+  private readonly _statementFactories: readonly StatementFactory[];
+  private readonly _terminalFactories: readonly TerminalFactory[];
 
   public constructor(
     public readonly seed: string,
-    statements: StatementFactory[]
+    statements: readonly StatementFactory[]
   ) {
     this._rng = xor4096(seed);
 
@@ -50,7 +52,7 @@ export class PopulationGenerator {
     );
   }
 
-  private _randomFrom<T>(arr: T[]): T {
+  private _randomFrom<T>(arr: readonly T[]): T {
     return arr[Math.floor(arr.length * this._rng())];
   }
 
@@ -129,6 +131,16 @@ export class PopulationGenerator {
           )
         );
       }
+    }
+  }
+
+  public halfAndHalf(max: 1): Terminal;
+  public halfAndHalf(max: number): Operator<PositiveInteger>;
+  public halfAndHalf(max: number): Statement {
+    if (this._rng() < 0.5) {
+      return this.grow(1, max);
+    } else {
+      return this.full(max);
     }
   }
 }

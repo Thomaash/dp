@@ -183,6 +183,38 @@ describe("Population", function (): void {
         });
       });
     });
+
+    describe("Half and half", function (): void {
+      [1, 7, 9].forEach((max): void => {
+        it(`Height: up to ${max}`, function (): void {
+          this.timeout(10000);
+
+          const generator = new PopulationGenerator(`TEST-${max}`, testOptions);
+
+          for (let i = 0; i < 3; ++i) {
+            const tree = generator.halfAndHalf(max);
+            const measured = tree;
+
+            expect(
+              measured.heightMin,
+              "Min and max height should be withit the limits"
+            ).to.be.at.least(1);
+            expect(
+              measured.heightMax,
+              "Min and max height should be withit the limits"
+            ).to.be.at.least(1);
+            expect(
+              measured.heightMin,
+              "Min and max height should be withit the limits"
+            ).to.be.at.most(max);
+            expect(
+              measured.heightMax,
+              "Min and max height should be withit the limits"
+            ).to.be.at.most(max);
+          }
+        });
+      });
+    });
   });
 
   describe("Mutator", function (): void {
