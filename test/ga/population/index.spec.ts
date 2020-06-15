@@ -15,11 +15,12 @@ import {
   times,
 } from "../../../src/ga/language";
 import {
+  MutateSpecimen,
   PopulationCompetition,
   PopulationCrossover,
   PopulationGenerator,
-  PopulationMutator,
   codeLengthPenalty,
+  createSimplePopulationMutator,
   heightPenalty,
 } from "../../../src/ga/population";
 import { deepFreeze } from "../../../src/util/deep-freeze";
@@ -191,17 +192,17 @@ describe("Population", function (): void {
           this.timeout(4000);
 
           const { c5, m1p1p2 } = create();
-          const mutator = new PopulationMutator("TEST");
+          const mutate = createSimplePopulationMutator(
+            "TEST",
+            chance,
+            (): Statement => c5
+          );
 
           const original = m1p1p2;
           testCommon(2, "1 + 2 - (3 + 4)", original);
 
           for (let i = 0; i < 50; ++i) {
-            const mutant = mutator.mutateSubtree(
-              original,
-              chance,
-              (): Statement => c5
-            );
+            const mutant = mutate(original);
 
             expect(
               mutant,
