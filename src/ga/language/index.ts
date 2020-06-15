@@ -12,6 +12,7 @@ import {
   Terminal,
   TerminalFactory,
   Tuple,
+  StatementRun,
 } from "./types";
 
 // Generic {{{
@@ -47,45 +48,60 @@ function createOperatorFactory<Args extends PositiveInteger>(
   }
 
   function create(operands: Tuple<Statement, Args>): Operator<Args> {
-    const code = codeFragments.reduce((acc, codeFragment, i): string => {
-      return i < operands.length
-        ? `${acc} ${codeFragment} (${operands[i].code})`
-        : acc + codeFragment;
-    }, "");
+    const code = codeFragments.reduce<string>(
+      (acc, codeFragment, i): string => {
+        return i < operands.length
+          ? `${acc} ${codeFragment} (${operands[i].code})`
+          : acc + codeFragment;
+      },
+      ""
+    );
 
     const heightMax =
       1 +
-      operands.reduce((acc, operand): number => {
+      operands.reduce<number>((acc, operand): number => {
         return Math.max(acc, operand.heightMax);
       }, Number.NEGATIVE_INFINITY);
     const heightMin =
       1 +
-      operands.reduce((acc, operand): number => {
+      operands.reduce<number>((acc, operand): number => {
         return Math.min(acc, operand.heightMin);
       }, Number.POSITIVE_INFINITY);
 
-    const run = new Function(`"use strict"; return (${code});`) as (
-      ...args: any[]
-    ) => any;
+    let cachedPrettyCode: string | null = null;
+    let cachedRun: StatementRun | null = null;
 
-    return Object.freeze({
+    return Object.freeze<Operator<Args>>({
+      get prettyCode(): string {
+        return cachedPrettyCode ?? (cachedPrettyCode = formatStatement(code));
+      },
+      get run(): (...args: any[]) => any {
+        return (
+          cachedRun ??
+          (cachedRun = new Function(
+            `"use strict"; return (${code});`
+          ) as StatementRun)
+        );
+      },
+
       args,
       clone,
       code,
       create,
       createOperandtuple,
-      get prettyCode(): string {
-        return formatStatement(code);
-      },
       heightMax,
       heightMin,
       name,
       operands,
-      run,
     });
   }
 
-  return Object.freeze({ args, create, createOperandtuple, name });
+  return Object.freeze<OperatorFactory<Args>>({
+    args,
+    create,
+    createOperandtuple,
+    name,
+  });
 }
 
 function createTerminalFactory(

@@ -31,7 +31,9 @@ export class PopulationCompetition {
   }
 
   public evaluateOne(statement: Statement): FitStats {
-    const fit = this._fit(statement);
+    const rawFit = Math.abs(this._fit(statement));
+    const fit = Number.isNaN(rawFit) ? Number.POSITIVE_INFINITY : rawFit;
+
     const penalty = this._penalties.reduce((acc, penalize): number => {
       return acc * penalize(statement);
     }, 1);
@@ -44,18 +46,11 @@ export class PopulationCompetition {
   }
 
   public evaluateAll(statements: Statement[]): Map<Statement, FitStats> {
-    return statements.reduce((acc, statement): Map<Statement, FitStats> => {
-      const fit = this._fit(statement);
-      const penalty = this._penalties.reduce((acc, penalize): number => {
-        return acc * penalize(statement);
-      }, 1);
-
-      return acc.set(statement, {
-        combined: fit * penalty,
-        fit,
-        penalty,
-      });
-    }, new Map<Statement, FitStats>());
+    return statements.reduce(
+      (acc, statement): Map<Statement, FitStats> =>
+        acc.set(statement, this.evaluateOne(statement)),
+      new Map<Statement, FitStats>()
+    );
   }
 
   public allVsAll(

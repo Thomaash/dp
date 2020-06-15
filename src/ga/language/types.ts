@@ -45,6 +45,7 @@ export type StatementFactory =
   | OperatorFactory<PositiveInteger>
   | TerminalFactory;
 
+export type StatementRun = (...args: any[]) => any;
 export interface StatementBase<Args extends NonNegativeInteger> {
   args: Args;
   clone(): StatementBase<Args>;
@@ -53,7 +54,7 @@ export interface StatementBase<Args extends NonNegativeInteger> {
   heightMin: number;
   name: string;
   prettyCode: string;
-  run: (...args: any[]) => any;
+  run: StatementRun;
 }
 export interface Operator<Args extends PositiveInteger>
   extends StatementBase<Args>,
