@@ -86,6 +86,24 @@ function parseDuration(log: CurryLog, dwellTime: string): number {
   );
 }
 
+function getOutflowRoutes(startRoute: Route, minLength = 0): Set<Route> {
+  const outflowRoutes = new Set<Route>();
+
+  const directOutflowRoutes =
+    startRoute.vertexes[startRoute.vertexes.length - 1].outflowRoutes;
+  for (const outflowRoute of directOutflowRoutes) {
+    outflowRoutes.add(outflowRoute);
+    const remainingLength = minLength - outflowRoute.length;
+    if (remainingLength > 0) {
+      for (const or of getOutflowRoutes(outflowRoute, remainingLength)) {
+        outflowRoutes.add(or);
+      }
+    }
+  }
+
+  return outflowRoutes;
+}
+
 function throwIfNotUniqe(
   values: Iterable<unknown>,
   msg = "Expected all values to be unique"
@@ -555,8 +573,7 @@ export async function parseInfrastructure(
         `Can't find outflow routes for station ${station.stationID}.`
       );
     }
-    for (const outflowRoute of route.vertexes[route.vertexes.length - 1]
-      .outflowRoutes) {
+    for (const outflowRoute of getOutflowRoutes(route, 1000)) {
       outflowRoutes.add(outflowRoute);
     }
   }
