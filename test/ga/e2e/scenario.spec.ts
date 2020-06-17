@@ -14,6 +14,25 @@ import {
   StatementFactory,
 } from "../../../src/ga";
 
+// TODO: This should be exproted from ga.
+function regenerateDuplicates(
+  population: readonly Statement[],
+  generate: () => Statement
+): Statement[] {
+  const map = new Map<string, Statement>(
+    population.map((statement): [string, Statement] => [
+      statement.code,
+      statement,
+    ])
+  );
+  const unique = [...map.values()];
+  while (unique.length < population.length) {
+    unique.push(generate());
+    console.count("regenerateDuplicates");
+  }
+  return unique;
+}
+
 describe.only("E2E scenario 1", function (): void {
   it("…", function (): void {
     const rng = xor4096("TEST");
@@ -90,7 +109,10 @@ describe.only("E2E scenario 1", function (): void {
 
       nextGeneration.map(mutate);
 
-      population = [...sorted.slice(0, 2), ...nextGeneration];
+      population = regenerateDuplicates(
+        [...sorted.slice(0, 2), ...nextGeneration],
+        (): Statement => generator.halfAndHalf(12)
+      );
 
       console.log(getSummary());
     }
