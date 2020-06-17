@@ -59,8 +59,10 @@ export class PopulationCompetition {
   ): Statement[] {
     return statements.sort(
       (a, b): number =>
-        (fitness.get(a)?.combined ?? Number.NEGATIVE_INFINITY) -
-        (fitness.get(b)?.combined ?? Number.NEGATIVE_INFINITY)
+        (fitness.get(a)?.fit ?? Number.NEGATIVE_INFINITY) -
+          (fitness.get(b)?.fit ?? Number.NEGATIVE_INFINITY) ||
+        (fitness.get(a)?.penalty ?? Number.NEGATIVE_INFINITY) -
+          (fitness.get(b)?.penalty ?? Number.NEGATIVE_INFINITY)
     );
   }
 }
