@@ -96,7 +96,7 @@ describe.only("E2E scenario 1", function (): void {
       const nextGeneration = [];
       while (nextGeneration.length < sorted.length - 2) {
         nextGeneration.push(
-          ...crossover.simple(
+          ...crossover.subtree(
             sorted.find(
               (_, i): boolean => i > rng.double() ** 2 * sorted.length
             ),

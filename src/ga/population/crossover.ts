@@ -1,6 +1,25 @@
 import { Rng, Statement, Tuple, isOperator } from "../language";
 import { xor4096 } from "seedrandom";
 
+function getAllStatements(root: Statement): Statement[] {
+  if (isOperator(root)) {
+    const operands: readonly Statement[] = root.operands;
+    return [
+      root,
+      ...([] as Statement[]).concat(
+        ...operands.map((statement): Statement[] => getAllStatements(statement))
+      ),
+    ];
+  } else {
+    return [root];
+  }
+}
+
+function pickRandomStatement(root: Statement, rng: Rng): Statement {
+  const statements = getAllStatements(root);
+  return statements[Math.floor(rng() * statements.length)];
+}
+
 function crossoverOperands<A extends number, B extends number>(
   a: Tuple<Statement, A>,
   b: Tuple<Statement, B>,
@@ -30,6 +49,37 @@ export class PopulationCrossover {
 
   public constructor(public readonly seed: string) {
     this._rng = xor4096(seed);
+  }
+
+  // TODO: Test this!
+  public subtree(a: Statement, b: Statement): [Statement, Statement] {
+    const swapA = pickRandomStatement(a, this._rng);
+    const swapB = pickRandomStatement(b, this._rng);
+
+    return [
+      this._subtreeSwap(a, swapA, swapB),
+      this._subtreeSwap(b, swapB, swapA),
+    ];
+  }
+
+  public _subtreeSwap(
+    root: Statement,
+    original: Statement,
+    replacement: Statement
+  ): Statement {
+    if (root === original) {
+      return replacement;
+    } else if (isOperator(root)) {
+      return root.create(
+        root.createOperandtuple(
+          (_, i): Statement =>
+            this._subtreeSwap(root.operands[i], original, replacement)
+        )
+      );
+    } else {
+      // A terminal encountered, nowhere else to go.
+      return root;
+    }
   }
 
   public simple(a: Statement, b: Statement): [Statement, Statement] {
