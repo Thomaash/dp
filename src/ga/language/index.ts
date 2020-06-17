@@ -68,6 +68,10 @@ function createOperatorFactory<Args extends PositiveInteger>(
         return Math.min(acc, operand.heightMin);
       }, Number.POSITIVE_INFINITY);
 
+    const size =
+      1 +
+      operands.reduce<number>((acc, operand): number => acc + operand.size, 0);
+
     let cachedPrettyCode: string | null = null;
     let cachedRun: StatementRun | null = null;
 
@@ -93,6 +97,7 @@ function createOperatorFactory<Args extends PositiveInteger>(
       heightMin,
       name,
       operands,
+      size,
     });
   }
 
@@ -114,35 +119,25 @@ function createTerminalFactory(
       ...args: any[]
     ) => any;
 
-    function clone(this: Terminal): Terminal {
+    function clone(): Terminal {
       return Object.freeze({
+        get prettyCode(): string {
+          return formatStatement(code);
+        },
+
         args: 0,
         clone,
         code,
         create,
-        get prettyCode(): string {
-          return formatStatement(code);
-        },
         heightMax: 1,
         heightMin: 1,
         name,
         run,
+        size: 1,
       });
     }
 
-    return Object.freeze({
-      args: 0,
-      clone,
-      code,
-      create,
-      get prettyCode(): string {
-        return formatStatement(code);
-      },
-      heightMax: 1,
-      heightMin: 1,
-      name,
-      run,
-    });
+    return clone();
   }
 
   return Object.freeze({ args: 0, name, create });

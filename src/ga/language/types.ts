@@ -55,6 +55,7 @@ export interface StatementBase<Args extends NonNegativeInteger> {
   name: string;
   prettyCode: string;
   run: StatementRun;
+  size: number;
 }
 export interface Operator<Args extends PositiveInteger>
   extends StatementBase<Args>,
