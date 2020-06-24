@@ -6,7 +6,41 @@ import packageJSON from "./package.json";
 import typescript2 from "rollup-plugin-typescript2";
 import { join } from "path";
 
+const plugins = () => [
+  nodeResolve({
+    extensions: [".ts", ".js"],
+    mainFields: ["module", "main"],
+    preferBuiltins: true,
+  }),
+  json(),
+  typescript2({
+    tsconfig: "./tsconfig.rollup.json",
+    tsconfigOverride: {
+      compilerOptions: {
+        declaration: !process.env.NO_TYPES,
+        declarationMap: !process.env.NO_TYPES,
+      },
+    },
+  }),
+  commonjs(),
+];
+
 export default [
+  {
+    input: "src/otapi/index.ts",
+    external: [
+      ...builtins,
+      ...Object.keys(packageJSON.dependencies || {}),
+      ...Object.keys(packageJSON.peerDependencies || {}),
+      ...Object.keys(packageJSON.devDependencies || {}),
+    ],
+    output: {
+      file: join("dist", "otapi", "index.js"),
+      format: "cjs",
+      sourcemap: true,
+    },
+    plugins: plugins(),
+  },
   {
     input: "src/index.ts",
     external: [
@@ -16,27 +50,10 @@ export default [
       ...Object.keys(packageJSON.devDependencies || {}),
     ],
     output: {
-      file: join(process.env.DIST || "./dist", "index.js"),
+      file: join(process.env.DIST || "dist-app", "index.js"),
       format: "cjs",
       sourcemap: true,
     },
-    plugins: [
-      nodeResolve({
-        extensions: [".ts", ".js"],
-        mainFields: ["module", "main"],
-        preferBuiltins: true,
-      }),
-      json(),
-      typescript2({
-        tsconfig: "./tsconfig.rollup.json",
-        tsconfigOverride: {
-          compilerOptions: {
-            declaration: !process.env.NO_TYPES,
-            declarationMap: !process.env.NO_TYPES,
-          },
-        },
-      }),
-      commonjs(),
-    ],
+    plugins: plugins(),
   },
 ];

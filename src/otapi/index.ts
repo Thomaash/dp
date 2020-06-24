@@ -69,9 +69,9 @@ export {
   EventPayloads,
 } from "./responses";
 
-export * from "./runfile";
-
 export * from "./functions";
+export * from "./outputs";
+export * from "./runfile";
 
 export interface OTAPIConstructorParams {
   communicationLog?: null | string | Config["communicationLog"];

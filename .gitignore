@@ -62,7 +62,8 @@ typings/
 
 # Built files
 /dist
+/dist-app
 
 # Local environment related files
-/local
 /.DS_Store
+/local

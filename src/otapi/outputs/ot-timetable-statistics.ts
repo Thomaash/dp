@@ -1,6 +1,7 @@
+import { CSVQuery, CSV } from "./csv";
+import { MapSet } from "../../util";
+
 const HEADERS_IN_FILE_ORDER = [
-  "run",
-  "scenario",
   "course",
   "station",
   "arrivalPlannedHHMMSS",
@@ -18,70 +19,67 @@ const HEADERS_IN_FILE_ORDER = [
 ] as const;
 type HeaderKey = typeof HEADERS_IN_FILE_ORDER[number];
 
-const EMPTY_RE = /^\s*$/;
 const FIELD_DELIMITER = "\t";
-const HEADER_ROWS = 2;
-const LINE_DELIMITER_RE = /(\n\r|\n|\r)/;
 
-interface PreprocessCSVOptions<Key extends string | number | symbol> {
-  fieldDelimiter: string;
-  headerRows: number;
-  keys: readonly Key[];
-}
-function processCSV<Key extends string | number | symbol>(
-  input: string,
-  { fieldDelimiter, headerRows, keys }: PreprocessCSVOptions<Key>
-): Record<Key, string>[] {
-  return (
-    input
-      // Split into an array of lines.
-      .split(LINE_DELIMITER_RE)
-      // Remove comment lines.
-      .filter((line): boolean => !line.startsWith("//"))
-      // Remove empty lines.
-      .filter((line): boolean => line.length !== 0 && !EMPTY_RE.test(line))
-      // Skip header rows.
-      .slice(headerRows)
-      // Split each line into array of fields.
-      .map((line): string[] => line.split(fieldDelimiter))
-      // Convert arrays of fields into records.
-      .map(
-        (fields): Record<Key, string> =>
-          fields.reduce<Record<Key, string>>((acc, field, i): Record<
-            Key,
-            string
-          > => {
-            acc[keys[i]] = field;
-            return acc;
-          }, Object.create(null) as Record<Key, string>)
-      )
-  );
-}
+// Two header rows and one nonempty, noncomment line of text (because why should
+// this be valid CSV, I guess).
+const HEADER_ROWS = 2 + 1;
 
-export class OTTimetableStatistics {
-  private readonly _data: Record<HeaderKey, string>[];
-
+export class OTTimetableStatistics extends CSV<HeaderKey> {
   public constructor(txt: string) {
-    this._data = processCSV(txt, {
+    super(txt, {
       fieldDelimiter: FIELD_DELIMITER,
       headerRows: HEADER_ROWS,
       keys: HEADERS_IN_FILE_ORDER,
     });
   }
 
-  public query(
-    query: { readonly [Key in HeaderKey]?: string }
-  ): Record<HeaderKey, string>[] {
-    return this._data
-      .filter((record): boolean => {
-        for (const [key, value] of Object.entries(query)) {
-          if ((record as Record<string, unknown>)[key] !== value) {
-            return false;
-          }
-        }
+  public getBeginEndDelayDiffs(
+    query: CSVQuery<HeaderKey> = {}
+  ): Map<string, number> {
+    return [
+      ...new Set(this.query(query).map((record): string => record.course)),
+    ]
+      .map((course): [string, number] => {
+        const records = this.query({ course });
 
-        return true;
+        const begin = records[0];
+        const end = records[records.length - 1];
+
+        return [course, +end.departureDiffS - +begin.departureDiffS];
       })
-      .map((record): Record<HeaderKey, string> => ({ ...record }));
+      .reduce<Map<string, number>>((acc, [course, diff]): Map<
+        string,
+        number
+      > => {
+        acc.set(course, diff);
+        return acc;
+      }, new Map());
+  }
+
+  public getGroupedBeginEndDelayDiffs<T>(
+    groupingReduce: (course: string) => T[],
+    query: CSVQuery<HeaderKey>
+  ): Map<T, number> {
+    const groupeCourseDiffs = [...this.getBeginEndDelayDiffs(query)].reduce<
+      MapSet<T, number>
+    >((acc, [course, diff]): MapSet<T, number> => {
+      for (const group of groupingReduce(course)) {
+        acc.get(group).add(diff);
+      }
+      return acc;
+    }, new MapSet());
+
+    return [...groupeCourseDiffs].reduce<Map<T, number>>(
+      (acc, [course, diffs]): Map<T, number> => {
+        acc.set(
+          course,
+          [...diffs].reduce<number>((acc, diff): number => acc + diff, 0) /
+            diffs.size
+        );
+        return acc;
+      },
+      new Map()
+    );
   }
 }
