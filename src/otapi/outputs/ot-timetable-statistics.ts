@@ -75,23 +75,23 @@ export class OTTimetableStatistics extends CSV<HeaderKey> {
       }, new Map());
   }
 
-  public getGroupedBeginEndDelayDiffs<T>(
-    groupingReduce: (course: string) => T[],
+  public getGroupedBeginEndDelayDiffs<GroupName>(
+    groupingReduce: (course: string) => GroupName[],
     query: CSVQuery<HeaderKey>
-  ): Map<T, number> {
-    const groupeCourseDiffs = [...this.getBeginEndDelayDiffs(query)].reduce<
-      MapSet<T, number>
-    >((acc, [course, diff]): MapSet<T, number> => {
+  ): Map<GroupName, number> {
+    const perGroupDiffs = [...this.getBeginEndDelayDiffs(query)].reduce<
+      MapSet<GroupName, number>
+    >((acc, [course, diff]): MapSet<GroupName, number> => {
       for (const group of groupingReduce(course)) {
         acc.get(group).add(diff);
       }
       return acc;
     }, new MapSet());
 
-    return [...groupeCourseDiffs].reduce<Map<T, number>>(
-      (acc, [course, diffs]): Map<T, number> => {
+    return [...perGroupDiffs].reduce<Map<GroupName, number>>(
+      (acc, [group, diffs]): Map<GroupName, number> => {
         acc.set(
-          course,
+          group,
           [...diffs].reduce<number>((acc, diff): number => acc + diff, 0) /
             diffs.size
         );
