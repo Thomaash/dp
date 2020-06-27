@@ -16,6 +16,8 @@ const HEADERS_IN_FILE_ORDER = [
   "arrivalDiffS",
   "departureDiffHHMMSS",
   "departureDiffS",
+  "trackPlanned",
+  "trackActual",
 ] as const;
 type HeaderKey = typeof HEADERS_IN_FILE_ORDER[number];
 
