@@ -25,6 +25,20 @@ const FIELD_DELIMITER = "\t";
 // this be valid CSV, I guess).
 const HEADER_ROWS = 2 + 1;
 
+/**
+ * Turn raw string delay diff seconds from CSV into meaningful numeric value.
+ *
+ * @remarks
+ * Negative delays are considered no delay (0s).
+ *
+ * @param s - The *DiffS value straight from CSV.
+ *
+ * @returns Meaningful numeric value (0+).
+ */
+function normalizeDelayDiffS(s: string): number {
+  return Math.max(+s, 0);
+}
+
 export class OTTimetableStatistics extends CSV<HeaderKey> {
   public constructor(txt: string) {
     super(txt, {
@@ -44,9 +58,13 @@ export class OTTimetableStatistics extends CSV<HeaderKey> {
         const records = this.query({ course });
 
         const begin = records[0];
+        const beginDiffS = normalizeDelayDiffS(begin.departureDiffS);
+
         const end = records[records.length - 1];
+        const endDiffS = normalizeDelayDiffS(end.departureDiffS);
 
         return [course, +end.departureDiffS - +begin.departureDiffS];
+        return [course, endDiffS - beginDiffS];
       })
       .reduce<Map<string, number>>((acc, [course, diff]): Map<
         string,
