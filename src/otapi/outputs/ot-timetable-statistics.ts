@@ -182,9 +182,6 @@ export class OTTimetableStatistics extends CSV<
             end.departureDiffS ?? end.arrivalDiffS ?? 0
           );
 
-        const end = records[records.length - 1];
-        const endDiffS = normalizeDelayDiffS(end.departureDiffS);
-
           return [course, endDiffS - beginDiffS];
         })
         // Reduce into a map (course -> delay diff in seconds).
