@@ -281,10 +281,12 @@ async function prepareForRun(
 
           // Continue only if:
           if (
+            // The user doesn't want to pause after each run.
+            args["pause-after-each-run"] === false &&
             // No trains are stuck in the model.
-            trainCounter.size === 0 ||
-            // The user doesn't want to pause and inspect the situation.
-            args["pause-with-stuck-trains"] === false
+            (trainCounter.size === 0 ||
+              // The user doesn't want to pause and inspect the situation.
+              args["pause-with-stuck-trains"] === false)
           ) {
             otapi.startSimulation().catch((error): void => {
               log.error(error, "Failed to resume simulation.");

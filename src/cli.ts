@@ -123,6 +123,12 @@ const y = yargs
       "If enabled runs will be performed with and without decision module (only works with --manage-ot).",
     type: "boolean",
   })
+  .option("pause-after-each-run", {
+    default: false,
+    describe:
+      "If enabled pauses the simulation after each run (e.g. for manual inspection).",
+    type: "boolean",
+  })
   .option("pause-with-stuck-trains", {
     default: false,
     describe:
