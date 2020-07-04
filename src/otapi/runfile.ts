@@ -5,6 +5,8 @@ import {
   writeFile as writeFileCallback,
 } from "fs";
 
+import { OTDate } from "../infrastructure/common";
+
 const copyFile = promisify(copyFileCallback);
 const readFile = promisify(readFileCallback);
 const writeFile = promisify(writeFileCallback);
@@ -92,6 +94,16 @@ export type RunfileKey =
   | "Use Ping"
   | "Use Switch Time and Route Res. Time";
 
+export type RunfileDayTimeKey = "break" | "start" | "stop";
+const timeKeys: Record<
+  RunfileDayTimeKey,
+  { day: RunfileKey; time: RunfileKey }
+> = {
+  break: { day: "Break Day Offset", time: "Break Time" },
+  start: { day: "Start Day Offset", time: "Start Time" },
+  stop: { day: "Stop Day Offset", time: "Stop Time" },
+};
+
 const newline = /\r?\n/g;
 
 export class Runfile {
@@ -146,7 +158,7 @@ export class Runfile {
 
     const value = line.split("#")[1];
 
-    if (value == null || value == "") {
+    if (value == null) {
       throw new TypeError(`Key ${key} is malformed in runfile ${this._path}.`);
     }
 
@@ -186,6 +198,17 @@ export class Runfile {
 
     await this.writeValue("OTD Server Port", "" + port1);
     await this.writeValue("OpenTrack Server Port", "" + port2);
+  }
+
+  public async readDayTimeValue(key: RunfileDayTimeKey): Promise<number> {
+    const [day, time] = await Promise.all([
+      this.readValue(timeKeys[key].day),
+      this.readValue(timeKeys[key].time),
+    ]);
+
+    const otDate = new OTDate(day, time);
+
+    return otDate.time;
   }
 }
 

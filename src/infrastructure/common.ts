@@ -41,7 +41,7 @@ export class OTDate {
   public readonly stringTime: string;
 
   public constructor(stringDay: string | null | undefined, stringTime: string) {
-    this.stringDay = stringDay ?? "0";
+    this.stringDay = stringDay == null || stringDay === "" ? "0" : stringDay;
     this.stringTime = stringTime;
 
     expect(this.stringDay, "Invalid day format").to.match(/^\d+/);
