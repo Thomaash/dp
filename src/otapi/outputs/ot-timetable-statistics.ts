@@ -46,7 +46,7 @@ const FIELD_DELIMITER = "\t";
 // this be valid CSV, I guess).
 const HEADER_ROWS = 2 + 1;
 
-const STUCK_HHMMSS = "XX:XX:XX";
+const NEVER_REACHED_HHMMSS = "XX:XX:XX";
 const NO_DATA_HHMMSS = "HH:MM:SS";
 
 /**
@@ -58,7 +58,7 @@ const NO_DATA_HHMMSS = "HH:MM:SS";
  * or XX:XX:XX).
  */
 function isValidHHMMSS(hhmmss: string): boolean {
-  return hhmmss !== NO_DATA_HHMMSS && hhmmss !== STUCK_HHMMSS;
+  return hhmmss !== NO_DATA_HHMMSS && hhmmss !== NEVER_REACHED_HHMMSS;
 }
 
 /**
@@ -162,10 +162,10 @@ export class OTTimetableStatistics extends CSV<
               (record): boolean =>
                 (isValidHHMMSS(record.arrivalPlannedHHMMSS) &&
                   isValidHHMMSS(record.arrivalActualHHMMSS) &&
-                  record.arrivalDiffHHMMSS !== STUCK_HHMMSS) ||
+                  record.arrivalDiffHHMMSS !== NEVER_REACHED_HHMMSS) ||
                 (isValidHHMMSS(record.departurePlannedHHMMSS) &&
                   isValidHHMMSS(record.departureActualHHMMSS) &&
-                  record.departureDiffHHMMSS !== STUCK_HHMMSS)
+                  record.departureDiffHHMMSS !== NEVER_REACHED_HHMMSS)
             ),
         ])
         // Keep only courses with more than one record.
@@ -221,12 +221,18 @@ export class OTTimetableStatistics extends CSV<
     );
   }
 
-  public getStuckTrainIDs(): Set<string> {
+  /**
+   * Get the ids of trains that have XX:XX:XX (never reached) in their
+   * timetables.
+   *
+   * @returns A set of train ids.
+   */
+  public getXXTrainIds(): Set<string> {
     return new Set<string>(
       this.filter(
         ({ departureActualHHMMSS, arrivalActualHHMMSS }): boolean =>
-          departureActualHHMMSS === STUCK_HHMMSS &&
-          arrivalActualHHMMSS === STUCK_HHMMSS
+          departureActualHHMMSS === NEVER_REACHED_HHMMSS &&
+          arrivalActualHHMMSS === NEVER_REACHED_HHMMSS
       ).map((record): string => record.course)
     );
   }
