@@ -227,7 +227,7 @@ export class OTTimetableStatistics extends CSV<
    *
    * @returns A set of train ids.
    */
-  public getXXTrainIds(): Set<string> {
+  public getXXTrainIDs(): Set<string> {
     return new Set<string>(
       this.filter(
         ({ departureActualHHMMSS, arrivalActualHHMMSS }): boolean =>
