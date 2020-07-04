@@ -25,6 +25,34 @@ const writeFile = promisify(writeFileCallback);
 
 const cooldownMs = 10000;
 
+async function continueUnless(
+  otapi: OTAPI,
+  trainCounter: TrainCounter
+): Promise<void> {
+  if (trainCounter.size > 0) {
+    // This simulation run failed.
+    log.warn(`${trainCounter.size} stuck trains.`);
+  }
+
+  // Continue only if:
+  if (
+    // The user doesn't want to pause after each run.
+    args["pause-after-each-run"] === false &&
+    // No trains are stuck in the model.
+    (trainCounter.size === 0 ||
+      // The user doesn't want to pause and inspect the situation.
+      args["pause-with-stuck-trains"] === false)
+  ) {
+    otapi.startSimulation().catch((error): void => {
+      log.error(error, "Failed to resume simulation.");
+    });
+  } else {
+    // Otherwise wait for the user to click the resume button in
+    // OpenTrack on their own.
+    log.info("Resume in OpenTrack to continue...");
+  }
+}
+
 function spawnAndLog(
   log: CurryLog,
   binaryPath: string,
@@ -85,16 +113,21 @@ async function startOpenTrackAndOTAPI(
 ): Promise<{
   command: ReturnType<typeof spawnAndLog>;
   otapi: OTAPI;
+  simulationRunning: Promise<void>;
   trainCounter: TrainCounter;
 }> {
-  const otArgs = Object.freeze(["-otd", `-runfile=${runfile.path}`]);
+  const otArgs = Object.freeze([
+    "-otd",
+    "-scriptinit",
+    `-runfile=${runfile.path}`,
+  ]);
   log.info("OpenTrack commandline:", [args["ot-binary"], ...otArgs]);
 
   for (let attempt = 1; ; ++attempt) {
     const cleanupCallbacks: (() => Promise<void>)[] = [];
 
     try {
-      const { otapi, trainCounter } = await prepareForRun(
+      const { otapi, simulationRunning, trainCounter } = await prepareForRun(
         log("preparations"),
         runfile,
         runSuffix,
@@ -102,8 +135,8 @@ async function startOpenTrackAndOTAPI(
       );
       cleanupCallbacks.push(otapi.kill.bind(otapi));
 
-      const readyForSimulation = otapi.once("simReadyForSimulation");
-      const simulationServerStarted = otapi.once("simServerStarted");
+      const simStarted = otapi.once("simStarted");
+      const simPaused = otapi.once("simPaused");
 
       const failed = new Deferred();
       setTimeout((): void => {
@@ -157,8 +190,8 @@ async function startOpenTrackAndOTAPI(
 
       await Promise.race([
         Promise.all([
-          readyForSimulation,
-          simulationServerStarted,
+          simStarted,
+          simPaused,
           waitPort({ port: otapi.config.portOT, output: "silent" }),
         ]),
         failed.promise,
@@ -167,7 +200,7 @@ async function startOpenTrackAndOTAPI(
       await otapi.openSimulationPanel({ mode: "Simulation" });
       log.info("OpenTrack responds to requests.");
 
-      return { command, otapi, trainCounter };
+      return { command, otapi, simulationRunning, trainCounter };
     } catch (error) {
       log.error(error, "Startup failed.");
 
@@ -184,6 +217,7 @@ async function startOpenTrackAndOTAPI(
   }
 }
 
+// TODO: Use agregate output instead of hunderds of folders.
 async function changeOutputPath(
   runfile: Runfile,
   runSuffix: string,
@@ -212,7 +246,11 @@ async function prepareForRun(
   runfile: Runfile,
   runSuffix?: string,
   runNumber?: number
-): Promise<{ otapi: OTAPI; trainCounter: TrainCounter }> {
+): Promise<{
+  otapi: OTAPI;
+  simulationRunning: Promise<void>;
+  trainCounter: TrainCounter;
+}> {
   for (;;) {
     const cleanupCallbacks = new CallbackQueue("reverse");
 
@@ -226,11 +264,14 @@ async function prepareForRun(
         await runfile.writeValue("Delay Scenario", "" + runNumber);
       }
 
-      // The simulation has to be stopped right before it ends to detect and
-      // react to stuck trains situation.
+      // The simulation has to be stopped to prevent start up race conditions.
+      await runfile.writeValue(
+        "Break Day Offset",
+        await runfile.readValue("Start Day Offset")
+      );
       await runfile.writeValue(
         "Break Time",
-        await runfile.readValue("Stop Time")
+        await runfile.readValue("Start Time")
       );
 
       // Force enable OTD.
@@ -244,7 +285,7 @@ async function prepareForRun(
 
       const communicationLog = args["communication-log"];
       const delayScenario = await runfile.readValue("Delay Scenario");
-      const endTime = await runfile.readTimeValue("Stop Time");
+      const endTime = await runfile.readDayTimeValue("stop");
       const hostApp = await runfile.readValue("OTD Server");
       const hostOT = args["ot-host"];
       const keepAlive = false;
@@ -272,30 +313,13 @@ async function prepareForRun(
 
       const trainCounter = new TrainCounter(otapi);
       cleanupCallbacks.plan(trainCounter.start());
-      otapi.on("simPaused", (_, { time }): void => {
-        if (time === endTime) {
-          if (trainCounter.size > 0) {
-            // This simulation run failed.
-            log.warn(`${trainCounter.size} stuck trains.`);
-          }
 
-          // Continue only if:
-          if (
-            // The user doesn't want to pause after each run.
-            args["pause-after-each-run"] === false &&
-            // No trains are stuck in the model.
-            (trainCounter.size === 0 ||
-              // The user doesn't want to pause and inspect the situation.
-              args["pause-with-stuck-trains"] === false)
-          ) {
-            otapi.startSimulation().catch((error): void => {
-              log.error(error, "Failed to resume simulation.");
-            });
-          } else {
-            // Otherwise wait for the user to click the resume button in
-            // OpenTrack on their own.
-            log.info("Resume in OpenTrack to continue...");
-          }
+      const simulationRunning = new Deferred<void>();
+      otapi.on("simPaused", (_, { time }): void => {
+        if (time >= endTime) {
+          simulationRunning.resolve();
+        } else {
+          otapi.setSimulationPauseTime({ time: endTime });
         }
       });
 
@@ -314,7 +338,11 @@ async function prepareForRun(
 
       await otapi.start();
 
-      return { otapi, trainCounter };
+      return {
+        otapi,
+        simulationRunning: simulationRunning.promise,
+        trainCounter,
+      };
     } catch (error) {
       log.error(error, "Preparations failed.");
 
@@ -351,7 +379,12 @@ async function doOneRun(
         log.info("Starting run...");
       }
 
-      const { command, otapi } = await startOpenTrackAndOTAPI(log("startup"), {
+      const {
+        command,
+        otapi,
+        simulationRunning,
+        trainCounter,
+      } = await startOpenTrackAndOTAPI(log("startup"), {
         runNumber,
         runSuffix: overtakingParamsBase.defaultModule,
         runfile,
@@ -373,22 +406,28 @@ async function doOneRun(
       try {
         await setup();
 
+        // The simulation has to be stopped right before it ends to detect and
+        // react to stuck trains situation.
+        await otapi.setSimulationPauseTime({
+          time: await runfile.readDayTimeValue("stop"),
+        });
+
         log.info("Starting simulation...");
         const simulationEnd = otapi.once("simStopped");
-        const simulationStart = otapi.once("simStarted");
+        const simulationContinued = otapi.once("simContinued");
         await otapi.startSimulation();
-        await simulationStart;
+        await simulationContinued;
         log.info("Simulating...");
 
-        await simulationEnd;
+        await simulationRunning;
         log.info("Simulation ended.");
         await cleanup();
+        await continueUnless(otapi, trainCounter);
+        await simulationEnd;
 
-        log.info("Closing OpenTrack...");
-        await otapi.terminateApplication();
-
-        // Wait for the process to finish. OpenTrack doesn't handle well when the
-        // app stops responding when it's running.
+        // Wait for the process to finish. OpenTrack doesn't handle well when
+        // the app stops responding when it's running.
+        log.info("Waiting for OpenTrack to terminate...");
         await command.returnCode;
         log.info("OpenTrack closed.");
       } finally {
