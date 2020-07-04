@@ -2,7 +2,17 @@ import xml2js from "xml2js";
 import { expect } from "chai";
 
 import { CurryLog } from "../curry-log";
-import { ck, filterChildren, idFromXML, xmlVertexCK, OTDate } from "./common";
+import {
+  ck,
+  filterChildren,
+  idFromXML,
+  xmlVertexCK,
+  OTDate,
+  parseDuration,
+  throwIfNotUniqe,
+  getOutflowRoutes,
+  checkTrainItineraries,
+} from "./common";
 import {
   Formation,
   InfrastructureData,
@@ -18,7 +28,6 @@ import {
   Vertex,
 } from "./types";
 import { parseItineraryArgs } from "./args";
-import { MapCounter } from "../util";
 
 export interface ParseInfrastructureXML {
   courses: string;
@@ -40,85 +49,6 @@ export interface TempVertex {
   readonly neighborVertexID: string;
   readonly outflowRoutes: Set<Route>;
   readonly vertexID: string;
-}
-
-const units = {
-  second: 1,
-  minute: 60,
-  hour: 60 * 60,
-  day: 60 * 60 * 24,
-  month: 60 * 60 * 24 * (365.2425 / 12),
-  year: 60 * 60 * 24 * 365.2425,
-};
-function parseDuration(log: CurryLog, dwellTime: string): number {
-  const [
-    ,
-    ,
-    years = 0,
-    ,
-    months = 0,
-    ,
-    days = 0,
-    ,
-    hours = 0,
-    ,
-    minutes = 0,
-    ,
-    seconds = 0,
-  ] =
-    /^P((\d+)Y)?((\d+)M)?((\d+)D)?T((\d+)H)?((\d+)M)?((\d+|\d*\.\d+)S)?$/i.exec(
-      dwellTime
-    ) ?? [];
-
-  if (years !== 0 || months !== 0) {
-    log.warn(
-      "The implementation of years and months for time durations is most likely wrong."
-    );
-  }
-
-  return (
-    +seconds +
-    +minutes * units.minute +
-    +hours * units.hour +
-    +days * units.day +
-    +months * units.month +
-    +years * units.year
-  );
-}
-
-function getOutflowRoutes(startRoute: Route, minLength = 0): Set<Route> {
-  const outflowRoutes = new Set<Route>();
-
-  const directOutflowRoutes =
-    startRoute.vertexes[startRoute.vertexes.length - 1].outflowRoutes;
-  for (const outflowRoute of directOutflowRoutes) {
-    outflowRoutes.add(outflowRoute);
-    const remainingLength = minLength - outflowRoute.length;
-    if (remainingLength > 0) {
-      for (const or of getOutflowRoutes(outflowRoute, remainingLength)) {
-        outflowRoutes.add(or);
-      }
-    }
-  }
-
-  return outflowRoutes;
-}
-
-function throwIfNotUniqe(
-  values: Iterable<unknown>,
-  msg = "Expected all values to be unique"
-): void {
-  const dupes = new MapCounter(values);
-
-  dupes.dropEmpty();
-  for (const counter of dupes.values()) {
-    counter.dec();
-  }
-  dupes.dropEmpty();
-
-  if (dupes.size) {
-    throw new Error(msg + ": " + JSON.stringify([...dupes.keys()]));
-  }
 }
 
 export async function parseInfrastructure(
@@ -788,6 +718,26 @@ export async function parseInfrastructure(
   const mainItineraries = new Set<Itinerary>(
     [...trains.values()].map((train): Itinerary => train.mainItinerary)
   );
+
+  // }}}
+  // Train warnings {{{
+
+  for (const train of trains.values()) {
+    for (const [itinerary, { canEnter, canExit }] of checkTrainItineraries(
+      train
+    )) {
+      if (!canEnter) {
+        log.warn(
+          `Train ${train.trainID} has an itinerary ${itinerary.itineraryID} that can't be entered from it's main itinerary ${train.mainItinerary.itineraryID}.`
+        );
+      }
+      if (!canExit) {
+        log.warn(
+          `Train ${train.trainID} has an itinerary ${itinerary.itineraryID} from which it's impossible to return to the main itinerary ${train.mainItinerary.itineraryID}.`
+        );
+      }
+    }
+  }
 
   // }}}
 

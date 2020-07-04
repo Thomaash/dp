@@ -1,4 +1,7 @@
 import { expect } from "chai";
+import { CurryLog } from "../curry-log";
+import { Route, Itinerary, Train } from "./types";
+import { MapCounter } from "../util";
 
 export function ck(...rest: (boolean | number | string)[]): string {
   return JSON.stringify(rest);
@@ -61,4 +64,140 @@ export class OTDate {
 
     Object.freeze(this);
   }
+}
+
+const units = {
+  second: 1,
+  minute: 60,
+  hour: 60 * 60,
+  day: 60 * 60 * 24,
+  month: 60 * 60 * 24 * (365.2425 / 12),
+  year: 60 * 60 * 24 * 365.2425,
+};
+export function parseDuration(log: CurryLog, dwellTime: string): number {
+  const [
+    ,
+    ,
+    years = 0,
+    ,
+    months = 0,
+    ,
+    days = 0,
+    ,
+    hours = 0,
+    ,
+    minutes = 0,
+    ,
+    seconds = 0,
+  ] =
+    /^P((\d+)Y)?((\d+)M)?((\d+)D)?T((\d+)H)?((\d+)M)?((\d+|\d*\.\d+)S)?$/i.exec(
+      dwellTime
+    ) ?? [];
+
+  if (years !== 0 || months !== 0) {
+    log.warn(
+      "The implementation of years and months for time durations is most likely wrong."
+    );
+  }
+
+  return (
+    +seconds +
+    +minutes * units.minute +
+    +hours * units.hour +
+    +days * units.day +
+    +months * units.month +
+    +years * units.year
+  );
+}
+
+export function throwIfNotUniqe(
+  values: Iterable<unknown>,
+  msg = "Expected all values to be unique"
+): void {
+  const dupes = new MapCounter(values);
+
+  dupes.dropEmpty();
+  for (const counter of dupes.values()) {
+    counter.dec();
+  }
+  dupes.dropEmpty();
+
+  if (dupes.size) {
+    throw new Error(msg + ": " + JSON.stringify([...dupes.keys()]));
+  }
+}
+
+export function getOutflowRoutes(startRoute: Route, minLength = 0): Set<Route> {
+  const outflowRoutes = new Set<Route>();
+
+  const directOutflowRoutes =
+    startRoute.vertexes[startRoute.vertexes.length - 1].outflowRoutes;
+  for (const outflowRoute of directOutflowRoutes) {
+    outflowRoutes.add(outflowRoute);
+    const remainingLength = minLength - outflowRoute.length;
+    if (remainingLength > 0) {
+      for (const or of getOutflowRoutes(outflowRoute, remainingLength)) {
+        outflowRoutes.add(or);
+      }
+    }
+  }
+
+  return outflowRoutes;
+}
+
+/**
+ * Verify that given secondary itinerary can be used in conjuction with the
+ * primary one.
+ *
+ * @remarks
+ * At the moment it checks only if the train can leave the primary itinerary and
+ * return to it from the secondary one.
+ *
+ * @param primary - The primary (1st) itinerary of a train.
+ * @param secondary - The secondary (2nd or more-th) itinerary of a train.
+ *
+ * @returns False if problems were found, true if it seems okay.
+ */
+export function checkSecondaryItinerary(
+  primary: Itinerary,
+  secondary: Itinerary
+): { canEnter: boolean; canExit: boolean } {
+  const entryVertex = secondary.vertexes[0];
+  const canEnter = primary.vertexes.includes(entryVertex);
+
+  const exitVertex = secondary.vertexes[secondary.vertexes.length - 1];
+  const canExit = primary.vertexes.includes(exitVertex);
+
+  return {
+    canEnter,
+    canExit,
+  };
+}
+
+/**
+ * Verify that given train has itineraries that can be used in conjuction with
+ * one another.
+ *
+ * @remarks
+ * At the moment it checks only if the train can leave the primary itinerary and
+ * return to it from all the secondary ones.
+ *
+ * @param train - The train to be checked.
+ *
+ * @returns False if problems were found, true if it seems okay.
+ */
+export function checkTrainItineraries(
+  train: Train
+): Map<Itinerary, { canEnter: boolean; canExit: boolean }> {
+  const results = new Map<Itinerary, { canEnter: boolean; canExit: boolean }>();
+
+  const primary = train.mainItinerary;
+  for (const itinerary of train.itineraries) {
+    const result = checkSecondaryItinerary(primary, itinerary);
+    if (Object.values(result).some((value): boolean => !value)) {
+      results.set(itinerary, result);
+    }
+  }
+
+  return results;
 }
