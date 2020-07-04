@@ -11,7 +11,7 @@
     "lint": "eslint --ext js,ts .",
     "playground": "ts-node --project tsconfig.start.json playground.ts",
     "playground:inspect": "TS_NODE_PROJECT=tsconfig.start.json node -r ts-node/register --debug playground.ts",
-    "start": "node -r source-map-support/register dist-app/index.js",
+    "start": "node --trace-warnings -r source-map-support/register dist-app/index.js",
     "start-from-sources": "ts-node --project tsconfig.start.json src/index.ts",
     "start:inspect": "node --inspect-brk -r source-map-support/register dist/index.js",
     "test": "run-s type-check lint unit",
