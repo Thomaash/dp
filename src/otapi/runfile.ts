@@ -97,6 +97,10 @@ const newline = /\r?\n/g;
 export class Runfile {
   public constructor(private readonly _path: string) {}
 
+  private async _readLines(): Promise<string[]> {
+    return (await readFile(this._path, "utf8")).split(newline);
+  }
+
   public get path(): string {
     return this._path;
   }
@@ -109,26 +113,38 @@ export class Runfile {
     return hh * 60 * 60 + mm * 60 + ss;
   }
 
+  public async readValues(key: RunfileKey): Promise<string[]> {
+    const lines = (await this._readLines()).filter((line): boolean =>
+      line.startsWith(key + "#")
+    );
+
+    const values = lines.map((line): string => line.split("#", 2)[1]);
+
+    if (values.some((value): boolean => value == null || value == "")) {
+      throw new TypeError(`Key ${key} is malformed in runfile ${this._path}.`);
+    }
+
+    return values;
+  }
+
   public async readValue(key: RunfileKey, nth = 1): Promise<string> {
     let found = 0;
-    const entry = (await readFile(this._path, "utf8"))
-      .split(newline)
-      .find((line): boolean => {
-        if (line.startsWith(key + "#")) {
-          ++found;
-          if (found === nth) {
-            return true;
-          }
+    const line = (await this._readLines()).find((line): boolean => {
+      if (line.startsWith(key + "#")) {
+        ++found;
+        if (found === nth) {
+          return true;
         }
+      }
 
-        return false;
-      });
+      return false;
+    });
 
-    if (entry == null) {
+    if (line == null) {
       throw new TypeError(`Key ${key} doesn't exist in runfile ${this._path}.`);
     }
 
-    const value = entry.split("#")[1];
+    const value = line.split("#")[1];
 
     if (value == null || value == "") {
       throw new TypeError(`Key ${key} is malformed in runfile ${this._path}.`);
