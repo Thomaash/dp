@@ -81,6 +81,7 @@ export type RunfileKey =
   | "Timeout"
   | "Timetable Messages"
   | "TimetableFile"
+  | "Train Diagram Document"
   | "Train Messages"
   | "Train Position Report Messages"
   | "TrainFile"
