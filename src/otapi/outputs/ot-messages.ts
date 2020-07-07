@@ -35,7 +35,7 @@ export class OTMessages {
       .map((line): (string | null)[] =>
         line
           .split("\t")
-          .map((cell) =>
+          .map((cell): string | null =>
             typeof cell === "string" && cell !== "" ? cell.trim() : null
           )
       )

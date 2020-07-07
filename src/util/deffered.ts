@@ -8,7 +8,7 @@ export class Deferred<T> {
   public rejected = false;
 
   public constructor() {
-    this.promise = new Promise<T>((resolve, reject) => {
+    this.promise = new Promise<T>((resolve, reject): void => {
       this.resolve = (...rest): void => {
         this.pending = false;
         this.resolved = true;

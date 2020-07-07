@@ -13,7 +13,7 @@ export function createSimplePopulationMutator(
   seed: string,
   chance: number,
   generate: () => Statement
-) {
+): MutateSpecimen {
   const rng = xor4096(seed);
 
   return function simplePopulationMutate(original: Statement): Statement {
