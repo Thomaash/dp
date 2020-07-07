@@ -4,7 +4,13 @@ import { promisify } from "util";
 import { resolve, sep } from "path";
 import { writeFile as writeFileCallback } from "fs";
 
-import { AnyEventCallback, OTAPI, Runfile, cloneRunfile } from "./otapi";
+import {
+  AnyEventCallback,
+  OTAPI,
+  Runfile,
+  createTmpRunfilePair,
+  TmpRunfilePair,
+} from "./otapi";
 import { CallbackQueue, Deferred } from "./util";
 import { args } from "./cli";
 import { buildChunkLogger } from "./util";
@@ -104,11 +110,11 @@ async function startOpenTrackAndOTAPI(
   {
     runNumber,
     runSuffix,
-    runfile,
+    runfiles,
   }: {
     runNumber?: number;
     runSuffix: string;
-    runfile: Runfile;
+    runfiles: TmpRunfilePair;
   }
 ): Promise<{
   command: ReturnType<typeof spawnAndLog>;
@@ -118,8 +124,8 @@ async function startOpenTrackAndOTAPI(
 }> {
   const otArgs = Object.freeze([
     "-otd",
-    "-scriptinit",
-    `-runfile=${runfile.path}`,
+    (runNumber ?? 1) === 1 ? "-scriptinit" : "-script",
+    `-runfile=${runfiles.tmp.path}`,
   ]);
   log.info("OpenTrack commandline:", [args["ot-binary"], ...otArgs]);
 
@@ -129,7 +135,7 @@ async function startOpenTrackAndOTAPI(
     try {
       const { otapi, simulationRunning, trainCounter } = await prepareForRun(
         log("preparations"),
-        runfile,
+        runfiles,
         runSuffix,
         runNumber
       );
@@ -217,33 +223,26 @@ async function startOpenTrackAndOTAPI(
   }
 }
 
-// TODO: Use agregate output instead of hunderds of folders.
 async function changeOutputPath(
-  runfile: Runfile,
-  runSuffix: string,
-  runNumber: number
+  runfiles: TmpRunfilePair,
+  variant: string
 ): Promise<void> {
-  const path = (await runfile.readValue("OutputPath")).split(sep);
+  const path = (await runfiles.orig.readValue("OutputPath")).split(sep);
 
   // Remove trailing separator.
-  if (path[path.length - 1] === "") {
-    path.pop();
-  }
-
-  // Remove old run number.
-  if (/^run-\d+-/.test(path[path.length - 1])) {
+  while (path[path.length - 1] === "") {
     path.pop();
   }
 
   // Add current run number.
-  path.push(`run-${runNumber}-${runSuffix}`);
+  path.push(`variant-${variant}`);
 
-  await runfile.writeValue("OutputPath", path.join(sep));
+  await runfiles.tmp.writeValue("OutputPath", path.join(sep));
 }
 
 async function prepareForRun(
   log: CurryLog,
-  runfile: Runfile,
+  runfiles: TmpRunfilePair,
   runSuffix?: string,
   runNumber?: number
 ): Promise<{
@@ -256,43 +255,43 @@ async function prepareForRun(
 
     try {
       if (args["randomize-ports"]) {
-        await runfile.randomizePortsInRunfile();
+        await runfiles.tmp.randomizePortsInRunfile();
       }
 
       if (typeof runSuffix === "string" && typeof runNumber === "number") {
-        await changeOutputPath(runfile, runSuffix, runNumber);
-        await runfile.writeValue("Delay Scenario", "" + runNumber);
+        await changeOutputPath(runfiles, runSuffix);
+        await runfiles.tmp.writeValue("Delay Scenario", "" + runNumber);
       }
 
       // The simulation has to be stopped to prevent start up race conditions.
-      await runfile.writeValue(
+      await runfiles.tmp.writeValue(
         "Break Day Offset",
-        await runfile.readValue("Start Day Offset")
+        await runfiles.tmp.readValue("Start Day Offset")
       );
-      await runfile.writeValue(
+      await runfiles.tmp.writeValue(
         "Break Time",
-        await runfile.readValue("Start Time")
+        await runfiles.tmp.readValue("Start Time")
       );
 
       // Force enable OTD.
-      await runfile.writeValue("Use OTD-Communication", "1");
-      await runfile.writeValue("Route Setting and Reservation Mode", "2");
+      await runfiles.tmp.writeValue("Use OTD-Communication", "1");
+      await runfiles.tmp.writeValue("Route Setting and Reservation Mode", "2");
 
       // No matter what I do OpenTrack will close each connection right
       // after receiving the second request on it.
       //
-      // const keepAlive = (await runfile.readValue("Keep Connection")) === "1";
+      // const keepAlive = (await runfiles.tmp.readValue("Keep Connection")) === "1";
 
       const communicationLog = args["communication-log"];
-      const delayScenario = await runfile.readValue("Delay Scenario");
-      const endTime = await runfile.readDayTimeValue("stop");
-      const hostApp = await runfile.readValue("OTD Server");
+      const delayScenario = await runfiles.tmp.readValue("Delay Scenario");
+      const endTime = await runfiles.tmp.readDayTimeValue("stop");
+      const hostApp = await runfiles.tmp.readValue("OTD Server");
       const hostOT = args["ot-host"];
       const keepAlive = false;
       const maxSimultaneousRequests = args["max-simultaneous-requests"];
-      const outputPath = await runfile.readValue("OutputPath");
-      const portApp = +(await runfile.readValue("OTD Server Port"));
-      const portOT = +(await runfile.readValue("OpenTrack Server Port"));
+      const outputPath = await runfiles.tmp.readValue("OutputPath");
+      const portApp = +(await runfiles.tmp.readValue("OTD Server Port"));
+      const portOT = +(await runfiles.tmp.readValue("OpenTrack Server Port"));
       const retry = args["max-retries"];
 
       log.info(`Delay Scenario: ${delayScenario}`);
@@ -363,11 +362,11 @@ async function doOneRun(
   {
     overtakingParamsBase,
     runNumber,
-    runfile,
+    runfiles,
   }: {
     overtakingParamsBase: OvertakingParamsBase;
     runNumber?: number;
-    runfile: Runfile;
+    runfiles: TmpRunfilePair;
   }
 ): Promise<void> {
   return retry(
@@ -387,7 +386,7 @@ async function doOneRun(
       } = await startOpenTrackAndOTAPI(log("startup"), {
         runNumber,
         runSuffix: overtakingParamsBase.defaultModule,
-        runfile,
+        runfiles,
       });
       command.returnCode.catch().then(
         async (): Promise<void> => {
@@ -409,7 +408,7 @@ async function doOneRun(
         // The simulation has to be stopped right before it ends to detect and
         // react to stuck trains situation.
         await otapi.setSimulationPauseTime({
-          time: await runfile.readDayTimeValue("stop"),
+          time: await runfiles.tmp.readDayTimeValue("stop"),
         });
 
         log.info("Starting simulation...");
@@ -447,7 +446,7 @@ const log = curryLog(
 ).get("index");
 
 (async (): Promise<void> => {
-  const runfile = await cloneRunfile(
+  const runfiles = await createTmpRunfilePair(
     args["ot-runfile"],
     args["ot-runfile"].endsWith(".txt")
       ? args["ot-runfile"].slice(0, -4) + ".tmp.txt"
@@ -530,7 +529,7 @@ const log = curryLog(
       const { command, otapi } = await startOpenTrackAndOTAPI(log("startup"), {
         runNumber: 1,
         runSuffix: "connection-test",
-        runfile,
+        runfiles,
       });
       command.returnCode.catch().then(
         async (): Promise<void> => {
@@ -551,7 +550,7 @@ const log = curryLog(
       log.info("Closing OpenTrack...");
       await otapi.terminateApplication();
     } else {
-      const { otapi } = await prepareForRun(log("preparations"), runfile);
+      const { otapi } = await prepareForRun(log("preparations"), runfiles);
 
       log.info("Waiting for OpenTrack...");
       await waitPort({
@@ -572,7 +571,7 @@ const log = curryLog(
     const lastRunDelayScenario = args["delay-scenario-last"];
 
     if (firstRunDelayScenario === -1 && lastRunDelayScenario === -1) {
-      await doOneRun(log("run"), { overtakingParamsBase, runfile });
+      await doOneRun(log("run"), { overtakingParamsBase, runfiles });
     } else if (
       Number.isInteger(firstRunDelayScenario) &&
       Number.isInteger(lastRunDelayScenario) &&
@@ -588,7 +587,7 @@ const log = curryLog(
         await doOneRun(log("run", "" + runNumber), {
           overtakingParamsBase,
           runNumber,
-          runfile,
+          runfiles,
         });
         if (args["control-runs"]) {
           await doOneRun(log("run", "control", "" + runNumber), {
@@ -597,7 +596,7 @@ const log = curryLog(
               defaultModule: "do-nothing",
             },
             runNumber,
-            runfile,
+            runfiles,
           });
         }
       }
@@ -607,7 +606,7 @@ const log = curryLog(
       );
     }
   } else {
-    const { otapi } = await prepareForRun(log("preparations"), runfile);
+    const { otapi } = await prepareForRun(log("preparations"), runfiles);
 
     log.info("Waiting for OpenTrack...");
     await waitPort({
