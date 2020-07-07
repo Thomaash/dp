@@ -2,29 +2,25 @@
 
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "fs";
 import { basename, resolve } from "path";
-import { formatDistanceStrict } from "date-fns";
 
-import { OTMessages } from "./ot-messages";
-import { OTTimetableStatistics } from "./ot-timetable-statistics";
+import { OTTimetable } from "./ot-timetable";
 
 interface RunDelays {
   readonly perCategoryDiffs: ReadonlyMap<string, number>;
-  readonly perCourseDiffs: ReadonlyMap<string, number>;
+  readonly perTrainDiffs: ReadonlyMap<string, number>;
 }
 interface Run {
-  readonly date: Date;
   readonly delays: RunDelays;
   readonly id: string;
   readonly module: string;
-  readonly runNumber: number;
-  readonly stuck: number;
-  readonly stuckCourseIDs: readonly string[];
+  readonly scenario: number;
   readonly trainIDs: readonly string[];
   readonly xx: number;
-  readonly xxCourseIDs: string[];
+  readonly xxTrainIDs: string[];
 }
 
 const outputPath = process.argv[2];
+const REQUIRED_FILES = ["OT_Timetable.txt"];
 
 function shiftRight(input: string): string;
 function shiftRight(input: readonly string[]): string[];
@@ -48,36 +44,7 @@ function nOutOf(n: number, total: number): string {
 }
 
 function getSuffix(dirname: string): string {
-  return dirname.replace(/^run-\d+-/, "");
-}
-
-function formatIntoColumns(...columns: readonly string[]): string {
-  const columnLines = columns.map((columnText): string[] =>
-    columnText.split("\n")
-  );
-  const widths = columnLines.map((lines): number =>
-    lines.reduce((acc, line): number => Math.max(acc, line.length), 0)
-  );
-  const height = columnLines.reduce((acc, lines): number => {
-    return Math.max(acc, lines.length);
-  }, 0);
-
-  const fixedSizeColumnLines = columnLines.map((lines, i): string[] => {
-    const fixedSizeLines = lines.slice();
-    while (fixedSizeLines.length < height) {
-      fixedSizeLines.push("");
-    }
-
-    return fixedSizeLines.map((line): string => line.padEnd(widths[i], " "));
-  });
-
-  const lines: string[] = [];
-  for (let i = 0; i < height; ++i) {
-    lines.push(
-      fixedSizeColumnLines.map((lines): string => lines[i]).join("      ")
-    );
-  }
-  return lines.join("\n");
+  return dirname.replace(/^variant-/, "");
 }
 
 function toCSV<Key extends string | number | symbol>(
@@ -94,83 +61,23 @@ function toCSV<Key extends string | number | symbol>(
   return lines.join("\n");
 }
 
-const newlineRE = /\r?\n/g;
-
-function getMessages(runDirname: string): OTMessages {
-  const messagesPath = resolve(outputPath, runDirname, "OT_Messages.txt");
-  return new OTMessages(readFileSync(messagesPath, "UTF-8"));
-}
-
-function getTrainIDs(messages: OTMessages): string[] {
-  return [
-    ...new Set(
-      messages
-        .query()
-        .map((v): string | null => v.trainID)
-        .filter((trainID): trainID is string => trainID != null)
-    ),
-  ];
-}
-
-function getStuckTrainIDs(messages: OTMessages): string[] {
-  return messages
-    .query({
-      message: "Terminated before End of Itinerary",
-    })
-    .map((v): string | null => v.trainID)
-    .filter((trainID): trainID is string => trainID != null);
-}
-
-const dateRE = /^\/\/ Produced by OpenTrack: ([^\r\n]+)$/;
-function getDate(runDirname: string): Date {
-  const messagesPath = resolve(outputPath, runDirname, "OT_Messages.txt");
-  if (!existsSync(messagesPath)) {
-    console.warn(
-      `Warning: ${messagesPath} doesn't exist, assuming it's in progress and returning current time.`
-    );
-    return new Date();
-  }
-
-  const [, dateString] =
-    dateRE.exec(readFileSync(messagesPath, "UTF-8").split(newlineRE)[3]) ?? [];
-  const date = new Date(dateString);
-
-  if (Symbol.for("" + date) === Symbol.for("Invalid Date")) {
-    throw new TypeError(`Error: found invalid date: ${dateString}.`);
-  }
-
-  return date;
-}
-
-function getStuck(runs: readonly Run[]): string[] {
-  return getFailedRunSummary(
-    "Stuck",
-    runs,
-    (run): readonly string[] => run.trainIDs,
-    [...runs].filter((run): boolean => run.stuck > 0),
-    (run): readonly string[] => run.stuckCourseIDs
-  );
-}
-
 function getXX(runs: readonly Run[]): string[] {
   return getFailedRunSummary(
-    "XX",
     runs,
     (run): readonly string[] => run.trainIDs,
     [...runs].filter((run): boolean => run.xx > 0),
-    (run): readonly string[] => run.xxCourseIDs
+    (run): readonly string[] => run.xxTrainIDs
   );
 }
 
 function getFailedRunSummary(
-  title: string,
   allRuns: readonly Run[],
   reduceTotal: (run: Run) => readonly unknown[],
   failedRuns: readonly Run[],
   reduceFailed: (run: Run) => readonly unknown[]
 ): string[] {
   return [
-    `${title} ${nOutOf(failedRuns.length, allRuns.length)}:`,
+    `${nOutOf(failedRuns.length, allRuns.length)}:`,
     ...shiftRight(
       [...new Set([...failedRuns.map((run): string => run.module)])]
         .sort()
@@ -189,10 +96,10 @@ function getFailedRunSummary(
             )}:`,
             ...shiftRight(
               [...failedModuleRuns]
-                .sort((a, b): number => a.runNumber - b.runNumber)
+                .sort((a, b): number => a.scenario - b.scenario)
                 .map(
                   (run): string =>
-                    `#${run.runNumber} ${nOutOf(
+                    `#${run.scenario} ${nOutOf(
                       reduceFailed(run).length,
                       reduceTotal(run).length
                     )}, trains: ${reduceFailed(run).join(", ")}`
@@ -204,48 +111,16 @@ function getFailedRunSummary(
   ];
 }
 
-function getRunNumbers(runs: readonly Run[]): number[] {
-  return [...new Set(runs.map((run): number => run.runNumber))].sort(
+function getScenarios(runs: readonly Run[]): number[] {
+  return [...new Set(runs.map((run): number => run.scenario))].sort(
     (a, b): number => a - b
   );
-}
-
-function getDateRange(
-  runs: readonly Run[]
-): { firstRunDate: Date; lastRunDate: Date } {
-  const firstRunDate = new Date(
-    runs
-      .map((run): number => +run.date)
-      .reduce<number>(
-        (acc, date): number => (acc < date ? acc : date),
-        Number.POSITIVE_INFINITY
-      )
-  );
-  const lastRunDate = new Date(
-    runs
-      .map((run): number => +run.date)
-      .reduce<number>(
-        (acc, date): number => (acc > date ? acc : date),
-        Number.NEGATIVE_INFINITY
-      )
-  );
-
-  return { firstRunDate, lastRunDate };
 }
 
 function getNumberOfRuns(runs: readonly Run[]): number {
   return new Set<string>(runs.map((run): string => run.id)).size;
 }
 
-const REQUIRED_FILES = [
-  "OT_Delay.delavg",
-  "OT_Delay.delbegin",
-  "OT_Delay.delend",
-  "OT_Delay.dellaststop",
-  "OT_Delay.delmax",
-  "OT_Messages.txt",
-  "OT_TimetableStatistics.txt",
-];
 function loadResults(): {
   runs: Run[];
 } {
@@ -254,13 +129,13 @@ function loadResults(): {
   const allDirnames = readdirSync(outputPath, { withFileTypes: true })
     .filter((dirent): boolean => dirent.isDirectory())
     .map((dirent): string => dirent.name);
-  const suffixes = new Set(
+  const modules = new Set(
     allDirnames.map((dirname): string => getSuffix(dirname))
   );
 
-  for (const suffix of suffixes) {
+  for (const module of modules) {
     const runDirnames = allDirnames.filter(
-      (dirname): boolean => getSuffix(dirname) === suffix
+      (dirname): boolean => getSuffix(dirname) === module
     );
     runDir: for (const runDirname of runDirnames) {
       for (const requiredFile of REQUIRED_FILES) {
@@ -276,46 +151,52 @@ function loadResults(): {
         }
       }
 
-      const messages = getMessages(runDirname);
-      const trainIDs = getTrainIDs(messages);
-      const stuckCourseIDs = getStuckTrainIDs(messages);
-      const stuck = stuckCourseIDs.length;
-      const date = getDate(runDirname);
-
-      const [, runNumberString] = /^run-(\d+)-.*/.exec(runDirname);
-      const runNumber = +runNumberString;
-
-      const otTimettableStatistics = new OTTimetableStatistics(
+      const otTimettableModule = new OTTimetable(
         readFileSync(
-          resolve(outputPath, runDirname, "OT_TimetableStatistics.txt"),
+          resolve(outputPath, runDirname, "OT_Timetable.txt"),
           "utf-8"
         )
       );
-      const xxCourseIDs = [...otTimettableStatistics.getXXTrainIDs()];
-      const xx = xxCourseIDs.length;
-      const perCategoryDiffs = otTimettableStatistics.getGroupedBeginEndDelayDiffs(
-        (course): [string, string] => ["total", course.split(" ", 1)[0]]
-      );
-      const perCourseDiffs = otTimettableStatistics.getBeginEndDelayDiffs();
 
-      const run: Run = {
-        date,
-        delays: { perCategoryDiffs, perCourseDiffs },
-        id: `${suffix}/${runNumber}`,
-        module: suffix,
-        runNumber,
-        stuck,
-        stuckCourseIDs,
-        trainIDs,
-        xx,
-        xxCourseIDs,
-      };
+      const scenarios = [
+        ...new Set(
+          otTimettableModule.query().map((record): number => record.scenario)
+        ),
+      ];
 
-      runs.push(run);
+      for (const scenario of scenarios) {
+        const otTimettable = new OTTimetable(
+          otTimettableModule.query({ scenario })
+        );
+        const trainIDs = [...otTimettable.getTrainIDs()];
+
+        const xxTrainIDs = [...otTimettable.getXXTrainIDs()];
+        const xx = xxTrainIDs.length;
+        const perCategoryDiffs = otTimettable.getGroupedBeginEndDelayDiffs(
+          (course): [string, string] => ["total", course.split(" ", 1)[0]]
+        );
+        const perTrainDiffs = otTimettable.getBeginEndDelayDiffs();
+
+        const run: Run = {
+          delays: { perCategoryDiffs, perTrainDiffs },
+          id: `${module}/${scenario}`,
+          module: module,
+          scenario,
+          trainIDs,
+          xx,
+          xxTrainIDs,
+        };
+
+        runs.push(run);
+      }
     }
   }
 
   return { runs };
+}
+
+function getModules(runs: readonly Run[]): string[] {
+  return [...new Set(runs.map((run): string => run.module))].sort();
 }
 
 function csvHeader(text: string, module: string): string {
@@ -324,10 +205,10 @@ function csvHeader(text: string, module: string): string {
 
 function buildCSV(
   allRuns: readonly Run[],
-  type: "perCategoryDiffs" | "perCourseDiffs"
+  type: "perCategoryDiffs" | "perTrainDiffs"
 ): string {
-  const modules = [...new Set(allRuns.map((run): string => run.module))].sort();
-  const runNumbers = getRunNumbers(allRuns);
+  const modules = getModules(allRuns);
+  const scenarios = getScenarios(allRuns);
 
   const diffCategories = [
     ...new Set(
@@ -346,7 +227,7 @@ function buildCSV(
   );
 
   const keys = [
-    "run",
+    "scenario",
     ...modules.flatMap((module): string[] => [
       "",
       ...diffCategories
@@ -355,36 +236,36 @@ function buildCSV(
       csvHeader("total", module),
     ]),
   ];
-  const rows = runNumbers
+  const rows = scenarios
     // Skip runs where all modules are not (yet) available.
     .filter(
-      (runNumber): boolean =>
+      (scenario): boolean =>
         new Set(
           allRuns
-            .filter((run): boolean => run.runNumber === runNumber)
+            .filter((run): boolean => run.scenario === scenario)
             .map((run): string => run.module)
         ).size === modules.length
     )
     // Turn runs into CSV rows.
     .map(
-      (runNumber): Record<string, string> => {
+      (scenario): Record<string, string> => {
         const runs = allRuns.filter(
-          (run): boolean => run.runNumber === runNumber
+          (run): boolean => run.scenario === scenario
         );
 
         return {
-          run: "" + runNumber,
+          scenario: "" + scenario,
           ...modulesAndDiffCategories.reduce<Record<string, string>>(
             (acc, { diffCategory, module }): Record<string, string> => {
               const run = runs.find((run): boolean => run.module === module);
               if (run == null) {
-                throw new Error(`Can't find for "${module}" #${runNumber}.`);
+                throw new Error(`Can't find for "${module}" #${scenario}.`);
               }
 
               const delay = run.delays[type].get(diffCategory);
               if (delay == null) {
                 throw new Error(
-                  `Can't find "${diffCategory}" delays in "${module}" #${runNumber}.`
+                  `Can't find "${diffCategory}" delays in "${module}" #${scenario}.`
                 );
               }
 
@@ -412,44 +293,27 @@ export function processOutputs(): string {
   if (allRuns.length >= 2) {
     lines.push(`==> Summary`, "");
 
-    const { firstRunDate, lastRunDate } = getDateRange(allRuns);
-
+    const modules = getModules(allRuns);
     const numberOfRuns = getNumberOfRuns(allRuns);
-    const stuck = getStuck(allRuns).join("\n");
     const xx = getXX(allRuns).join("\n");
 
-    // Note: All the times are finish times. The +1, -1 logic bellow
-    // extrapolates start times based on finish times and the average difference
-    // between them.
-    const totalDuration = formatDistanceStrict(
-      firstRunDate,
-      new Date(
-        +firstRunDate +
-          Math.round(
-            (+lastRunDate - +firstRunDate) * ((numberOfRuns + 1) / numberOfRuns)
-          )
-      )
-    );
-    const avgRunDuration = formatDistanceStrict(
-      firstRunDate,
-      new Date(
-        numberOfRuns > 1
-          ? +firstRunDate +
-            Math.round((+lastRunDate - +firstRunDate) / (numberOfRuns - 1))
-          : +firstRunDate
+    lines.push(
+      `Number of runs: ${numberOfRuns}`,
+      ...shiftRight(
+        modules.map((module): string => {
+          const sum = allRuns
+            .filter((run): boolean => run.module === module)
+            .reduce<number>((acc): number => acc + 1, 0);
+
+          return `${module}: ${nOutOf(sum, numberOfRuns)}`;
+        })
       )
     );
 
-    lines.push("First run: " + firstRunDate);
-    lines.push("Last run: " + lastRunDate);
-    lines.push("Number of runs: " + numberOfRuns);
-    lines.push("Duration: " + totalDuration);
-    lines.push("Avg run duration: " + avgRunDuration);
-    lines.push("Never reached: " + xx);
-    lines.push("Stuck: " + stuck);
+    lines.push("Some trains never reached some stations: " + xx);
   }
 
-  for (const type of ["perCategoryDiffs", "perCourseDiffs"] as const) {
+  for (const type of ["perCategoryDiffs", "perTrainDiffs"] as const) {
     const csv = buildCSV(allRuns, type);
     writeFileSync(
       resolve(outputPath, `${basename(outputPath)}.delays.${type}.csv`),
@@ -457,5 +321,6 @@ export function processOutputs(): string {
     );
   }
 
+  lines.push("");
   return lines.join("\n");
 }
