@@ -77,7 +77,7 @@ export class CSV<CSVRecord extends Record<HK, any>, HK extends string> {
       );
   }
 
-  public query(query: Partial<CSVRecord>): CSVRecord[] {
+  public query(query: Partial<CSVRecord> = {}): CSVRecord[] {
     return this.filter((record: Record<string, unknown>): boolean => {
       for (const [key, value] of Object.entries(query)) {
         if (record[key] !== value) {
