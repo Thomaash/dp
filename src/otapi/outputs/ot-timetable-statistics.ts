@@ -197,7 +197,7 @@ export class OTTimetableStatistics extends CSV<
 
   public getGroupedBeginEndDelayDiffs<GroupName>(
     groupingReduce: (course: string) => GroupName[],
-    query: Partial<OTTimetableStatisticsRecord>
+    query: Partial<OTTimetableStatisticsRecord> = {}
   ): Map<GroupName, number> {
     const perGroupDiffs = [...this.getBeginEndDelayDiffs(query)].reduce<
       MapSet<GroupName, number>

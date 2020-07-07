@@ -13,6 +13,14 @@ export interface OTMessage {
   trainID: string | null;
 }
 
+export interface OTMessageQuery {
+  document: string;
+  level: string;
+  message: string;
+  simTime: string;
+  trainID: string;
+}
+
 export class OTMessages {
   private _messages: readonly OTMessage[];
 
@@ -84,20 +92,20 @@ export class OTMessages {
   }
 
   public query({
-    level = null,
-    simTime = null,
-    trainID = null,
-    message = null,
-    document = null,
-  } = {}): OTMessage[] {
+    document,
+    level,
+    message,
+    simTime,
+    trainID,
+  }: Partial<OTMessageQuery> = {}): OTMessage[] {
     return this._messages
       .filter(
         (value): boolean =>
+          (document == null || value.document === document) &&
           (level == null || value.level === level) &&
-          (simTime == null || value.simTime === simTime) &&
-          (trainID == null || value.trainID === trainID) &&
           (message == null || value.message === message) &&
-          (document == null || value.document === document)
+          (simTime == null || value.simTime === simTime) &&
+          (trainID == null || value.trainID === trainID)
       )
       .map((value): OTMessage => ({ ...value }));
   }

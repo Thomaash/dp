@@ -3,6 +3,13 @@ const LINE_DELIMITER_RE = /(\n\r|\n|\r)/;
 
 type RawCSVRecord<Key extends string> = Record<Key, string>;
 
+export function toNumber(value: string): number {
+  if (Number.isNaN(value)) {
+    throw new TypeError(`Not a valid number: "${value}".`);
+  }
+  return +value;
+}
+
 export function toString(value: string): string {
   return value;
 }
