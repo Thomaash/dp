@@ -29,7 +29,7 @@ import { retry } from "./otapi/util";
 
 const writeFile = promisify(writeFileCallback);
 
-const cooldownMs = 10000;
+const cooldownMs = 100;
 
 async function continueUnless(
   otapi: OTAPI,
