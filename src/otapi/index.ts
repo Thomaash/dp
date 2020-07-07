@@ -216,8 +216,9 @@ export class OTAPI {
             }
           }
           throw error;
+        } finally {
+          this._callOnKill.delete(cancel);
         }
-        this._callOnKill.delete(cancel);
 
         return result;
       }
