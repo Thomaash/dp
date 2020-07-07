@@ -15,7 +15,6 @@ import {
   times,
 } from "../../../src/ga/language";
 import {
-  MutateSpecimen,
   PopulationCompetition,
   PopulationCrossover,
   PopulationGenerator,

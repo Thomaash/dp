@@ -1,7 +1,8 @@
+/* eslint-disable no-console */
+
 import { xor4096 } from "seedrandom";
 
 import {
-  FitStats,
   PopulationCompetition,
   PopulationCrossover,
   PopulationGenerator,

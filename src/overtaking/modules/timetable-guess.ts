@@ -92,10 +92,6 @@ export const decisionModule: DecisionModule = {
           log.error(error, "Can't plan overtaking.");
         });
       } else {
-        if (0 < difference && difference <= threshold) {
-          console.count("-- -- -- -- THRESHOLD -- -- -- --");
-        }
-
         log.info(
           `Don't overtake ${train1.trainID} by ${train2.trainID} at ${
             overtakingArea.outflowStation.stationID

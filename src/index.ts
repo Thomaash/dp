@@ -7,7 +7,6 @@ import { writeFile as writeFileCallback } from "fs";
 import {
   AnyEventCallback,
   OTAPI,
-  Runfile,
   createTmpRunfilePair,
   TmpRunfilePair,
 } from "./otapi";
