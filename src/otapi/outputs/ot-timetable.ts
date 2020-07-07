@@ -225,6 +225,17 @@ export class OTTimetable extends CSV<OTTimetableRecord, HeaderKey> {
   }
 
   /**
+   * Get all train ids.
+   *
+   * @returns A set of train ids.
+   */
+  public getTrainIDs(): Set<string> {
+    return new Set<string>(
+      this.filter((): boolean => true).map((record): string => record.course)
+    );
+  }
+
+  /**
    * Get the ids of trains that have XX:XX:XX (never reached) in their
    * timetables.
    *
