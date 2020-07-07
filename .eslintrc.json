@@ -28,6 +28,26 @@
         "allowTypedFunctionExpressions": false
       }
     ],
+    "no-restricted-properties": [
+      "error",
+      {
+        "object": "describe",
+        "property": "only",
+        "message": "Please, don't commit tests with `.only`."
+      },
+      {
+        "object": "it",
+        "property": "only",
+        "message": "Please, don't commit tests with `.only`."
+      }
+    ],
+    "no-restricted-globals": [
+      "error",
+      {
+        "name": "event",
+        "message": "Please, use local parameter instead."
+      }
+    ],
     "@typescript-eslint/ban-types": "off",
     "@typescript-eslint/explicit-module-boundary-types": "off",
     "@typescript-eslint/no-empty-function": "off",

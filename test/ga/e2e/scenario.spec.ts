@@ -34,7 +34,7 @@ function regenerateDuplicates(
   return unique;
 }
 
-describe.only("E2E scenario 1", function (): void {
+describe.skip("E2E scenario 1", function (): void {
   it("…", function (): void {
     const rng = xor4096("TEST");
     const numbers = new Array(1000)
