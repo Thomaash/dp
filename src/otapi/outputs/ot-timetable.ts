@@ -80,74 +80,78 @@ function normalizeDelayDiffS(s: number): number {
 }
 
 export class OTTimetable extends CSV<OTTimetableRecord, HeaderKey> {
-  public constructor(txt: string) {
-    super(txt, {
-      fieldDelimiter: FIELD_DELIMITER,
-      headerRows: HEADER_ROWS,
-      keys: HEADERS_IN_FILE_ORDER,
-      convert: {
-        run: toNumber,
-        scenario: toNumber,
-        course: toString,
-        station: toString,
-        arrivalPlannedHHMMSS: toString,
-        arrivalPlannedS(value, _key, rawRecord): null | number {
-          if (isValidHHMMSS(rawRecord.arrivalPlannedHHMMSS)) {
-            return +value;
-          } else {
-            return null;
-          }
+  public constructor(input: string | readonly OTTimetableRecord[]) {
+    if (typeof input === "string") {
+      super(input, {
+        fieldDelimiter: FIELD_DELIMITER,
+        headerRows: HEADER_ROWS,
+        keys: HEADERS_IN_FILE_ORDER,
+        convert: {
+          run: toNumber,
+          scenario: toNumber,
+          course: toString,
+          station: toString,
+          arrivalPlannedHHMMSS: toString,
+          arrivalPlannedS(value, _key, rawRecord): null | number {
+            if (isValidHHMMSS(rawRecord.arrivalPlannedHHMMSS)) {
+              return +value;
+            } else {
+              return null;
+            }
+          },
+          departurePlannedHHMMSS: toString,
+          departurePlannedS(value, _key, rawRecord): null | number {
+            if (isValidHHMMSS(rawRecord.departurePlannedHHMMSS)) {
+              return +value;
+            } else {
+              return null;
+            }
+          },
+          arrivalActualHHMMSS: toString,
+          arrivalActualS(value, _key, rawRecord): null | number {
+            if (isValidHHMMSS(rawRecord.arrivalActualHHMMSS)) {
+              return +value;
+            } else {
+              return null;
+            }
+          },
+          departureActualHHMMSS: toString,
+          departureActualS(value, _key, rawRecord): null | number {
+            if (isValidHHMMSS(rawRecord.departureActualHHMMSS)) {
+              return +value;
+            } else {
+              return null;
+            }
+          },
+          arrivalDiffHHMMSS: toString,
+          arrivalDiffS(value, _key, rawRecord): null | number {
+            if (
+              isValidHHMMSS(rawRecord.arrivalPlannedHHMMSS) &&
+              isValidHHMMSS(rawRecord.arrivalActualHHMMSS)
+            ) {
+              return +value;
+            } else {
+              return null;
+            }
+          },
+          departureDiffHHMMSS: toString,
+          departureDiffS(value, _key, rawRecord): null | number {
+            if (
+              isValidHHMMSS(rawRecord.departurePlannedHHMMSS) &&
+              isValidHHMMSS(rawRecord.departureActualHHMMSS)
+            ) {
+              return +value;
+            } else {
+              return null;
+            }
+          },
+          trackPlanned: toString,
+          trackActual: toString,
         },
-        departurePlannedHHMMSS: toString,
-        departurePlannedS(value, _key, rawRecord): null | number {
-          if (isValidHHMMSS(rawRecord.departurePlannedHHMMSS)) {
-            return +value;
-          } else {
-            return null;
-          }
-        },
-        arrivalActualHHMMSS: toString,
-        arrivalActualS(value, _key, rawRecord): null | number {
-          if (isValidHHMMSS(rawRecord.arrivalActualHHMMSS)) {
-            return +value;
-          } else {
-            return null;
-          }
-        },
-        departureActualHHMMSS: toString,
-        departureActualS(value, _key, rawRecord): null | number {
-          if (isValidHHMMSS(rawRecord.departureActualHHMMSS)) {
-            return +value;
-          } else {
-            return null;
-          }
-        },
-        arrivalDiffHHMMSS: toString,
-        arrivalDiffS(value, _key, rawRecord): null | number {
-          if (
-            isValidHHMMSS(rawRecord.arrivalPlannedHHMMSS) &&
-            isValidHHMMSS(rawRecord.arrivalActualHHMMSS)
-          ) {
-            return +value;
-          } else {
-            return null;
-          }
-        },
-        departureDiffHHMMSS: toString,
-        departureDiffS(value, _key, rawRecord): null | number {
-          if (
-            isValidHHMMSS(rawRecord.departurePlannedHHMMSS) &&
-            isValidHHMMSS(rawRecord.departureActualHHMMSS)
-          ) {
-            return +value;
-          } else {
-            return null;
-          }
-        },
-        trackPlanned: toString,
-        trackActual: toString,
-      },
-    });
+      });
+    } else {
+      super(input);
+    }
   }
 
   public getBeginEndDelayDiffs(
