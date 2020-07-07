@@ -106,8 +106,8 @@ const timeKeys: Record<
 
 const newline = /\r?\n/g;
 
-export class Runfile {
-  public constructor(private readonly _path: string) {}
+export class ReadonlyRunfile {
+  public constructor(protected readonly _path: string) {}
 
   private async _readLines(): Promise<string[]> {
     return (await readFile(this._path, "utf8")).split(newline);
@@ -165,6 +165,19 @@ export class Runfile {
     return value;
   }
 
+  public async readDayTimeValue(key: RunfileDayTimeKey): Promise<number> {
+    const [day, time] = await Promise.all([
+      this.readValue(timeKeys[key].day),
+      this.readValue(timeKeys[key].time),
+    ]);
+
+    const otDate = new OTDate(day, time);
+
+    return otDate.time;
+  }
+}
+
+export class Runfile extends ReadonlyRunfile {
   public async writeValue(
     key: RunfileKey,
     value: string,
@@ -199,20 +212,19 @@ export class Runfile {
     await this.writeValue("OTD Server Port", "" + port1);
     await this.writeValue("OpenTrack Server Port", "" + port2);
   }
-
-  public async readDayTimeValue(key: RunfileDayTimeKey): Promise<number> {
-    const [day, time] = await Promise.all([
-      this.readValue(timeKeys[key].day),
-      this.readValue(timeKeys[key].time),
-    ]);
-
-    const otDate = new OTDate(day, time);
-
-    return otDate.time;
-  }
 }
 
-export async function cloneRunfile(src: string, dst: string): Promise<Runfile> {
-  await copyFile(src, dst);
-  return new Runfile(dst);
+export interface TmpRunfilePair {
+  orig: ReadonlyRunfile;
+  tmp: Runfile;
+}
+export async function createTmpRunfilePair(
+  orig: string,
+  tmp: string
+): Promise<TmpRunfilePair> {
+  await copyFile(orig, tmp);
+  return {
+    orig: new ReadonlyRunfile(orig),
+    tmp: new Runfile(tmp),
+  };
 }
