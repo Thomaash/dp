@@ -23,7 +23,7 @@ import {
   heightPenalty,
 } from "../../../src/ga/population";
 import { deepFreeze } from "../../../src/util/deep-freeze";
-import { createRng, testCommon, prop } from "../util";
+import { createRng, prop, testCommon } from "../util";
 
 const create = (
   seed = 0

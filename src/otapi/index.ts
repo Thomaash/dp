@@ -14,6 +14,7 @@ import {
   ResetRequestedDecelerationParameters,
   ResetRequestedSpeedParameters,
   ResetTimetableParameters,
+  SendParameters,
   SetArrivalTimeParameters,
   SetConnectionParameters,
   SetDelayScenarioParameters,
@@ -44,9 +45,8 @@ import {
   StartSimulationParameters,
   StepSimulationParameters,
   TerminateApplicationParameters,
-  send,
-  SendParameters,
   createAxios,
+  send,
 } from "./requests";
 import {
   EventCallback,
@@ -56,7 +56,7 @@ import {
 } from "./responses";
 import { Config } from "./config";
 import { RateLimiter } from "./util";
-import { curryLog, CurryLog } from "../curry-log";
+import { CurryLog, curryLog } from "../curry-log";
 import {
   CommunicationDumpsterLogger,
   CommunicationFileLogger,

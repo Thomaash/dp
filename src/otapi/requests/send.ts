@@ -1,9 +1,9 @@
 import axiosStatic, { AxiosInstance } from "axios";
 import {
+  default as HTTPAgent,
   HttpOptions as HTTPAgentOptions,
   HttpsAgent as HTTPSAgent,
   HttpsOptions as HTTPSAgentOptions,
-  default as HTTPAgent,
 } from "agentkeepalive";
 
 import { Config } from "../config";

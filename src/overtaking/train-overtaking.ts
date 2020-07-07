@@ -1,9 +1,9 @@
-import { Infrastructure, Train, Station, Route } from "../infrastructure";
+import { Infrastructure, Route, Station, Train } from "../infrastructure";
 import { OTAPI } from "../otapi";
-import { curryCatch, CurryLog } from "../curry-log";
+import { CurryLog, curryCatch } from "../curry-log";
 
 import { Blocking } from "./util";
-import { OvertakingArea, DecisionModule } from "./api-public";
+import { DecisionModule, OvertakingArea } from "./api-public";
 import { TrainTracker } from "src/train-tracker";
 
 export interface OvertakingParams {

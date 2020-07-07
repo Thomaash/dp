@@ -3,15 +3,15 @@ import { expect } from "chai";
 
 import { CurryLog } from "../curry-log";
 import {
+  OTDate,
+  checkTrainItineraries,
   ck,
   filterChildren,
+  getOutflowRoutes,
   idFromXML,
-  xmlVertexCK,
-  OTDate,
   parseDuration,
   throwIfNotUniqe,
-  getOutflowRoutes,
-  checkTrainItineraries,
+  xmlVertexCK,
 } from "./common";
 import {
   Formation,

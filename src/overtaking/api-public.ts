@@ -1,12 +1,12 @@
 import {
+  CommonTimetableEntry,
   Itinerary,
+  Path,
   Route,
   Station,
+  Timetable,
   Train,
   Vertex,
-  Path,
-  CommonTimetableEntry,
-  Timetable,
 } from "../infrastructure";
 import { Area } from "../train-tracker";
 import { CurryLog } from "../curry-log";

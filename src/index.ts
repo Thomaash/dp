@@ -7,8 +7,8 @@ import { writeFile as writeFileCallback } from "fs";
 import {
   AnyEventCallback,
   OTAPI,
-  createTmpRunfilePair,
   TmpRunfilePair,
+  createTmpRunfilePair,
 } from "./otapi";
 import { CallbackQueue, Deferred } from "./util";
 import { args } from "./cli";
@@ -23,7 +23,7 @@ import {
   curryLogCleanConsoleConsumer,
 } from "./curry-log";
 
-import { overtaking, OvertakingParams, DecisionModule } from "./overtaking";
+import { DecisionModule, OvertakingParams, overtaking } from "./overtaking";
 import { retry } from "./otapi/util";
 
 const writeFile = promisify(writeFileCallback);

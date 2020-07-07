@@ -1,12 +1,12 @@
 import { OvertakingArea } from "../api-public";
 import {
   Infrastructure,
-  Route,
-  Vertex,
   Itinerary,
+  Route,
   Station,
+  Vertex,
 } from "../../infrastructure";
-import { MapSet, MapMapSet, Bug } from "../../util";
+import { Bug, MapMapSet, MapSet } from "../../util";
 import { expect } from "chai";
 
 function getOvertakingAreas(infrastructure: Infrastructure): OvertakingArea[] {

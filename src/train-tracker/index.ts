@@ -1,7 +1,7 @@
 import { EventPayloads, OTAPI } from "../otapi";
 import { Infrastructure, Route, Station, Train } from "../infrastructure";
-import { curryLog, CurryLog } from "../curry-log";
-import { MapSet, haveIntersection, MapMap, MapArray } from "../util";
+import { CurryLog, curryLog } from "../curry-log";
+import { MapArray, MapMap, MapSet, haveIntersection } from "../util";
 import { Bug } from "../util";
 
 export type Report = EventPayloads["trainPositionReport"];

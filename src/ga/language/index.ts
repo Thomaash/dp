@@ -9,10 +9,10 @@ import {
   Rng,
   Statement,
   StatementFactory,
+  StatementRun,
   Terminal,
   TerminalFactory,
   Tuple,
-  StatementRun,
 } from "./types";
 
 // Generic {{{

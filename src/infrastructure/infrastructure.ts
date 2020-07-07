@@ -19,7 +19,7 @@ import {
   Vertex,
 } from "./types";
 
-import { parseInfrastructure, ParseInfrastructureXML } from "./parser";
+import { ParseInfrastructureXML, parseInfrastructure } from "./parser";
 import { MapSet } from "../util";
 
 const readFile = promisify(readFileCallback);

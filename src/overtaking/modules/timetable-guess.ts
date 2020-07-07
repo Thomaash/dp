@@ -1,9 +1,9 @@
 import { DecisionModule, Station } from "../";
 
 import {
+  Bug,
   getAllOvertakingCandidates,
   getConsecutivePairs,
-  Bug,
 } from "../../util";
 
 // TODO: This should be configurable, not hardcoded.

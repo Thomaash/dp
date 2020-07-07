@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { CurryLog } from "../curry-log";
-import { Route, Itinerary, Train } from "./types";
+import { Itinerary, Route, Train } from "./types";
 import { MapCounter } from "../util";
 
 export function ck(...rest: (boolean | number | string)[]): string {

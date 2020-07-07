@@ -1,4 +1,4 @@
-import { Infrastructure, Train, Station } from "../../infrastructure";
+import { Infrastructure, Station, Train } from "../../infrastructure";
 import { TrainTracker } from "../../train-tracker";
 import { DecisionModuleAPI, OvertakingArea } from "../api-public";
 import { TrainOvertaking } from "../train-overtaking";

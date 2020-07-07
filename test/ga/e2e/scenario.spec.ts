@@ -7,12 +7,12 @@ import {
   PopulationCrossover,
   PopulationGenerator,
   Statement,
+  StatementFactory,
   codeLengthPenalty,
   createSimplePopulationMutator,
   heightPenalty,
-  statements,
   input,
-  StatementFactory,
+  statements,
 } from "../../../src/ga";
 
 // TODO: This should be exproted from ga.
