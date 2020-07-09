@@ -2,24 +2,33 @@
 
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "fs";
 import { basename, resolve } from "path";
+import { sync as globbySync } from "globby";
 
 import { OTTimetable } from "./ot-timetable";
+import { MapCounter } from "../../util";
 
 interface RunDelays {
   readonly perCategoryDiffs: ReadonlyMap<string, number>;
   readonly perTrainDiffs: ReadonlyMap<string, number>;
 }
+interface Module {
+  readonly name: string;
+  readonly path: string;
+}
 interface Run {
   readonly delays: RunDelays;
   readonly id: string;
-  readonly module: string;
+  readonly module: Module;
   readonly scenario: number;
   readonly trainIDs: readonly string[];
   readonly xx: number;
   readonly xxTrainIDs: string[];
 }
+interface Result {
+  readonly modules: readonly Module[];
+  readonly runs: readonly Run[];
+}
 
-const outputPath = process.argv[2];
 const REQUIRED_FILES = ["OT_Timetable.txt"];
 
 function shiftRight(input: string): string;
@@ -43,8 +52,9 @@ function nOutOf(n: number, total: number): string {
   return `${n}/${total} (${Math.round((n / total) * 100)}%)`;
 }
 
-function getSuffix(dirname: string): string {
-  return dirname.replace(/^variant-/, "");
+function getModule(path: string): Module {
+  const name = basename(path).replace(/^variant-/, "");
+  return { name, path };
 }
 
 function toCSV<Key extends string | number | symbol>(
@@ -79,18 +89,18 @@ function getFailedRunSummary(
   return [
     `${nOutOf(failedRuns.length, allRuns.length)}:`,
     ...shiftRight(
-      [...new Set([...failedRuns.map((run): string => run.module)])]
+      [...new Set([...failedRuns.map((run): Module => run.module)])]
         .sort()
         .flatMap((module): string[] => {
           const failedModuleRuns = failedRuns.filter(
-            (run): boolean => run.module === module
+            (run): boolean => run.module.name === module.name
           );
           const allModuleRuns = allRuns.filter(
-            (run): boolean => run.module === module
+            (run): boolean => run.module.name === module.name
           );
 
           return [
-            `${module} ${nOutOf(
+            `${module.name} ${nOutOf(
               failedModuleRuns.length,
               allModuleRuns.length
             )}:`,
@@ -121,95 +131,86 @@ function getNumberOfRuns(runs: readonly Run[]): number {
   return new Set<string>(runs.map((run): string => run.id)).size;
 }
 
-function loadResults(): {
-  runs: Run[];
-} {
+function loadResult(outputPath: string): Result {
   const runs: Run[] = [];
 
-  const allDirnames = readdirSync(outputPath, { withFileTypes: true })
+  const modules = readdirSync(outputPath, { withFileTypes: true })
     .filter((dirent): boolean => dirent.isDirectory())
-    .map((dirent): string => dirent.name);
-  const modules = new Set(
-    allDirnames.map((dirname): string => getSuffix(dirname))
-  );
+    .map((dirent): string => dirent.name)
+    .map((dirname): string => resolve(outputPath, dirname))
+    .map((path): Module => getModule(path));
 
-  for (const module of modules) {
-    const runDirnames = allDirnames.filter(
-      (dirname): boolean => getSuffix(dirname) === module
+  modules: for (const module of modules) {
+    for (const requiredFile of REQUIRED_FILES) {
+      const requiredFilePath = resolve(module.path, requiredFile);
+      if (!existsSync(requiredFilePath)) {
+        console.warn(
+          `Warning: ${requiredFilePath} doesn't exist, skipping ${module.path}.`
+        );
+        continue modules;
+      }
+    }
+
+    const otTimettableModule = new OTTimetable(
+      readFileSync(resolve(module.path, "OT_Timetable.txt"), "utf-8")
     );
-    runDir: for (const runDirname of runDirnames) {
-      for (const requiredFile of REQUIRED_FILES) {
-        const requiredFilePath = resolve(outputPath, runDirname, requiredFile);
-        if (!existsSync(requiredFilePath)) {
-          console.warn(
-            `Warning: ${requiredFilePath} doesn't exist, skipping ${resolve(
-              outputPath,
-              runDirname
-            )}.`
-          );
-          continue runDir;
-        }
-      }
 
-      const otTimettableModule = new OTTimetable(
-        readFileSync(
-          resolve(outputPath, runDirname, "OT_Timetable.txt"),
-          "utf-8"
-        )
+    const scenarios = [
+      ...new Set(
+        otTimettableModule.query().map((record): number => record.scenario)
+      ),
+    ];
+
+    for (const scenario of scenarios) {
+      const otTimettable = new OTTimetable(
+        otTimettableModule.query({ scenario })
       );
+      const trainIDs = [...otTimettable.getTrainIDs()];
 
-      const scenarios = [
-        ...new Set(
-          otTimettableModule.query().map((record): number => record.scenario)
-        ),
-      ];
+      const xxTrainIDs = [...otTimettable.getXXTrainIDs()];
+      const xx = xxTrainIDs.length;
+      const perCategoryDiffs = otTimettable.getGroupedBeginEndDelayDiffs(
+        (course): [string, string] => ["total", course.split(" ", 1)[0]]
+      );
+      const perTrainDiffs = otTimettable.getBeginEndDelayDiffs();
 
-      for (const scenario of scenarios) {
-        const otTimettable = new OTTimetable(
-          otTimettableModule.query({ scenario })
-        );
-        const trainIDs = [...otTimettable.getTrainIDs()];
+      const run: Run = {
+        delays: { perCategoryDiffs, perTrainDiffs },
+        id: `${module}/${scenario}`,
+        module: module,
+        scenario,
+        trainIDs,
+        xx,
+        xxTrainIDs,
+      };
 
-        const xxTrainIDs = [...otTimettable.getXXTrainIDs()];
-        const xx = xxTrainIDs.length;
-        const perCategoryDiffs = otTimettable.getGroupedBeginEndDelayDiffs(
-          (course): [string, string] => ["total", course.split(" ", 1)[0]]
-        );
-        const perTrainDiffs = otTimettable.getBeginEndDelayDiffs();
-
-        const run: Run = {
-          delays: { perCategoryDiffs, perTrainDiffs },
-          id: `${module}/${scenario}`,
-          module: module,
-          scenario,
-          trainIDs,
-          xx,
-          xxTrainIDs,
-        };
-
-        runs.push(run);
-      }
+      runs.push(run);
     }
   }
 
-  return { runs };
+  return { modules, runs };
 }
 
-function getModules(runs: readonly Run[]): string[] {
-  return [...new Set(runs.map((run): string => run.module))].sort();
+function csvHeader(text: string, module: Module): string {
+  return `${text} (${module.name})`;
 }
 
-function csvHeader(text: string, module: string): string {
-  return `${text} (${module})`;
+function checkOtsimcors(
+  module: Module,
+  scenario: number,
+  min: number
+): boolean {
+  return (
+    globbySync(resolve(module.path, `*.${scenario}.otsimcor`)).length >= min
+  );
 }
 
 function buildCSV(
-  allRuns: readonly Run[],
-  type: "perCategoryDiffs" | "perTrainDiffs"
+  { runs: allRuns, modules }: Result,
+  type: "perCategoryDiffs" | "perTrainDiffs",
+  requireOtsimcor: number,
+  ignoreScenarios: boolean
 ): string {
-  const modules = getModules(allRuns);
-  const scenarios = getScenarios(allRuns);
-
   const diffCategories = [
     ...new Set(
       allRuns.flatMap((run): string[] => [...run.delays[type].keys()])
@@ -218,11 +219,11 @@ function buildCSV(
 
   const modulesAndDiffCategories = modules.flatMap((module): {
     diffCategory: string;
-    module: string;
+    module: Module;
   }[] =>
     diffCategories.map((diffCategory): {
       diffCategory: string;
-      module: string;
+      module: Module;
     } => ({ diffCategory, module }))
   );
 
@@ -236,20 +237,46 @@ function buildCSV(
       csvHeader("total", module),
     ]),
   ];
-  const rows = scenarios
-    // Skip runs where all modules are not (yet) available.
-    .filter(
-      (scenario): boolean =>
-        new Set(
-          allRuns
-            .filter((run): boolean => run.scenario === scenario)
-            .map((run): string => run.module)
-        ).size === modules.length
+
+  const perModuleRunCounters = new MapCounter<Module>();
+  const filteredRuns = allRuns
+    // Skip runs where not all otsimcors are available or some were deleted.
+    .filter((run): boolean =>
+      checkOtsimcors(run.module, run.scenario, requireOtsimcor)
     )
+    // Overwrite scenarios if configured.
+    .map(
+      (run): Run => {
+        if (ignoreScenarios) {
+          const counter = perModuleRunCounters.get(run.module);
+          const scenario = counter.get();
+          counter.inc();
+
+          return {
+            ...run,
+            scenario,
+          };
+        } else {
+          return { ...run };
+        }
+      }
+    );
+
+  const rows = getScenarios(filteredRuns)
+    // Skip runs where all modules are not (yet) available.
+    .filter((scenario): boolean => {
+      return (
+        new Set(
+          filteredRuns
+            .filter((run): boolean => run.scenario === scenario)
+            .map((run): string => run.module.name)
+        ).size === modules.length
+      );
+    })
     // Turn runs into CSV rows.
     .map(
       (scenario): Record<string, string> => {
-        const runs = allRuns.filter(
+        const runs = filteredRuns.filter(
           (run): boolean => run.scenario === scenario
         );
 
@@ -257,15 +284,19 @@ function buildCSV(
           scenario: "" + scenario,
           ...modulesAndDiffCategories.reduce<Record<string, string>>(
             (acc, { diffCategory, module }): Record<string, string> => {
-              const run = runs.find((run): boolean => run.module === module);
+              const run = runs.find(
+                (run): boolean => run.module.name === module.name
+              );
               if (run == null) {
-                throw new Error(`Can't find for "${module}" #${scenario}.`);
+                throw new Error(
+                  `Can't find for "${module.name}" #${scenario}.`
+                );
               }
 
               const delay = run.delays[type].get(diffCategory);
               if (delay == null) {
                 throw new Error(
-                  `Can't find "${diffCategory}" delays in "${module}" #${scenario}.`
+                  `Can't find "${diffCategory}" delays in "${module.name}" #${scenario}.`
                 );
               }
 
@@ -279,33 +310,47 @@ function buildCSV(
           ),
         };
       }
+    )
+    .map(
+      (row, i): Record<string, string> => ({
+        ...row,
+        scenario: ignoreScenarios ? "" + i : row.scenario,
+      })
     );
 
   return toCSV(rows, ",", keys);
 }
 
-export function processOutputs(): string {
+export function processOutputs({
+  ignoreScenarios,
+  outputPath,
+  requireOtsimcor,
+}: {
+  ignoreScenarios: boolean;
+  outputPath: string;
+  requireOtsimcor: number;
+}): string {
   const lines: string[] = [];
 
-  const { runs: allRuns } = loadResults();
+  const result = loadResult(outputPath);
   lines.push("");
 
-  if (allRuns.length >= 2) {
+  if (result.runs.length >= 2) {
     lines.push(`==> Summary`, "");
 
-    const modules = getModules(allRuns);
-    const numberOfRuns = getNumberOfRuns(allRuns);
-    const xx = getXX(allRuns).join("\n");
+    const moduleNames = result.modules.map((module): string => module.name);
+    const numberOfRuns = getNumberOfRuns(result.runs);
+    const xx = getXX(result.runs).join("\n");
 
     lines.push(
       `Number of runs: ${numberOfRuns}`,
       ...shiftRight(
-        modules.map((module): string => {
-          const sum = allRuns
-            .filter((run): boolean => run.module === module)
+        moduleNames.map((moduleName): string => {
+          const sum = result.runs
+            .filter((run): boolean => run.module.name === moduleName)
             .reduce<number>((acc): number => acc + 1, 0);
 
-          return `${module}: ${nOutOf(sum, numberOfRuns)}`;
+          return `${moduleName}: ${nOutOf(sum, numberOfRuns)}`;
         })
       )
     );
@@ -314,7 +359,7 @@ export function processOutputs(): string {
   }
 
   for (const type of ["perCategoryDiffs", "perTrainDiffs"] as const) {
-    const csv = buildCSV(allRuns, type);
+    const csv = buildCSV(result, type, requireOtsimcor, ignoreScenarios);
     writeFileSync(
       resolve(outputPath, `${basename(outputPath)}.delays.${type}.csv`),
       csv
