@@ -1,8 +1,8 @@
 import waitPort from "wait-port";
 import { ChildProcessWithoutNullStreams, spawn } from "child_process";
 import { promisify } from "util";
-import { resolve, sep } from "path";
-import { writeFile as writeFileCallback } from "fs";
+import { join, resolve, sep } from "path";
+import { mkdir as mkdirCallback, writeFile as writeFileCallback } from "fs";
 
 import {
   AnyEventCallback,
@@ -23,12 +23,42 @@ import {
   curryLogCleanConsoleConsumer,
 } from "./curry-log";
 
-import { DecisionModule, OvertakingParams, overtaking } from "./overtaking";
+import {
+  DecisionModule,
+  OvertakingParams,
+  decisionModuleFactories,
+  overtaking,
+} from "./overtaking";
 import { retry } from "./otapi/util";
 
+const mkdir = promisify(mkdirCallback);
 const writeFile = promisify(writeFileCallback);
 
 const cooldownMs = 100;
+
+const fsConversionTable: Record<string, undefined | string> = {
+  "*": "-",
+  "/": "=",
+  ":": "=",
+  "<": "(",
+  ">": ")",
+  "?": " ",
+  "\\": "=",
+  "|": "=",
+  '"': "'",
+};
+function toFSSafe(input: string): string {
+  return input
+    .split("")
+    .map((char): string => fsConversionTable[char] ?? char)
+    .join("");
+}
+
+interface OvertakingModule {
+  confString: string;
+  fsConfString: string;
+  module: DecisionModule;
+}
 
 async function continueUnless(
   otapi: OTAPI,
@@ -226,17 +256,30 @@ async function changeOutputPath(
   runfiles: TmpRunfilePair,
   variant: string
 ): Promise<void> {
-  const path = (await runfiles.orig.readValue("OutputPath")).split(sep);
+  const parts = (await runfiles.orig.readValue("OutputPath")).split(sep);
 
   // Remove trailing separator.
-  while (path[path.length - 1] === "") {
-    path.pop();
+  while (parts[parts.length - 1] === "") {
+    parts.pop();
   }
 
   // Add current run number.
-  path.push(`variant-${variant}`);
+  parts.push(variant);
 
-  await runfiles.tmp.writeValue("OutputPath", path.join(sep));
+  // Create the output directory if it doesn't exist yet.
+  for (let i = 2; i <= parts.length; ++i) {
+    try {
+      await mkdir(join(...parts.slice(0, i)));
+    } catch (error) {
+      if (error.code !== "EEXIST") {
+        throw error;
+      }
+    }
+  }
+
+  // Save the path into the runfile.
+  const path = join(...parts);
+  await runfiles.tmp.writeValue("OutputPath", path);
 }
 
 async function prepareForRun(
@@ -361,10 +404,12 @@ async function doOneRun(
   {
     overtakingParamsBase,
     runNumber,
+    runSuffix,
     runfiles,
   }: {
     overtakingParamsBase: OvertakingParamsBase;
     runNumber?: number;
+    runSuffix: string;
     runfiles: TmpRunfilePair;
   }
 ): Promise<void> {
@@ -384,7 +429,7 @@ async function doOneRun(
         trainCounter,
       } = await startOpenTrackAndOTAPI(log("startup"), {
         runNumber,
-        runSuffix: overtakingParamsBase.defaultModule,
+        runSuffix,
         runfiles,
       });
       command.returnCode.catch().then(
@@ -506,18 +551,47 @@ const log = curryLog(
     ].join("\n")
   );
 
-  const overtakingModules = await Promise.all(
-    (args["overtaking-modules"] ?? []).map(
-      async (path): Promise<DecisionModule> => {
-        return (await import(resolve(process.cwd(), path))).decisionModule;
+  const overtakingModules: OvertakingModule[] = await Promise.all(
+    args["overtaking-module"].map(
+      async (confString): Promise<OvertakingModule> => {
+        const [nameOrPath, paramsString] = confString.split("?", 2);
+
+        const params =
+          typeof paramsString === "string" && paramsString.length > 0
+            ? JSON.parse(paramsString)
+            : null;
+
+        if (nameOrPath.includes("/") || nameOrPath.includes("\\")) {
+          const path = nameOrPath;
+          return {
+            confString: confString,
+            fsConfString: toFSSafe(confString),
+            module: (
+              await import(resolve(process.cwd(), path))
+            ).decisionModuleFactory.create(params),
+          };
+        } else if (
+          Object.prototype.hasOwnProperty.call(
+            decisionModuleFactories,
+            nameOrPath
+          )
+        ) {
+          const name = nameOrPath;
+          return {
+            confString: confString,
+            fsConfString: toFSSafe(confString),
+            module: decisionModuleFactories[name].create(params),
+          };
+        } else {
+          throw new Error(`Unknown module "${nameOrPath}".`);
+        }
       }
     )
   );
+
   const overtakingParamsBase = {
-    defaultModule: args["overtaking-default-module"],
     infrastructure,
     log: log("overtaking"),
-    modules: overtakingModules,
   };
 
   if (
@@ -570,7 +644,13 @@ const log = curryLog(
     const lastRunDelayScenario = args["delay-scenario-last"];
 
     if (firstRunDelayScenario === -1 && lastRunDelayScenario === -1) {
-      await doOneRun(log("run"), { overtakingParamsBase, runfiles });
+      for (const { fsConfString, module } of overtakingModules) {
+        await doOneRun(log("run"), {
+          overtakingParamsBase: { ...overtakingParamsBase, module },
+          runSuffix: fsConfString,
+          runfiles,
+        });
+      }
     } else if (
       Number.isInteger(firstRunDelayScenario) &&
       Number.isInteger(lastRunDelayScenario) &&
@@ -583,18 +663,11 @@ const log = curryLog(
         runNumber <= lastRunDelayScenario;
         ++runNumber
       ) {
-        await doOneRun(log("run", "" + runNumber), {
-          overtakingParamsBase,
-          runNumber,
-          runfiles,
-        });
-        if (args["control-runs"]) {
-          await doOneRun(log("run", "control", "" + runNumber), {
-            overtakingParamsBase: {
-              ...overtakingParamsBase,
-              defaultModule: "do-nothing",
-            },
+        for (const { fsConfString, module } of overtakingModules) {
+          await doOneRun(log("run", "" + runNumber), {
+            overtakingParamsBase: { ...overtakingParamsBase, module },
             runNumber,
+            runSuffix: fsConfString,
             runfiles,
           });
         }
@@ -605,6 +678,11 @@ const log = curryLog(
       );
     }
   } else {
+    if (overtakingModules.length > 1) {
+      throw new Error("There can be only one module without --manage-ot.");
+    }
+    const [{ module }] = overtakingModules;
+
     const { otapi } = await prepareForRun(log("preparations"), runfiles);
 
     log.info("Waiting for OpenTrack...");
@@ -617,6 +695,7 @@ const log = curryLog(
     for (;;) {
       const { setup, cleanup } = overtaking({
         ...overtakingParamsBase,
+        module,
         otapi,
       });
       await setup();

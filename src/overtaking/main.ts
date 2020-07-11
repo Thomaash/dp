@@ -7,40 +7,23 @@ import { DecisionModule } from "./api-public";
 import { DecisionModuleAPIFactory, getOvertakingData } from "./api";
 import { TrainOvertaking } from "./train-overtaking";
 
-import { decisionModule as doNothingDM } from "./modules/do-nothing";
-import { decisionModule as maxSpeedDM } from "./modules/max-speed";
-import { decisionModule as timetableGuessDM } from "./modules/timetable-guess";
-
 export interface OvertakingParams {
-  defaultModule: string;
   infrastructure: Infrastructure;
   log: CurryLog;
-  modules: DecisionModule[];
+  module: DecisionModule;
   otapi: OTAPI;
 }
 
 export function overtaking({
-  defaultModule: defaultModuleName,
   infrastructure,
   log,
-  modules: customModules,
+  module,
   otapi,
 }: OvertakingParams): {
   setup: () => Promise<void>;
   cleanup: () => Promise<void>;
 } {
   const cleanupCallbacks: (() => void)[] = [];
-
-  const modules = [doNothingDM, maxSpeedDM, timetableGuessDM, ...customModules];
-
-  const requestedDefaultModule = modules.find(
-    (module): boolean => module.name === defaultModuleName
-  );
-  if (requestedDefaultModule == null) {
-    throw new Error(`There is no decision module named ${defaultModuleName}.`);
-  }
-  const defaultModule: DecisionModule = requestedDefaultModule;
-  log.info(`Default overtaking module: ${defaultModule.name}.`);
 
   const overtakingData = getOvertakingData(infrastructure);
   const { overtakingAreas } = overtakingData;
@@ -82,7 +65,7 @@ export function overtaking({
                     const { api, commit } = decisionModuleAPIFactory.get(
                       overtakingArea
                     );
-                    await defaultModule.newTrainEnteredOvertakingArea(
+                    await module.newTrainEnteredOvertakingArea(
                       api,
                       Object.freeze({
                         entryRoute: route,

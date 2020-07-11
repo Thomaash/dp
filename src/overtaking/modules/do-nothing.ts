@@ -1,6 +1,11 @@
-import { DecisionModule } from "../";
+import { DecisionModule, DecisionModuleFactory } from "../";
 
-export const decisionModule: DecisionModule = {
+export const decisionModuleFactory: DecisionModuleFactory = {
   name: "do-nothing",
-  newTrainEnteredOvertakingArea(): void {},
+  create(): DecisionModule {
+    return {
+      name: "do-nothing",
+      newTrainEnteredOvertakingArea(): void {},
+    };
+  },
 };

@@ -53,7 +53,7 @@ function nOutOf(n: number, total: number): string {
 }
 
 function getModule(path: string): Module {
-  const name = basename(path).replace(/^variant-/, "");
+  const name = basename(path);
   return { name, path };
 }
 
@@ -201,7 +201,9 @@ function checkOtsimcors(
   min: number
 ): boolean {
   return (
-    globbySync(resolve(module.path, `*.${scenario}.otsimcor`)).length >= min
+    globbySync(
+      resolve(module.path.replace(/[{}*?!]/g, "\\$&"), `*.${scenario}.otsimcor`)
+    ).length >= min
   );
 }
 

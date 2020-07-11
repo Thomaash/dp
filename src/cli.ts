@@ -7,16 +7,13 @@ const y = yargs
   .config()
   .help()
 
-  .option("overtaking-modules", {
+  .option("overtaking-module", {
     array: true,
-    describe: "Decision modules for overtaking",
-    required: false,
-    type: "string",
-  })
-  .option("overtaking-default-module", {
-    default: "timetable-guess",
+    default: ["do-nothing"],
     describe:
-      "The decision module that will be used unless specified otherwise",
+      "Decision module for overtaking (can be repeated). " +
+      "Format: `name?args` or `path-with-slash?args`. " +
+      'Where args is a JSON object (e.g. `{ "arg-name": "arg-value" }`).',
     required: false,
     type: "string",
   })
@@ -116,12 +113,6 @@ const y = yargs
     default: -1,
     describe: "The delay scenario to end with (inclusive).",
     type: "number",
-  })
-  .option("control-runs", {
-    default: false,
-    describe:
-      "If enabled runs will be performed with and without decision module (only works with --manage-ot).",
-    type: "boolean",
   })
   .option("pause-after-each-run", {
     default: false,

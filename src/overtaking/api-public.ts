@@ -75,6 +75,11 @@ export interface NewTrainEntedOvertakingAreaParams extends Time {
   overtakingArea: OvertakingArea;
 }
 
+export interface DecisionModuleFactory {
+  name: string;
+  create(params: any): DecisionModule;
+}
+
 export interface DecisionModule {
   name: string;
 
