@@ -11,6 +11,7 @@ interface RunDelays {
   readonly perCategoryDiffs: ReadonlyMap<string, number>;
   readonly perTrainDiffs: ReadonlyMap<string, number>;
 }
+type RunDelayType = keyof RunDelays;
 interface Module {
   readonly name: string;
   readonly path: string;
@@ -30,6 +31,25 @@ interface Result {
 }
 
 const REQUIRED_FILES = ["OT_Timetable.txt"];
+
+const collator = new Intl.Collator(undefined, { numeric: true });
+const cmp = collator.compare.bind(collator);
+const cmpProp = <T extends string | number | symbol>(
+  prop: T
+): ((
+  a: Record<T, string | number>,
+  b: Record<T, string | number>
+) => number) => (a, b): number => collator.compare("" + a[prop], "" + b[prop]);
+
+// TODO: This should be configurable.
+const catIntercity = (trainID: string): string[] =>
+  /^(Ex|R) /.test(trainID) ? ["intercity"] : [];
+const catCommuter = (trainID: string): string[] =>
+  /^(Sp|Os) /.test(trainID) ? ["commuter"] : [];
+const catPassenger = (trainID: string): string[] =>
+  /^(Ex|R|Sp|Os) /.test(trainID) ? ["passenger"] : [];
+const catFreight = (trainID: string): string[] =>
+  /^(Nex|Pn|Mn) /.test(trainID) ? ["freight"] : [];
 
 function shiftRight(input: string): string;
 function shiftRight(input: readonly string[]): string[];
@@ -90,7 +110,7 @@ function getFailedRunSummary(
     `${nOutOf(failedRuns.length, allRuns.length)}:`,
     ...shiftRight(
       [...new Set([...failedRuns.map((run): Module => run.module)])]
-        .sort()
+        .sort(cmpProp("name"))
         .flatMap((module): string[] => {
           const failedModuleRuns = failedRuns.filter(
             (run): boolean => run.module.name === module.name
@@ -138,7 +158,8 @@ function loadResult(outputPath: string): Result {
     .filter((dirent): boolean => dirent.isDirectory())
     .map((dirent): string => dirent.name)
     .map((dirname): string => resolve(outputPath, dirname))
-    .map((path): Module => getModule(path));
+    .map((path): Module => getModule(path))
+    .sort(cmpProp("name"));
 
   modules: for (const module of modules) {
     for (const requiredFile of REQUIRED_FILES) {
@@ -170,13 +191,20 @@ function loadResult(outputPath: string): Result {
       const xxTrainIDs = [...otTimettable.getXXTrainIDs()];
       const xx = xxTrainIDs.length;
       const perCategoryDiffs = otTimettable.getGroupedBeginEndDelayDiffs(
-        (course): [string, string] => ["total", course.split(" ", 1)[0]]
+        (trainID): string[] => [
+          "total",
+          trainID.split(" ", 1)[0],
+          ...catIntercity(trainID),
+          ...catCommuter(trainID),
+          ...catPassenger(trainID),
+          ...catFreight(trainID),
+        ]
       );
       const perTrainDiffs = otTimettable.getBeginEndDelayDiffs();
 
       const run: Run = {
         delays: { perCategoryDiffs, perTrainDiffs },
-        id: `${module}/${scenario}`,
+        id: `${module}#${scenario}`,
         module: module,
         scenario,
         trainIDs,
@@ -207,17 +235,98 @@ function checkOtsimcors(
   );
 }
 
+interface CSVPreparedRowData {
+  scenario: number;
+  runs: Run[];
+}
+
+function secondsToCSVValue(seconds: number): string {
+  // TODO: Minutes, evaluate ideal units/format.
+  return "" + seconds / 60;
+}
+
+function filterRunsForCSV(
+  { runs: allRuns }: Result,
+  requireOtsimcor: number,
+  ignoreScenarios: boolean
+): Run[] {
+  const perModuleRunCounters = new MapCounter<Module>();
+  return (
+    allRuns
+      // Skip runs where not all otsimcors are available or some were deleted.
+      .filter((run): boolean =>
+        checkOtsimcors(run.module, run.scenario, requireOtsimcor)
+      )
+      // Overwrite scenarios if configured.
+      .map(
+        (run): Run => {
+          if (ignoreScenarios) {
+            const counter = perModuleRunCounters.get(run.module);
+            const scenario = counter.get();
+            counter.inc();
+
+            return {
+              ...run,
+              scenario,
+            };
+          } else {
+            return { ...run };
+          }
+        }
+      )
+  );
+}
+
+function prepareDataForCSV(
+  result: Result,
+  requireOtsimcor: number,
+  ignoreScenarios: boolean
+): CSVPreparedRowData[] {
+  const { modules } = result;
+  const filteredRuns = filterRunsForCSV(
+    result,
+    requireOtsimcor,
+    ignoreScenarios
+  );
+
+  return (
+    getScenarios(filteredRuns)
+      // Skip runs where all modules are not (yet) available.
+      .filter((scenario): boolean => {
+        return (
+          new Set(
+            filteredRuns
+              .filter((run): boolean => run.scenario === scenario)
+              .map((run): string => run.module.name)
+          ).size === modules.length
+        );
+      })
+      // Turn runs into raw CSV row data.
+      .map(
+        (scenario): CSVPreparedRowData => {
+          const runs = filteredRuns.filter(
+            (run): boolean => run.scenario === scenario
+          );
+
+          return { runs, scenario };
+        }
+      )
+  );
+}
+
 function buildCSV(
-  { runs: allRuns, modules }: Result,
-  type: "perCategoryDiffs" | "perTrainDiffs",
+  result: Result,
+  type: RunDelayType,
   requireOtsimcor: number,
   ignoreScenarios: boolean
 ): string {
+  const { runs: allRuns, modules } = result;
+
   const diffCategories = [
     ...new Set(
       allRuns.flatMap((run): string[] => [...run.delays[type].keys()])
     ),
-  ].sort();
+  ].sort(cmp);
 
   const modulesAndDiffCategories = modules.flatMap((module): {
     diffCategory: string;
@@ -240,50 +349,11 @@ function buildCSV(
     ]),
   ];
 
-  const perModuleRunCounters = new MapCounter<Module>();
-  const filteredRuns = allRuns
-    // Skip runs where not all otsimcors are available or some were deleted.
-    .filter((run): boolean =>
-      checkOtsimcors(run.module, run.scenario, requireOtsimcor)
-    )
-    // Overwrite scenarios if configured.
-    .map(
-      (run): Run => {
-        if (ignoreScenarios) {
-          const counter = perModuleRunCounters.get(run.module);
-          const scenario = counter.get();
-          counter.inc();
-
-          return {
-            ...run,
-            scenario,
-          };
-        } else {
-          return { ...run };
-        }
-      }
-    );
-
-  const rows = getScenarios(filteredRuns)
-    // Skip runs where all modules are not (yet) available.
-    .filter((scenario): boolean => {
-      return (
-        new Set(
-          filteredRuns
-            .filter((run): boolean => run.scenario === scenario)
-            .map((run): string => run.module.name)
-        ).size === modules.length
-      );
-    })
+  const rows = prepareDataForCSV(result, requireOtsimcor, ignoreScenarios)
     // Turn runs into CSV rows.
     .map(
-      (scenario): Record<string, string> => {
-        const runs = filteredRuns.filter(
-          (run): boolean => run.scenario === scenario
-        );
-
+      ({ runs, scenario }): Record<string, string> => {
         return {
-          scenario: "" + scenario,
           ...modulesAndDiffCategories.reduce<Record<string, string>>(
             (acc, { diffCategory, module }): Record<string, string> => {
               const run = runs.find(
@@ -302,23 +372,96 @@ function buildCSV(
                 );
               }
 
-              // In minutes for now.
-              // TODO: Evaluate ideal units/format.
-              acc[csvHeader(diffCategory, module)] = "" + delay / 60;
+              acc[csvHeader(diffCategory, module)] = secondsToCSVValue(delay);
 
               return acc;
             },
             {}
           ),
+          scenario: "" + scenario,
         };
       }
-    )
-    .map(
-      (row, i): Record<string, string> => ({
-        ...row,
-        scenario: ignoreScenarios ? "" + i : row.scenario,
-      })
     );
+
+  return toCSV(rows, ",", keys);
+}
+
+function computeAverageDelay(
+  runs: readonly Run[],
+  type: RunDelayType,
+  categories: readonly string[]
+): number {
+  const delays = runs.flatMap((run): number[] =>
+    categories.map((diffCategory): number => {
+      const delay = run.delays[type].get(diffCategory);
+      if (delay == null) {
+        throw new Error(`Can't find "${diffCategory}" delays in "${run.id}".`);
+      }
+
+      return delay;
+    })
+  );
+
+  return (
+    delays.reduce<number>((acc, delay): number => {
+      return acc + delay;
+    }, 0) / delays.length
+  );
+}
+
+function buildAvgCSV(
+  result: Result,
+  type: RunDelayType,
+  requireOtsimcor: number,
+  ignoreScenarios: boolean
+): string {
+  const { runs: allRuns, modules } = result;
+
+  const diffCategories = [
+    ...new Set(
+      allRuns.flatMap((run): string[] => [...run.delays[type].keys()])
+    ),
+  ].sort(cmp);
+
+  const keys = [
+    "module",
+    ...diffCategories.filter(
+      (diffCategory): boolean => diffCategory !== "total"
+    ),
+    "total",
+  ];
+
+  const filteredRuns = filterRunsForCSV(
+    result,
+    requireOtsimcor,
+    ignoreScenarios
+  );
+
+  // Turn runs into CSV rows.
+  const rows = modules.map(
+    (module): Record<string, string> => {
+      const runs = filteredRuns.filter(
+        (run): boolean => run.module.name === module.name
+      );
+
+      return {
+        ...diffCategories.reduce<Record<string, string>>(
+          (acc, diffCategory): Record<string, string> => {
+            acc[diffCategory] = secondsToCSVValue(
+              computeAverageDelay(runs, type, [diffCategory])
+            );
+
+            return acc;
+          },
+          {}
+        ),
+        module: module.name,
+        total: secondsToCSVValue(
+          computeAverageDelay(runs, type, diffCategories)
+        ),
+      };
+    }
+  );
 
   return toCSV(rows, ",", keys);
 }
@@ -361,10 +504,16 @@ export function processOutputs({
   }
 
   for (const type of ["perCategoryDiffs", "perTrainDiffs"] as const) {
-    const csv = buildCSV(result, type, requireOtsimcor, ignoreScenarios);
+    const dataCSV = buildCSV(result, type, requireOtsimcor, ignoreScenarios);
     writeFileSync(
       resolve(outputPath, `${basename(outputPath)}.delays.${type}.csv`),
-      csv
+      dataCSV
+    );
+
+    const avgCSV = buildAvgCSV(result, type, requireOtsimcor, ignoreScenarios);
+    writeFileSync(
+      resolve(outputPath, `${basename(outputPath)}.avg.${type}.csv`),
+      avgCSV
     );
   }
 
