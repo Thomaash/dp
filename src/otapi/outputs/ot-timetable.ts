@@ -79,6 +79,17 @@ function normalizeDelayDiffS(s: number): number {
   return Math.max(s, 0);
 }
 
+/**
+ * Turn train id into a list of categories.
+ *
+ * @param course - The id of the train (course).
+ *
+ * @returns A list of categories given train belongs to.
+ */
+export type GroupingReduce<GroupName> = (
+  course: string
+) => readonly GroupName[];
+
 export class OTTimetable extends CSV<OTTimetableRecord, HeaderKey> {
   public constructor(input: string | readonly OTTimetableRecord[]) {
     if (typeof input === "string") {
@@ -203,7 +214,7 @@ export class OTTimetable extends CSV<OTTimetableRecord, HeaderKey> {
   }
 
   public getGroupedBeginEndDelayDiffs<GroupName>(
-    groupingReduce: (course: string) => GroupName[],
+    groupingReduce: (course: string) => readonly GroupName[],
     query: Partial<OTTimetableRecord> = {}
   ): Map<GroupName, number> {
     const perGroupDiffs = [...this.getBeginEndDelayDiffs(query)].reduce<

@@ -5,7 +5,7 @@ import { basename, resolve } from "path";
 import { sync as globbySync } from "globby";
 import { cumsum, mean, normalci } from "jstat";
 
-import { OTTimetable } from "./ot-timetable";
+import { GroupingReduce, OTTimetable } from "./ot-timetable";
 import { MapCounter } from "../../util";
 
 interface RunDelays {
@@ -46,16 +46,6 @@ const cmpProp = <T extends string | number | symbol>(
   a: Record<T, string | number>,
   b: Record<T, string | number>
 ) => number) => (a, b): number => collator.compare("" + a[prop], "" + b[prop]);
-
-// TODO: This should be configurable.
-const catIntercity = (trainID: string): string[] =>
-  /^(Ex|R) /.test(trainID) ? ["intercity"] : [];
-const catCommuter = (trainID: string): string[] =>
-  /^(Sp|Os) /.test(trainID) ? ["commuter"] : [];
-const catPassenger = (trainID: string): string[] =>
-  /^(Ex|R|Sp|Os) /.test(trainID) ? ["passenger"] : [];
-const catFreight = (trainID: string): string[] =>
-  /^(Nex|Pn|Mn) /.test(trainID) ? ["freight"] : [];
 
 function shiftRight(input: string): string;
 function shiftRight(input: readonly string[]): string[];
@@ -157,7 +147,10 @@ function getNumberOfRuns(runs: readonly Run[]): number {
   return new Set<string>(runs.map((run): string => run.id)).size;
 }
 
-function loadResult(outputPath: string): Result {
+function loadResult<GroupName extends string>(
+  outputPath: string,
+  getCategoriesForTrain: GroupingReduce<GroupName>
+): Result {
   const runs: Run[] = [];
 
   const modules = readdirSync(outputPath, { withFileTypes: true })
@@ -197,14 +190,7 @@ function loadResult(outputPath: string): Result {
       const xxTrainIDs = [...otTimettable.getXXTrainIDs()];
       const xx = xxTrainIDs.length;
       const perCategoryDiffs = otTimettable.getGroupedBeginEndDelayDiffs(
-        (trainID): string[] => [
-          "total",
-          trainID.split(" ", 1)[0],
-          ...catIntercity(trainID),
-          ...catCommuter(trainID),
-          ...catPassenger(trainID),
-          ...catFreight(trainID),
-        ]
+        getCategoriesForTrain
       );
       const perTrainDiffs = otTimettable.getBeginEndDelayDiffs();
 
@@ -592,12 +578,14 @@ function buildAvgCSV(
   return toCSV(rows, ",", keys);
 }
 
-export function processOutputs({
+export function processOutputs<GroupName extends string = string>({
+  getCategoriesForTrain,
   ignoreScenarios,
   outputPath,
   requireOtsimcor,
   skipXX,
 }: {
+  getCategoriesForTrain: GroupingReduce<GroupName>;
   ignoreScenarios: boolean;
   outputPath: string;
   requireOtsimcor: number;
@@ -605,7 +593,7 @@ export function processOutputs({
 }): string {
   const lines: string[] = [];
 
-  const result = loadResult(outputPath);
+  const result = loadResult(outputPath, getCategoriesForTrain);
   lines.push("");
 
   if (result.runs.length >= 2) {
