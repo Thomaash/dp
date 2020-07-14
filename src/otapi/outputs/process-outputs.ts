@@ -444,7 +444,7 @@ function buildCICSV(
   const { cats, modCats } = getModCats(allRuns, modules, type);
 
   const keys = [
-    "scenario",
+    "scenarios",
     ...modules.flatMap((module): string[] => [
       ...cats
         .filter((diffCategory): boolean => diffCategory !== "total")
@@ -463,7 +463,8 @@ function buildCICSV(
   )
     // Turn runs into CSV rows.
     .map(({ scenario }, index, array): null | Record<string, string> => {
-      if (index < 2) {
+      const scenarios = index + 1;
+      if (scenarios < 3) {
         return null;
       }
 
@@ -501,11 +502,11 @@ function buildCICSV(
           },
           {}
         ),
-        scenario: "" + scenario,
+        scenarios: "" + scenarios,
       };
     })
-    // CI requires at least two values to be computed so the first one will be
-    // null and should be omitted.
+    // CI requires at least 3 values (1 to check against 2 other sample) to be
+    // computed so the first one will be null and should be omitted.
     .filter((value): value is Record<string, string> => value != null);
 
   return toCSV(rows, ",", keys);
