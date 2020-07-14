@@ -210,8 +210,8 @@ function loadResult(outputPath: string): Result {
 
       const run: Run = {
         delays: { perCategoryDiffs, perTrainDiffs },
-        id: `${module}#${scenario}`,
-        module: module,
+        id: `${module.name}#${scenario}`,
+        module,
         scenario,
         trainIDs,
         xx,
