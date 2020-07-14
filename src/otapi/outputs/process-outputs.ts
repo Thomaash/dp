@@ -619,7 +619,10 @@ export function processOutputs<GroupName extends string = string>({
     lines.push("Some trains never reached some stations: " + xx);
   }
 
-  for (const type of ["perCategoryDiffs", "perTrainDiffs"] as const) {
+  for (const [type, typeFilenamePart] of [
+    ["perCategoryDiffs", "categories"],
+    ["perTrainDiffs", "trains"],
+  ] as const) {
     const dataCSV = buildCSV(
       result,
       type,
@@ -628,7 +631,10 @@ export function processOutputs<GroupName extends string = string>({
       skipXX
     );
     writeFileSync(
-      resolve(outputPath, `${basename(outputPath)}.delays.${type}.csv`),
+      resolve(
+        outputPath,
+        `${basename(outputPath)}.data.${typeFilenamePart}.csv`
+      ),
       dataCSV
     );
 
@@ -640,7 +646,7 @@ export function processOutputs<GroupName extends string = string>({
       skipXX
     );
     writeFileSync(
-      resolve(outputPath, `${basename(outputPath)}.ci.${type}.csv`),
+      resolve(outputPath, `${basename(outputPath)}.ci.${typeFilenamePart}.csv`),
       ciCSV
     );
 
@@ -652,7 +658,10 @@ export function processOutputs<GroupName extends string = string>({
       skipXX
     );
     writeFileSync(
-      resolve(outputPath, `${basename(outputPath)}.avg.${type}.csv`),
+      resolve(
+        outputPath,
+        `${basename(outputPath)}.avg.${typeFilenamePart}.csv`
+      ),
       avgCSV
     );
   }
