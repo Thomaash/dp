@@ -9,7 +9,7 @@ import { GroupingReduce, OTTimetable } from "./ot-timetable";
 import { MapCounter } from "../../util";
 
 interface RunDelays {
-  readonly perCategoryDiffs: ReadonlyMap<string, number>;
+  readonly perGroupDiffs: ReadonlyMap<string, number>;
   readonly perTrainDiffs: ReadonlyMap<string, number>;
 }
 type RunDelayType = keyof RunDelays;
@@ -149,7 +149,7 @@ function getNumberOfRuns(runs: readonly Run[]): number {
 
 function loadResult<GroupName extends string>(
   outputPath: string,
-  getCategoriesForTrain: GroupingReduce<GroupName>
+  getGroupsForTrain: GroupingReduce<GroupName>
 ): Result {
   const runs: Run[] = [];
 
@@ -189,13 +189,13 @@ function loadResult<GroupName extends string>(
 
       const xxTrainIDs = [...otTimettable.getXXTrainIDs()];
       const xx = xxTrainIDs.length;
-      const perCategoryDiffs = otTimettable.getGroupedBeginEndDelayDiffs(
-        getCategoriesForTrain
+      const perGroupDiffs = otTimettable.getGroupedBeginEndDelayDiffs(
+        getGroupsForTrain
       );
       const perTrainDiffs = otTimettable.getBeginEndDelayDiffs();
 
       const run: Run = {
-        delays: { perCategoryDiffs, perTrainDiffs },
+        delays: { perGroupDiffs, perTrainDiffs },
         id: `${module.name}#${scenario}`,
         module,
         scenario,
@@ -325,7 +325,7 @@ function getDelay(
   module: Module,
   type: RunDelayType,
   scenario: number,
-  diffCategory: string
+  diffGroup: string
 ): number {
   const run = runs.filter((run): boolean => run.module.name === module.name);
   if (run.length < 1) {
@@ -337,9 +337,9 @@ function getDelay(
     );
   }
 
-  const delay = run[0].delays[type].get(diffCategory);
+  const delay = run[0].delays[type].get(diffGroup);
   if (delay == null) {
-    throw new Error(`Can't find "${diffCategory}" delays in "${run[0].id}".`);
+    throw new Error(`Can't find "${diffGroup}" delays in "${run[0].id}".`);
   }
 
   return delay;
@@ -354,16 +354,13 @@ function buildCSV(
 ): string {
   const { runs: allRuns, modules } = result;
 
-  const { cats, modCats } = getModCats(allRuns, modules, type);
+  const { groups, modGroups } = getModGroups(allRuns, modules, type);
 
   const keys = [
     "scenario",
     ...modules.flatMap((module): string[] => [
       "",
-      ...cats
-        .filter((diffCategory): boolean => diffCategory !== "total")
-        .map((diffCategory): string => csvHeader(diffCategory, module)),
-      csvHeader("total", module),
+      ...groups.map((diffGroup): string => csvHeader(diffGroup, module)),
     ]),
   ];
 
@@ -377,10 +374,10 @@ function buildCSV(
     .map(
       ({ runs, scenario }): Record<string, string> => {
         return {
-          ...modCats.reduce<Record<string, string>>(
-            (acc, { diffCategory, module }): Record<string, string> => {
-              acc[csvHeader(diffCategory, module)] = secondsToCSVValue(
-                getDelay(runs, module, type, scenario, diffCategory)
+          ...modGroups.reduce<Record<string, string>>(
+            (acc, { diffGroup, module }): Record<string, string> => {
+              acc[csvHeader(diffGroup, module)] = secondsToCSVValue(
+                getDelay(runs, module, type, scenario, diffGroup)
               );
 
               return acc;
@@ -395,27 +392,27 @@ function buildCSV(
   return toCSV(rows, ",", keys);
 }
 
-interface ModCat {
-  diffCategory: string;
+interface ModGroup {
+  diffGroup: string;
   module: Module;
 }
-function getModCats(
+function getModGroups(
   runs: readonly Run[],
   modules: readonly Module[],
   type: RunDelayType
-): { cats: string[]; modCats: ModCat[] } {
-  const cats = [
+): { groups: string[]; modGroups: ModGroup[] } {
+  const groups = [
     ...new Set(runs.flatMap((run): string[] => [...run.delays[type].keys()])),
   ].sort(cmp);
 
-  const modCats = modules.flatMap((module): ModCat[] =>
-    cats.map((diffCategory): {
-      diffCategory: string;
+  const modGroups = modules.flatMap((module): ModGroup[] =>
+    groups.map((diffGroup): {
+      diffGroup: string;
       module: Module;
-    } => ({ diffCategory, module }))
+    } => ({ diffGroup, module }))
   );
 
-  return { cats, modCats };
+  return { groups, modGroups };
 }
 
 function buildCICSV(
@@ -427,17 +424,14 @@ function buildCICSV(
 ): string {
   const { runs: allRuns, modules } = result;
 
-  const { cats, modCats } = getModCats(allRuns, modules, type);
+  const { groups, modGroups } = getModGroups(allRuns, modules, type);
 
   const keys = [
     "scenarios",
     ...modules.flatMap((module): string[] => [
-      ...cats
-        .filter((diffCategory): boolean => diffCategory !== "total")
-        .flatMap((diffCategory): string[] =>
-          csvHeaders(diffCategory, module, [HEADER_CIM, HEADER_CMA, HEADER_CIP])
-        ),
-      ...csvHeaders("total", module, [HEADER_CIM, HEADER_CMA, HEADER_CIP]),
+      ...groups.flatMap((diffGroup): string[] =>
+        csvHeaders(diffGroup, module, [HEADER_CIM, HEADER_CMA, HEADER_CIP])
+      ),
     ]),
   ];
 
@@ -455,34 +449,34 @@ function buildCICSV(
       }
 
       return {
-        ...modCats.reduce<Record<string, string>>(
-          (acc, { diffCategory, module }): Record<string, string> => {
+        ...modGroups.reduce<Record<string, string>>(
+          (acc, { diffGroup, module }): Record<string, string> => {
             const delayCMAs = cumsum(
               array
                 .slice(0, index + 1)
                 .map(({ runs }): number =>
-                  getDelay(runs, module, type, scenario, diffCategory)
+                  getDelay(runs, module, type, scenario, diffGroup)
                 )
             ).map(
               (cumulativeDelaySum, index): number =>
                 cumulativeDelaySum / (index + 1)
             );
 
-            acc[
-              csvHeader(diffCategory, module, HEADER_CMA)
-            ] = secondsToCSVValue(delayCMAs[delayCMAs.length - 1]);
+            acc[csvHeader(diffGroup, module, HEADER_CMA)] = secondsToCSVValue(
+              delayCMAs[delayCMAs.length - 1]
+            );
 
             const [low, high] = normalci(
               delayCMAs[delayCMAs.length - 1],
               ALPHA,
               delayCMAs.slice(0, -1)
             );
-            acc[
-              csvHeader(diffCategory, module, HEADER_CIP)
-            ] = secondsToCSVValue(high);
-            acc[
-              csvHeader(diffCategory, module, HEADER_CIM)
-            ] = secondsToCSVValue(low);
+            acc[csvHeader(diffGroup, module, HEADER_CIP)] = secondsToCSVValue(
+              high
+            );
+            acc[csvHeader(diffGroup, module, HEADER_CIM)] = secondsToCSVValue(
+              low
+            );
 
             return acc;
           },
@@ -501,16 +495,14 @@ function buildCICSV(
 function computeAverageDelay(
   runs: readonly Run[],
   type: RunDelayType,
-  categories: readonly string[]
+  groups: readonly string[]
 ): number {
   return mean(
     runs.flatMap((run): number[] =>
-      categories.map((diffCategory): number => {
-        const delay = run.delays[type].get(diffCategory);
+      groups.map((diffGroup): number => {
+        const delay = run.delays[type].get(diffGroup);
         if (delay == null) {
-          throw new Error(
-            `Can't find "${diffCategory}" delays in "${run.id}".`
-          );
+          throw new Error(`Can't find "${diffGroup}" delays in "${run.id}".`);
         }
 
         return delay;
@@ -528,19 +520,13 @@ function buildAvgCSV(
 ): string {
   const { runs: allRuns, modules } = result;
 
-  const diffCategories = [
+  const diffGroups = [
     ...new Set(
       allRuns.flatMap((run): string[] => [...run.delays[type].keys()])
     ),
   ].sort(cmp);
 
-  const keys = [
-    "module",
-    ...diffCategories.filter(
-      (diffCategory): boolean => diffCategory !== "total"
-    ),
-    "total",
-  ];
+  const keys = ["module", ...diffGroups];
 
   const filteredRuns = filterRunsForCSV(
     result,
@@ -557,20 +543,17 @@ function buildAvgCSV(
       );
 
       return {
-        ...diffCategories.reduce<Record<string, string>>(
-          (acc, diffCategory): Record<string, string> => {
-            acc[diffCategory] = secondsToCSVValue(
-              computeAverageDelay(runs, type, [diffCategory])
-            );
+        ...diffGroups.reduce<Record<string, string>>((acc, diffGroup): Record<
+          string,
+          string
+        > => {
+          acc[diffGroup] = secondsToCSVValue(
+            computeAverageDelay(runs, type, [diffGroup])
+          );
 
-            return acc;
-          },
-          {}
-        ),
+          return acc;
+        }, {}),
         module: module.name,
-        total: secondsToCSVValue(
-          computeAverageDelay(runs, type, diffCategories)
-        ),
       };
     }
   );
@@ -579,13 +562,13 @@ function buildAvgCSV(
 }
 
 export function processOutputs<GroupName extends string = string>({
-  getCategoriesForTrain,
+  getGroupsForTrain,
   ignoreScenarios,
   outputPath,
   requireOtsimcor,
   skipXX,
 }: {
-  getCategoriesForTrain: GroupingReduce<GroupName>;
+  getGroupsForTrain: GroupingReduce<GroupName>;
   ignoreScenarios: boolean;
   outputPath: string;
   requireOtsimcor: number;
@@ -593,7 +576,7 @@ export function processOutputs<GroupName extends string = string>({
 }): string {
   const lines: string[] = [];
 
-  const result = loadResult(outputPath, getCategoriesForTrain);
+  const result = loadResult(outputPath, getGroupsForTrain);
   lines.push("");
 
   if (result.runs.length >= 2) {
@@ -620,7 +603,7 @@ export function processOutputs<GroupName extends string = string>({
   }
 
   for (const [type, typeFilenamePart] of [
-    ["perCategoryDiffs", "categories"],
+    ["perGroupDiffs", "groups"],
     ["perTrainDiffs", "trains"],
   ] as const) {
     const dataCSV = buildCSV(
