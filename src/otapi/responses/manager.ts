@@ -66,7 +66,7 @@ export class ResponseManager {
   ) {}
 
   public async start(): Promise<void> {
-    return new Promise((resolve, reject): void => {
+    return new Promise((resolve): void => {
       const app = express();
 
       app.use(
@@ -103,7 +103,7 @@ export class ResponseManager {
 
       this._server = app.listen(
         this._config.portApp,
-        (error): void => void (error ? reject(error) : resolve())
+        (): void => void resolve()
       );
 
       this._server.keepAliveTimeout = 125 * 1000;
