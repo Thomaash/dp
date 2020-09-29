@@ -57,12 +57,19 @@ export class PopulationCompetition {
     statements: Statement[],
     fitness: ReadonlyFitMap = this.evaluateAll(statements)
   ): Statement[] {
-    return statements.sort(
-      (a, b): number =>
-        (fitness.get(a)?.fit ?? Number.NEGATIVE_INFINITY) -
-          (fitness.get(b)?.fit ?? Number.NEGATIVE_INFINITY) ||
-        (fitness.get(a)?.penalty ?? Number.NEGATIVE_INFINITY) -
-          (fitness.get(b)?.penalty ?? Number.NEGATIVE_INFINITY)
-    );
+    return statements.sort((a, b): number => {
+      const aStats = fitness.get(a);
+      if (aStats == null) {
+        throw new Error("Missing stats.");
+      }
+
+      const bStats = fitness.get(b);
+      if (bStats == null) {
+        throw new Error("Missing stats.");
+      }
+
+      return aStats.combined - bStats.combined;
+      // return aStats.fit - bStats.fit || aStats.penalty - bStats.penalty;
+    });
   }
 }

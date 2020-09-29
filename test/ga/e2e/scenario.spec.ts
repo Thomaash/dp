@@ -98,12 +98,8 @@ describe.skip("E2E scenario 1", function (): void {
       while (nextGeneration.length < sorted.length - 2) {
         nextGeneration.push(
           ...crossover.subtree(
-            sorted.find(
-              (_, i): boolean => i > rng.double() ** 2 * sorted.length
-            ),
-            sorted.find(
-              (_, i): boolean => i > rng.double() ** 2 * sorted.length
-            )
+            sorted[Math.floor(rng.double() ** 10 * sorted.length)],
+            sorted[Math.floor(rng.double() ** 10 * sorted.length)]
           )
         );
       }
