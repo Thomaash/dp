@@ -183,7 +183,7 @@ export const integerConstant = createTerminalFactory(
 export const input = createTerminalFactory(
   "Input",
   (rng: Rng): string =>
-    `arguments[Math.floor(arguments.length * ${rng()})] || 0`
+    `arguments[Math.floor(arguments.length * ${rng()})] ?? 0`
 );
 export const smallIntegerConstant = createTerminalFactory(
   "Small Integer Constant",
