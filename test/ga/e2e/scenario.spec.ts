@@ -15,7 +15,7 @@ import {
   statements,
 } from "../../../src/ga";
 
-// TODO: This should be exproted from ga.
+// TODO: This should be exported from GA.
 function regenerateDuplicates(
   population: readonly Statement[],
   generate: () => Statement
@@ -38,10 +38,12 @@ describe.skip("E2E scenario 1", function (): void {
   for (const noise of [0, 0.05, 0.1, 0.2]) {
     it(`Noise ${noise}%`, function (): void {
       const rng = xor4096("TEST");
-      const numbers = new Array(1000).fill(null).map((): [[number], number] => {
+      const numbers = new Array(10000).fill(null).map((): [
+        [number],
+        number
+      ] => {
         const x = (rng.double() - 0.5) * 2000;
-        const result =
-          (Math.pow(x, 2) + x) * (1 + (rng.double() - 0.5) * 2 * noise);
+        const result = (x ** 2 + x) * (1 + (rng.double() - 0.5) * 2 * noise);
 
         return [[x], result];
       });
@@ -95,7 +97,7 @@ describe.skip("E2E scenario 1", function (): void {
 
       // console.log(getSummary());
 
-      for (let i = 0; i < 50; ++i) {
+      for (let i = 0; i < 80; ++i) {
         const fitness = competition.evaluateAll(population);
         const sorted = competition.allVsAll(population, fitness);
 
