@@ -72,18 +72,17 @@ function createOperatorFactory<Args extends PositiveInteger>(
       1 +
       operands.reduce<number>((acc, operand): number => acc + operand.size, 0);
 
-    let cachedPrettyCode: string | null = null;
     let cachedRun: StatementRun | null = null;
 
     return Object.freeze<Operator<Args>>({
       get prettyCode(): string {
-        return cachedPrettyCode ?? (cachedPrettyCode = formatStatement(code));
+        return formatStatement(code);
       },
       get run(): (...args: any[]) => any {
         return (
           cachedRun ??
           (cachedRun = new Function(
-            `"use strict"; return (${code});`
+            `"use strict";return(${code})`
           ) as StatementRun)
         );
       },

@@ -1,5 +1,4 @@
-import { Rng, Statement } from "../language";
-import { xor4096 } from "seedrandom";
+import { Statement } from "../language";
 
 export type FitFunction = (statement: Statement) => number;
 export interface FitStats {
@@ -11,14 +10,13 @@ export type FitMap = Map<Statement, FitStats>;
 export type ReadonlyFitMap = ReadonlyMap<Statement, FitStats>;
 
 export const codeLengthPenalty = (strength = 0.0001): FitFunction => {
-  return (statement): number => 1 + statement.code.length * strength;
+  return (statement): number => 1 + statement.code.length ** 2 * strength;
 };
 export const heightPenalty = (strength = 0.0001): FitFunction => {
-  return (statement): number => 1 + statement.heightMax * strength;
+  return (statement): number => 1 + statement.heightMax ** 2 * strength;
 };
 
 export class PopulationCompetition {
-  private readonly _rng: Rng;
   private readonly _penalties: FitFunction[];
 
   public constructor(
@@ -26,7 +24,6 @@ export class PopulationCompetition {
     private readonly _fit: FitFunction,
     ...penalties: FitFunction[]
   ) {
-    this._rng = xor4096(seed);
     this._penalties = penalties;
   }
 
@@ -68,8 +65,11 @@ export class PopulationCompetition {
         throw new Error("Missing stats.");
       }
 
-      return aStats.combined - bStats.combined;
-      // return aStats.fit - bStats.fit || aStats.penalty - bStats.penalty;
+      return (
+        aStats.combined - bStats.combined ||
+        aStats.fit - bStats.fit ||
+        aStats.penalty - bStats.penalty
+      );
     });
   }
 }

@@ -396,7 +396,7 @@ describe("Population", function (): void {
       const ordered = pc
         .allVsAll([o4, o3, o2, o1, c3, c2, c1])
         .map(prop("prettyCode"));
-      const expected = [c3, o2, c2, o3, c1, o4, o1].map(prop("prettyCode"));
+      const expected = [c3, c2, o2, c1, o3, o4, o1].map(prop("prettyCode"));
 
       expect(ordered).to.deep.equal(expected);
     });
