@@ -1,28 +1,32 @@
 import { xor4096 } from "seedrandom";
-import { Statement, isOperator } from "../language";
+import { InputConfig, Statement, isOperator } from "../language";
 
-export type MutateSpecimen = (original: Statement) => Statement;
+export type MutateSpecimen<Inputs extends InputConfig> = (
+  original: Statement<Inputs>
+) => Statement<Inputs>;
 
-export type MutateSpecimenFactory = (
+export type MutateSpecimenFactory<Inputs extends InputConfig> = (
   seed: string,
   chance: number,
-  generate: () => Statement
-) => MutateSpecimen;
+  generate: () => Statement<Inputs>
+) => MutateSpecimen<Inputs>;
 
-export function createSimplePopulationMutator(
+export function createSimplePopulationMutator<Inputs extends InputConfig>(
   seed: string,
   chance: number,
-  generate: () => Statement
-): MutateSpecimen {
+  generate: () => Statement<Inputs>
+): MutateSpecimen<Inputs> {
   const rng = xor4096(seed);
 
-  return function simplePopulationMutate(original: Statement): Statement {
+  return function simplePopulationMutate(
+    original: Statement<Inputs>
+  ): Statement<Inputs> {
     if (rng() < chance) {
       return generate();
     } else if (isOperator(original)) {
       return original.create(
         original.createOperandtuple(
-          (_value, i): Statement => {
+          (_value, i): Statement<Inputs> => {
             return simplePopulationMutate(original.operands[i]);
           }
         )

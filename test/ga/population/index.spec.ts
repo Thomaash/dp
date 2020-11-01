@@ -2,17 +2,17 @@ import { expect } from "chai";
 
 import {
   Statement,
-  bipolarConstant,
-  divide,
-  floor,
-  ifElse,
-  integerConstant,
-  minus,
-  not,
-  plus,
-  power,
-  smallIntegerConstant,
-  times,
+  createBipolarConstant,
+  createDivide,
+  createFloor,
+  createIfElse,
+  createIntegerConstant,
+  createMinus,
+  createNot,
+  createPlus,
+  createPower,
+  createSmallIntegerConstant,
+  createTimes,
 } from "../../../src/ga/language";
 import {
   PopulationCompetition,
@@ -25,11 +25,25 @@ import {
 import { deepFreeze } from "../../../src/util/deep-freeze";
 import { createRng, prop, testCommon } from "../util";
 
+interface Inputs {}
+
+const bipolarConstant = createBipolarConstant({});
+const divide = createDivide({});
+const floor = createFloor({});
+const ifElse = createIfElse({});
+const integerConstant = createIntegerConstant({});
+const minus = createMinus({});
+const not = createNot({});
+const plus = createPlus({});
+const power = createPower({});
+const smallIntegerConstant = createSmallIntegerConstant({});
+const times = createTimes({});
+
 const create = (
   seed = 0
 ): Record<
   "c1" | "c2" | "c3" | "c4" | "c5" | "p1c1c2" | "p2c3c4" | "m1p1p2",
-  Statement
+  Statement<Inputs>
 > => {
   const rng = createRng(seed);
 
@@ -226,7 +240,7 @@ describe("Population", function (): void {
           const mutate = createSimplePopulationMutator(
             "TEST",
             chance,
-            (): Statement => c5
+            (): Statement<Inputs> => c5
           );
 
           const original = m1p1p2;
@@ -273,7 +287,7 @@ describe("Population", function (): void {
     it("Simple", function (): void {
       this.timeout(4000);
 
-      const ancestorA = ((): Statement => {
+      const ancestorA = ((): Statement<Inputs> => {
         const rng = createRng(0);
 
         const c1 = integerConstant.create(rng);
@@ -291,7 +305,7 @@ describe("Population", function (): void {
         return minus.create([o3, o4]);
       })();
 
-      const ancestorB = ((): Statement => {
+      const ancestorB = ((): Statement<Inputs> => {
         const rng = createRng(0);
 
         const c1 = integerConstant.create(rng);
@@ -366,7 +380,7 @@ describe("Population", function (): void {
 
       const pc = new PopulationCompetition(
         "TEST",
-        (statement): number => 100 - statement.run(),
+        (statement): number => 100 - statement.run({}),
         codeLengthPenalty(),
         heightPenalty()
       );

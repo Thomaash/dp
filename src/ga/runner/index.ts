@@ -1,5 +1,7 @@
 import {
   FitStats,
+  InputConfig,
+  InputConfigJS,
   MutateSpecimen,
   PopulationCompetition,
   PopulationCrossover,
@@ -8,19 +10,19 @@ import {
   Statement,
   StatementFactory,
   codeLengthPenalty,
+  createInput,
   createSimplePopulationMutator,
+  createStatements,
   heightPenalty,
-  input,
-  statements,
 } from "../../../src/ga";
 
 // TODO: This should be exported from GA.
-function regenerateDuplicates(
-  population: readonly Statement[],
-  generate: () => Statement
-): Statement[] {
-  const map = new Map<string, Statement>(
-    population.map((statement): [string, Statement] => [
+function regenerateDuplicates<Inputs extends InputConfig>(
+  population: readonly Statement<Inputs>[],
+  generate: () => Statement<Inputs>
+): Statement<Inputs>[] {
+  const map = new Map<string, Statement<Inputs>>(
+    population.map((statement): [string, Statement<Inputs>] => [
       statement.code,
       statement,
     ])
@@ -32,35 +34,41 @@ function regenerateDuplicates(
   return unique;
 }
 
-export interface RunSummarySpecimen {
-  specimen: Statement;
+export interface RunSummarySpecimen<Inputs extends InputConfig> {
+  specimen: Statement<Inputs>;
   fit: FitStats;
 }
-export interface RunSummary {
+export interface RunSummary<Inputs extends InputConfig> {
   number: number;
-  specimens: readonly RunSummarySpecimen[];
+  specimens: readonly RunSummarySpecimen<Inputs>[];
 }
 
-export class GARunner<Inputs extends readonly any[], Result extends any> {
-  public lastRun: RunSummary | null = null;
+export class GARunner<Inputs extends InputConfig, Result extends any> {
+  public lastRun: RunSummary<Inputs> | null = null;
 
-  private _competition: PopulationCompetition;
-  private _crossover: PopulationCrossover;
-  private _generator: PopulationGenerator;
-  private _mutate: MutateSpecimen;
-  private _population: Statement[];
+  private _competition: PopulationCompetition<Inputs>;
+  private _crossover: PopulationCrossover<Inputs>;
+  private _generator: PopulationGenerator<Inputs>;
+  private _mutate: MutateSpecimen<Inputs>;
+  private _population: Statement<Inputs>[];
 
   public constructor(
+    inputs: InputConfigJS<Inputs>,
     private readonly _rng: Rng,
-    private readonly _data: readonly Inputs[],
+    data: readonly Inputs[],
     private readonly _fit: (inputs: Inputs, result: Result) => number,
-    private readonly _saveRun: (runSummary: RunSummary) => void = (): void => {}
+    private readonly _saveRun: (
+      runSummary: RunSummary<Inputs>
+    ) => void = (): void => {}
   ) {
+    const statements = createStatements(inputs);
+    const input = createInput(inputs);
+
     this._generator = new PopulationGenerator("TEST", [
       ...statements,
       ...new Array(statements.length)
         .fill(null)
-        .map((): StatementFactory => input),
+        .map((): StatementFactory<Inputs> => input),
     ]);
     this._mutate = createSimplePopulationMutator(
       "TEST",
@@ -70,11 +78,11 @@ export class GARunner<Inputs extends readonly any[], Result extends any> {
     this._competition = new PopulationCompetition(
       "TEST",
       (statement): number =>
-        this._data.reduce<number>(
+        data.reduce<number>(
           (acc, inputs): number =>
-            acc + this._fit(inputs, statement.run(...inputs)),
+            acc + this._fit(inputs, statement.run(inputs)),
           0
-        ) / this._data.length,
+        ) / data.length,
       codeLengthPenalty(),
       heightPenalty()
     );
@@ -82,18 +90,18 @@ export class GARunner<Inputs extends readonly any[], Result extends any> {
 
     this._population = new Array(100)
       .fill(null)
-      .map((): Statement => this._generator.halfAndHalf(12));
+      .map((): Statement<Inputs> => this._generator.halfAndHalf(12));
   }
 
   public run(): void {
     const fitness = this._competition.evaluateAll(this._population);
     const sorted = this._competition.allVsAll(this._population, fitness);
 
-    this.lastRun = Object.freeze<RunSummary>({
+    this.lastRun = Object.freeze<RunSummary<Inputs>>({
       number: this.lastRun != null ? this.lastRun.number + 1 : 1,
       specimens: sorted.map(
-        (specimen): RunSummarySpecimen =>
-          Object.freeze<RunSummarySpecimen>({
+        (specimen): RunSummarySpecimen<Inputs> =>
+          Object.freeze<RunSummarySpecimen<Inputs>>({
             specimen,
             fit: Object.freeze<FitStats>(fitness.get(specimen)!),
           })
@@ -115,7 +123,7 @@ export class GARunner<Inputs extends readonly any[], Result extends any> {
 
     this._population = regenerateDuplicates(
       [...sorted.slice(0, 2), ...nextGeneration],
-      (): Statement => this._generator.halfAndHalf(12)
+      (): Statement<Inputs> => this._generator.halfAndHalf(12)
     );
   }
 }

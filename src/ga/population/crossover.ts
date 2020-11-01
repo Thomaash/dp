@@ -1,13 +1,17 @@
-import { Rng, Statement, Tuple, isOperator } from "../language";
+import { InputConfig, Rng, Statement, Tuple, isOperator } from "../language";
 import { xor4096 } from "seedrandom";
 
-function getAllStatements(root: Statement): Statement[] {
+function getAllStatements<Inputs extends InputConfig>(
+  root: Statement<Inputs>
+): Statement<Inputs>[] {
   if (isOperator(root)) {
-    const operands: readonly Statement[] = root.operands;
+    const operands: readonly Statement<Inputs>[] = root.operands;
     return [
       root,
-      ...([] as Statement[]).concat(
-        ...operands.map((statement): Statement[] => getAllStatements(statement))
+      ...([] as Statement<Inputs>[]).concat(
+        ...operands.map((statement): Statement<Inputs>[] =>
+          getAllStatements(statement)
+        )
       ),
     ];
   } else {
@@ -15,18 +19,28 @@ function getAllStatements(root: Statement): Statement[] {
   }
 }
 
-function pickRandomStatement(root: Statement, rng: Rng): Statement {
+function pickRandomStatement<Inputs extends InputConfig>(
+  root: Statement<Inputs>,
+  rng: Rng
+): Statement<Inputs> {
   const statements = getAllStatements(root);
   return statements[Math.floor(rng() * statements.length)];
 }
 
-function crossoverOperands<A extends number, B extends number>(
-  a: Tuple<Statement, A>,
-  b: Tuple<Statement, B>,
-  crossover: (a: Statement, b: Statement) => [Statement, Statement]
+function crossoverOperands<
+  Inputs extends InputConfig,
+  A extends number,
+  B extends number
+>(
+  a: Tuple<Statement<Inputs>, A>,
+  b: Tuple<Statement<Inputs>, B>,
+  crossover: (
+    a: Statement<Inputs>,
+    b: Statement<Inputs>
+  ) => [Statement<Inputs>, Statement<Inputs>]
 ): {
-  a: Tuple<Statement, A>;
-  b: Tuple<Statement, B>;
+  a: Tuple<Statement<Inputs>, A>;
+  b: Tuple<Statement<Inputs>, B>;
 } {
   const newA = a.slice();
   const newB = b.slice();
@@ -39,12 +53,12 @@ function crossoverOperands<A extends number, B extends number>(
   }
 
   return {
-    a: (newA as readonly Statement[]) as Tuple<Statement, A>,
-    b: (newB as readonly Statement[]) as Tuple<Statement, B>,
+    a: (newA as readonly Statement<Inputs>[]) as Tuple<Statement<Inputs>, A>,
+    b: (newB as readonly Statement<Inputs>[]) as Tuple<Statement<Inputs>, B>,
   };
 }
 
-export class PopulationCrossover {
+export class PopulationCrossover<Inputs extends InputConfig> {
   private readonly _rng: Rng;
 
   public constructor(public readonly seed: string) {
@@ -52,7 +66,10 @@ export class PopulationCrossover {
   }
 
   // TODO: Test this!
-  public subtree(a: Statement, b: Statement): [Statement, Statement] {
+  public subtree(
+    a: Statement<Inputs>,
+    b: Statement<Inputs>
+  ): [Statement<Inputs>, Statement<Inputs>] {
     const swapA = pickRandomStatement(a, this._rng);
     const swapB = pickRandomStatement(b, this._rng);
 
@@ -63,16 +80,16 @@ export class PopulationCrossover {
   }
 
   public _subtreeSwap(
-    root: Statement,
-    original: Statement,
-    replacement: Statement
-  ): Statement {
+    root: Statement<Inputs>,
+    original: Statement<Inputs>,
+    replacement: Statement<Inputs>
+  ): Statement<Inputs> {
     if (root === original) {
       return replacement;
     } else if (isOperator(root)) {
       return root.create(
         root.createOperandtuple(
-          (_, i): Statement =>
+          (_, i): Statement<Inputs> =>
             this._subtreeSwap(root.operands[i], original, replacement)
         )
       );
@@ -82,7 +99,10 @@ export class PopulationCrossover {
     }
   }
 
-  public simple(a: Statement, b: Statement): [Statement, Statement] {
+  public simple(
+    a: Statement<Inputs>,
+    b: Statement<Inputs>
+  ): [Statement<Inputs>, Statement<Inputs>] {
     const commonHeight = Math.min(a.heightMin, b.heightMin);
     return commonHeight === 0
       ? // They have nothing in common, there's no way how to do a crossover.
@@ -94,9 +114,9 @@ export class PopulationCrossover {
 
   public _simple(
     crossoverHeight: number,
-    a: Statement,
-    b: Statement
-  ): [Statement, Statement] {
+    a: Statement<Inputs>,
+    b: Statement<Inputs>
+  ): [Statement<Inputs>, Statement<Inputs>] {
     if (crossoverHeight === 0) {
       return [b, a];
     } else if (isOperator(a) && isOperator(b)) {

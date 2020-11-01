@@ -1,28 +1,76 @@
 import { expect } from "chai";
+import { xor4096 } from "seedrandom";
+import snapshot from "snap-shot-it";
 
 import {
+  InputConfigJS,
   NonNegativeInteger,
   OperatorFactory,
   PositiveInteger,
   Terminal,
-  and,
-  bipolarConstant,
-  bool,
-  constant,
-  divide,
-  floor,
-  input,
-  integerConstant,
-  minus,
-  not,
-  or,
-  plus,
-  power,
-  times,
+  createAnd,
+  createBipolarConstant,
+  createBool,
+  createConstant,
+  createDivide,
+  createFloor,
+  createInput,
+  createIntegerConstant,
+  createMinus,
+  createNot,
+  createOr,
+  createPlus,
+  createPower,
+  createTimes,
 } from "../../../src/ga/language";
 import { createRng, ddIt, numberRE, testCommon } from "../util";
 
 describe("Language", function (): void {
+  interface Inputs0 {}
+  const inputs: InputConfigJS<Inputs0> = {};
+
+  const and = createAnd(inputs);
+  const bipolarConstant = createBipolarConstant(inputs);
+  const bool = createBool(inputs);
+  const constant = createConstant(inputs);
+  const divide = createDivide(inputs);
+  const floor = createFloor(inputs);
+  const integerConstant = createIntegerConstant(inputs);
+  const minus = createMinus(inputs);
+  const not = createNot(inputs);
+  const or = createOr(inputs);
+  const plus = createPlus(inputs);
+  const power = createPower(inputs);
+  const times = createTimes(inputs);
+
+  interface Inputs2 {
+    a: number;
+    b: number;
+  }
+  const inputs2: InputConfigJS<Inputs2> = {
+    a: Number,
+    b: Number,
+  };
+
+  const input2 = createInput<Inputs2>(inputs2);
+  const times2 = createTimes<Inputs2>(inputs2);
+
+  interface Inputs3 {
+    a: number;
+    b: number;
+    c: number;
+  }
+  const inputs3: InputConfigJS<Inputs3> = {
+    a: Number,
+    b: Number,
+    c: Number,
+  };
+
+  const input3 = createInput<Inputs3>(inputs3);
+  const minus3 = createMinus<Inputs3>(inputs3);
+  const plus3 = createPlus<Inputs3>(inputs3);
+  const times3 = createTimes<Inputs3>(inputs3);
+
   it("Code construction", function (): void {
     const rng = createRng();
 
@@ -93,10 +141,10 @@ describe("Language", function (): void {
   it("Random Bipolar Constant", function (): void {
     this.timeout(20000);
 
-    const rng = createRng();
+    const rng = xor4096("TEST");
 
     const rbcs = new Array(1000).fill(null).map(
-      (): Terminal => {
+      (): Terminal<Inputs0> => {
         return bipolarConstant.create(rng);
       }
     );
@@ -104,6 +152,10 @@ describe("Language", function (): void {
     rbcs.forEach((rbc): void => {
       testCommon(0, numberRE, rbc);
 
+      expect(rbc.prettyCode).to.match(
+        /^-?\d+(\.\d+)?$/,
+        "Bipolar constant should be a number."
+      );
       expect(+rbc.prettyCode, "Bipolar constant should be within (-1, 1) range")
         .to.be.lessThan(1)
         .and.greaterThan(-1);
@@ -113,52 +165,50 @@ describe("Language", function (): void {
   describe("Inputs", function (): void {
     ddIt(
       "Order independent",
-      (): ((...args: number[]) => number) => {
-        const p1 = input.create((): number => 0 / 2);
-        const p2 = input.create((): number => 1 / 2);
+      (): ((inputs: Inputs2) => number) => {
+        const p1 = input2.create((): number => 0 / 2);
+        const p2 = input2.create((): number => 1 / 2);
 
-        return times.create([p1, p2]).run;
+        return times2.create([p1, p2]).run;
       },
       (given): void => {
-        given().expect(
-          0,
-          "In case of no inputs zeros should be used as fallback values."
-        );
-        given(7).expect(
-          49,
-          "If there are some inputs missing the present should be used multiple times."
-        );
-        given(2, 3).expect(6, "Both inputs should be used.");
-        given(4, 5, 900).expect(20, "Additional inputs should be ignored.");
+        given({ a: 2, b: 3 }).expect(6, "Both inputs should be used.");
       }
     );
 
     ddIt(
       "Order dependent",
-      (): ((...args: number[]) => number) => {
-        const p1 = input.create((): number => 0 / 3);
-        const p2 = input.create((): number => 1 / 3);
-        const p3 = input.create((): number => 2 / 3);
+      (): ((inputs: Inputs3) => number) => {
+        const p1 = input3.create((): number => 0 / 3);
+        const p2 = input3.create((): number => 1 / 3);
+        const p3 = input3.create((): number => 2 / 3);
 
-        const o1 = plus.create([p3, p2]);
-        const o2 = minus.create([p1, p3]);
-        const o3 = times.create([o1, o2]);
+        const o1 = plus3.create([p3, p2]);
+        const o2 = minus3.create([p1, p3]);
+        const o3 = times3.create([o1, o2]);
+
+        snapshot(o3.prettyFunction);
 
         return o3.run;
       },
       (given): void => {
-        given(1, 2, 3).expect(-10);
-        given(1, 3, 2).expect(-5);
-        given(2, 1, 3).expect(-4);
-        given(2, 3, 1).expect(4);
-        given(3, 1, 2).expect(3);
-        given(3, 2, 1).expect(6);
+        given({ a: 1, b: 2, c: 3 }).expect(-10);
+        given({ a: 1, b: 3, c: 2 }).expect(-5);
+        given({ a: 2, b: 1, c: 3 }).expect(-4);
+        given({ a: 2, b: 3, c: 1 }).expect(4);
+        given({ a: 3, b: 1, c: 2 }).expect(3);
+        given({ a: 3, b: 2, c: 1 }).expect(6);
       }
     );
   });
 
   describe("Operators", function (): void {
-    const configs: [OperatorFactory<PositiveInteger>, any[], string, any][] = [
+    const configs: [
+      OperatorFactory<Inputs0, PositiveInteger>,
+      any[],
+      string,
+      any
+    ][] = [
       // [Divide, [0, 0], "0 / 0", Number.NaN], // TODO
       [and, [false, false], "false && false", false],
       [and, [false, true], "false && true", false],
@@ -219,7 +269,7 @@ describe("Language", function (): void {
 
         testCommon(operands.length as NonNegativeInteger, code, operator);
         expect(
-          operator.run(),
+          operator.run({}),
           "Unexpected value returned after code execution"
         ).to.equal(output);
       });

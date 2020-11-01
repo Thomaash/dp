@@ -21,53 +21,76 @@ export interface Tuple<T extends any, L extends number>
   length: L;
 }
 
-export interface Expression {
-  root: Statement;
+export interface InputConfig {
+  [key: string]: any;
 }
+export type InputConfigJS<Inputs> = {
+  [Key in keyof Inputs]: Inputs[Key] extends boolean
+    ? BooleanConstructor
+    : Inputs[Key] extends number
+    ? NumberConstructor
+    : Inputs[Key] extends string
+    ? StringConstructor
+    : never;
+};
 
 export type Rng = () => number;
 
-export interface OperatorFactory<Args extends PositiveInteger> {
+export interface OperatorFactory<
+  Inputs extends InputConfig,
+  Args extends PositiveInteger
+> {
   args: Args;
-  create(operands: Tuple<Statement, Args>): Operator<Args>;
-  createOperandtuple<U extends Statement>(
+  create(operands: Tuple<Statement<Inputs>, Args>): Operator<Inputs, Args>;
+  createOperandtuple<U extends Statement<Inputs>>(
     callbackfn: (value: null, index: number, array: (null | U)[]) => U,
     thisArg?: any
   ): Tuple<U, Args>;
   name: string;
 }
-export interface TerminalFactory {
+export interface TerminalFactory<Inputs extends InputConfig> {
   args: 0;
-  create(rng: Rng): Terminal;
+  create(rng: Rng): Terminal<Inputs>;
   name: string;
 }
-export type StatementFactory =
-  | OperatorFactory<PositiveInteger>
-  | TerminalFactory;
+export type StatementFactory<Inputs extends InputConfig> =
+  | OperatorFactory<Inputs, PositiveInteger>
+  | TerminalFactory<Inputs>;
 
-export type StatementRun = (...args: any[]) => any;
-export interface StatementBase<Args extends NonNegativeInteger> {
+export type StatementRun<Inputs extends InputConfig> = (args: Inputs) => any;
+export interface StatementBase<
+  Inputs extends InputConfig,
+  Args extends NonNegativeInteger
+> {
   args: Args;
-  clone(): StatementBase<Args>;
+  clone(): StatementBase<Inputs, Args>;
   code: string;
   heightMax: number;
   heightMin: number;
+  inputs: InputConfigJS<Inputs>;
   name: string;
   prettyCode: string;
-  run: StatementRun;
+  prettyFunction: string;
+  run: StatementRun<Inputs>;
   size: number;
 }
-export interface Operator<Args extends PositiveInteger>
-  extends StatementBase<Args>,
-    OperatorFactory<Args> {
-  clone(): Operator<Args>;
-  create: OperatorFactory<Args>["create"];
-  operands: Tuple<Statement, Args>;
+export interface Operator<
+  Inputs extends InputConfig,
+  Args extends PositiveInteger
+> extends StatementBase<Inputs, Args>,
+    OperatorFactory<Inputs, Args> {
+  clone(): Operator<Inputs, Args>;
+  create: OperatorFactory<Inputs, Args>["create"];
+  operands: Tuple<Statement<Inputs>, Args>;
 }
-export interface Terminal extends StatementBase<0>, TerminalFactory {
-  clone(): Terminal;
-  create: TerminalFactory["create"];
+export interface Terminal<Inputs extends InputConfig>
+  extends StatementBase<Inputs, 0>,
+    TerminalFactory<Inputs> {
+  clone(): Terminal<Inputs>;
+  create: TerminalFactory<Inputs>["create"];
   heightMax: 1;
   heightMin: 1;
 }
-export type Statement = Operator<PositiveInteger> | Terminal;
+export type Statement<Inputs extends InputConfig> =
+  | Operator<Inputs, PositiveInteger>
+  | Terminal<Inputs>;

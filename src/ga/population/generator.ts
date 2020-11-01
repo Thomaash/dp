@@ -1,5 +1,6 @@
 import { xor4096 } from "seedrandom";
 import {
+  InputConfig,
   Operator,
   OperatorFactory,
   PositiveInteger,
@@ -10,38 +11,39 @@ import {
   TerminalFactory,
 } from "../language";
 
-type FixArgsFactories = Map<
+type FixArgsFactories<Inputs extends InputConfig> = Map<
   PositiveInteger,
-  OperatorFactory<PositiveInteger>[]
+  OperatorFactory<Inputs, PositiveInteger>[]
 >;
 
-export class PopulationGenerator {
+export class PopulationGenerator<Inputs extends InputConfig> {
   private readonly _rng: Rng;
 
-  private readonly _fixedArgsOperatorFactories: FixArgsFactories;
+  private readonly _fixedArgsOperatorFactories: FixArgsFactories<Inputs>;
   private readonly _operatorFactories: readonly OperatorFactory<
+    Inputs,
     PositiveInteger
   >[];
-  private readonly _statementFactories: readonly StatementFactory[];
-  private readonly _terminalFactories: readonly TerminalFactory[];
+  private readonly _statementFactories: readonly StatementFactory<Inputs>[];
+  private readonly _terminalFactories: readonly TerminalFactory<Inputs>[];
 
   public constructor(
     public readonly seed: string,
-    statements: readonly StatementFactory[]
+    statements: readonly StatementFactory<Inputs>[]
   ) {
     this._rng = xor4096(seed);
 
     this._operatorFactories = statements.filter(
-      (statement): statement is OperatorFactory<PositiveInteger> =>
+      (statement): statement is OperatorFactory<Inputs, PositiveInteger> =>
         statement.args > 0
     );
     this._statementFactories = statements;
     this._terminalFactories = statements.filter(
-      (statement): statement is TerminalFactory => statement.args === 0
+      (statement): statement is TerminalFactory<Inputs> => statement.args === 0
     );
 
     this._fixedArgsOperatorFactories = this._operatorFactories.reduce(
-      (acc, factory): FixArgsFactories => {
+      (acc, factory): FixArgsFactories<Inputs> => {
         (
           acc.get(factory.args) || acc.set(factory.args, []).get(factory.args)!
         ).push(factory);
@@ -58,11 +60,11 @@ export class PopulationGenerator {
 
   public fixedArgsOperatorFactory<Args extends PositiveInteger>(
     args: Args
-  ): OperatorFactory<Args> {
+  ): OperatorFactory<Inputs, Args> {
     const factories:
-      | OperatorFactory<Args>[]
+      | OperatorFactory<Inputs, Args>[]
       | undefined = this._fixedArgsOperatorFactories.get(args) as
-      | OperatorFactory<Args>[]
+      | OperatorFactory<Inputs, Args>[]
       | undefined;
 
     if (factories == null) {
@@ -72,26 +74,26 @@ export class PopulationGenerator {
     }
   }
 
-  public operatorFactory(): OperatorFactory<PositiveInteger> {
+  public operatorFactory(): OperatorFactory<Inputs, PositiveInteger> {
     return this._randomFrom(this._operatorFactories);
   }
 
-  public statementFactory(): StatementFactory {
+  public statementFactory(): StatementFactory<Inputs> {
     return this._randomFrom(this._statementFactories);
   }
 
-  public terminalFactory(): TerminalFactory {
+  public terminalFactory(): TerminalFactory<Inputs> {
     return this._randomFrom(this._terminalFactories);
   }
 
-  public full(depth: 1): Terminal;
-  public full(depth: number): Operator<PositiveInteger>;
-  public full(depth: number): Statement {
+  public full(depth: 1): Terminal<Inputs>;
+  public full(depth: number): Operator<Inputs, PositiveInteger>;
+  public full(depth: number): Statement<Inputs> {
     if (depth > 1) {
       const factory = this.operatorFactory();
       return factory.create(
         factory.createOperandtuple(
-          (): Statement => {
+          (): Statement<Inputs> => {
             return this.full(depth - 1);
           }
         )
@@ -101,9 +103,9 @@ export class PopulationGenerator {
     }
   }
 
-  public grow(min: number, max: 1): Terminal;
-  public grow(min: number, max: number): Operator<PositiveInteger>;
-  public grow(min: number, max: number): Statement {
+  public grow(min: number, max: 1): Terminal<Inputs>;
+  public grow(min: number, max: number): Operator<Inputs, PositiveInteger>;
+  public grow(min: number, max: number): Statement<Inputs> {
     if (max <= 1) {
       // Max size limit was reached, return a terminal.
       return this.terminalFactory().create(this._rng);
@@ -112,7 +114,7 @@ export class PopulationGenerator {
       const factory = this.operatorFactory();
       return factory.create(
         factory.createOperandtuple(
-          (): Statement => {
+          (): Statement<Inputs> => {
             return this.grow(min - 1, max - 1);
           }
         )
@@ -125,7 +127,7 @@ export class PopulationGenerator {
       } else {
         return factory.create(
           factory.createOperandtuple(
-            (): Statement => {
+            (): Statement<Inputs> => {
               return this.grow(min - 1, max - 1);
             }
           )
@@ -134,9 +136,9 @@ export class PopulationGenerator {
     }
   }
 
-  public halfAndHalf(max: 1): Terminal;
-  public halfAndHalf(max: number): Operator<PositiveInteger>;
-  public halfAndHalf(max: number): Statement {
+  public halfAndHalf(max: 1): Terminal<Inputs>;
+  public halfAndHalf(max: number): Operator<Inputs, PositiveInteger>;
+  public halfAndHalf(max: number): Statement<Inputs> {
     if (this._rng() < 0.5) {
       return this.grow(1, max);
     } else {

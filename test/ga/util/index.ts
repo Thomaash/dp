@@ -14,7 +14,7 @@ export const numberRE = /^-?\d+(\.\d+)?$/;
 export const testCommon = <Args extends NonNegativeInteger>(
   args: Args,
   code: null | string | RegExp,
-  statement: Statement
+  statement: Statement<{}>
 ): void => {
   expect(
     statement,
@@ -42,6 +42,6 @@ export const testCommon = <Args extends NonNegativeInteger>(
     .that.is.a("function");
 
   expect((): void => {
-    statement.run();
+    statement.run({});
   }, "The code should not throw when run").to.not.throw();
 };

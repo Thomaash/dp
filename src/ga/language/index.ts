@@ -1,7 +1,9 @@
 export * from "./types";
 
-import { format } from "prettier";
+import { Options, format } from "prettier";
 import {
+  InputConfig,
+  InputConfigJS,
   NextInteger,
   Operator,
   OperatorFactory,
@@ -17,28 +19,63 @@ import {
 
 // Generic {{{
 
-function formatStatement(code: string): string {
+const formatConfig: Options = { filepath: "file.js", endOfLine: "lf" };
+
+function formatCodeIntoStatement(code: string): string {
   return (
-    format(code, { filepath: "statement.js", endOfLine: "lf" })
+    format(code, formatConfig)
       // Remove the last two characters (linefeed and newline).
       .slice(0, -2)
   );
 }
+function formatCodeIntoFunction(inputs: InputConfig, code: string): string {
+  const keys = Object.keys(inputs);
+  return keys.length > 0
+    ? format(
+        `function f({ ${Object.keys(inputs).join(", ")} }) {"use strict";` +
+          `return (${code});` +
+          "}",
+        formatConfig
+      )
+    : format(`"use strict";return (${code});`, formatConfig);
+}
 
-function createOperatorFactory<Args extends PositiveInteger>(
+function createRunFunction<Inputs extends InputConfig>(
+  inputs: Inputs,
+  code: string
+): StatementRun<Inputs>;
+function createRunFunction(
+  inputs: Record<string, any>,
+  code: string
+): Function {
+  const keys = Object.keys(inputs);
+  return keys.length > 0
+    ? new Function(
+        '"use strict";' +
+          `const [{ ${keys.join(", ")} }] = arguments;` +
+          `return (${code});`
+      )
+    : new Function(`"use strict";return (${code});`);
+}
+
+function createOperatorFactory<
+  Inputs extends InputConfig,
+  Args extends PositiveInteger
+>(
   name: string,
   args: Args,
+  inputs: InputConfigJS<Inputs>,
   ...codeFragments: Tuple<string, NextInteger[Args]>
-): OperatorFactory<Args> {
-  function clone(this: Operator<Args>): Operator<Args> {
+): OperatorFactory<Inputs, Args> {
+  function clone(this: Operator<Inputs, Args>): Operator<Inputs, Args> {
     return create(
       Object.freeze(
-        this.operands.map((operand): Statement => operand.clone())
-      ) as Tuple<Statement, Args>
+        this.operands.map((operand): Statement<Inputs> => operand.clone())
+      ) as Tuple<Statement<Inputs>, Args>
     );
   }
 
-  function createOperandtuple<U extends Statement>(
+  function createOperandtuple<U extends Statement<Inputs>>(
     callbackfn: (value: null, index: number, array: (null | U)[]) => U,
     thisArg?: any
   ): Tuple<U, Args> {
@@ -47,7 +84,9 @@ function createOperatorFactory<Args extends PositiveInteger>(
     ) as Tuple<U, Args>;
   }
 
-  function create(operands: Tuple<Statement, Args>): Operator<Args> {
+  function create(
+    operands: Tuple<Statement<Inputs>, Args>
+  ): Operator<Inputs, Args> {
     const code = codeFragments.reduce<string>(
       (acc, codeFragment, i): string => {
         return i < operands.length
@@ -72,19 +111,17 @@ function createOperatorFactory<Args extends PositiveInteger>(
       1 +
       operands.reduce<number>((acc, operand): number => acc + operand.size, 0);
 
-    let cachedRun: StatementRun | null = null;
+    let cachedRun: StatementRun<Inputs> | null = null;
 
-    return Object.freeze<Operator<Args>>({
+    const ret: Operator<Inputs, Args> = {
       get prettyCode(): string {
-        return formatStatement(code);
+        return formatCodeIntoStatement(code);
       },
-      get run(): (...args: any[]) => any {
-        return (
-          cachedRun ??
-          (cachedRun = new Function(
-            `"use strict";return(${code})`
-          ) as StatementRun)
-        );
+      get prettyFunction(): string {
+        return formatCodeIntoFunction(inputs, code);
+      },
+      get run(): (inputs: Inputs) => any {
+        return cachedRun ?? (cachedRun = createRunFunction(inputs, code));
       },
 
       args,
@@ -94,13 +131,16 @@ function createOperatorFactory<Args extends PositiveInteger>(
       createOperandtuple,
       heightMax,
       heightMin,
+      inputs,
       name,
       operands,
       size,
-    });
+    };
+    Object.freeze<Operator<Inputs, Args>>(ret);
+    return ret;
   }
 
-  return Object.freeze<OperatorFactory<Args>>({
+  return Object.freeze<OperatorFactory<Inputs, Args>>({
     args,
     create,
     createOperandtuple,
@@ -108,20 +148,26 @@ function createOperatorFactory<Args extends PositiveInteger>(
   });
 }
 
-function createTerminalFactory(
+function createTerminalFactory<Inputs extends InputConfig>(
   name: string,
-  createCode: (rng: Rng) => string
-): TerminalFactory {
-  function create(rng: Rng): Terminal {
+  createCode: (rng: Rng) => string,
+  inputs: InputConfigJS<Inputs>
+): TerminalFactory<Inputs> {
+  function create(rng: Rng): Terminal<Inputs> {
     const code = createCode(rng);
-    const run = new Function(`"use strict"; return (${code});`) as (
-      ...args: any[]
-    ) => any;
 
-    function clone(): Terminal {
-      return Object.freeze({
+    let cachedRun: StatementRun<Inputs> | null = null;
+
+    function clone(): Terminal<Inputs> {
+      const ret: Terminal<Inputs> = {
         get prettyCode(): string {
-          return formatStatement(code);
+          return formatCodeIntoStatement(code);
+        },
+        get prettyFunction(): string {
+          return formatCodeIntoFunction(inputs, code);
+        },
+        get run(): (inputs: Inputs) => any {
+          return cachedRun ?? (cachedRun = createRunFunction(inputs, code));
         },
 
         args: 0,
@@ -130,10 +176,12 @@ function createTerminalFactory(
         create,
         heightMax: 1,
         heightMin: 1,
+        inputs,
         name,
-        run,
         size: 1,
-      });
+      };
+      Object.freeze<Terminal<Inputs>>(ret);
+      return ret;
     }
 
     return clone();
@@ -145,100 +193,212 @@ function createTerminalFactory(
 // }}}
 // Helpers {{{
 
-export function isOperator(
-  value: Statement
-): value is Operator<PositiveInteger>;
-export function isOperator<Args extends PositiveInteger>(
-  args: Args,
-  value: Statement
-): value is Operator<Args>;
-export function isOperator(
-  ...rest: [Statement] | [number, Statement]
+export function isOperator<
+  Inputs extends InputConfig,
+  Args extends PositiveInteger
+>(value: Statement<Inputs>): value is Operator<Inputs, Args>;
+export function isOperator<
+  Inputs extends InputConfig,
+  Args extends PositiveInteger
+>(args: Args, value: Statement<Inputs>): value is Operator<Inputs, Args>;
+export function isOperator<Inputs extends InputConfig>(
+  ...rest: [Statement<Inputs>] | [number, Statement<Inputs>]
 ): boolean {
   return rest.length === 1 ? rest[0].args > 0 : rest[1].args === rest[0];
 }
-export function isTerminal(value: Statement): value is Terminal {
+export function isTerminal<Inputs extends InputConfig>(
+  value: Statement<Inputs>
+): value is Terminal<Inputs> {
   return value.args === 0;
 }
 
 // }}}
 // Terminals {{{
 
-export const bipolarConstant = createTerminalFactory(
-  "Bipolar Constant",
-  (rng: Rng): string => "" + rng() * Math.sign(rng() - 0.5)
-);
-export const bool = createTerminalFactory("Bool", (rng: Rng): string =>
-  rng() < 0.5 ? "false" : "true"
-);
-export const constant = createTerminalFactory(
-  "Constant",
-  (rng: Rng): string => "" + rng()
-);
-export const integerConstant = createTerminalFactory(
-  "Integer Constant",
-  (rng: Rng): string => "" + Math.floor(rng() * 1000000)
-);
-export const input = createTerminalFactory(
-  "Input",
-  (rng: Rng): string =>
-    `arguments[Math.floor(arguments.length * ${rng()})] ?? 0`
-);
-export const smallIntegerConstant = createTerminalFactory(
-  "Small Integer Constant",
-  (rng: Rng): string => "" + Math.floor(rng() * 100)
-);
+export function createBipolarConstant<Inputs extends InputConfig>(
+  inputs: InputConfigJS<Inputs>
+): TerminalFactory<Inputs> {
+  return createTerminalFactory(
+    "Bipolar Constant",
+    (rng: Rng): string => "" + rng() * Math.sign(rng() - 0.5),
+    inputs
+  );
+}
+export function createBool<Inputs extends InputConfig>(
+  inputs: InputConfigJS<Inputs>
+): TerminalFactory<Inputs> {
+  return createTerminalFactory(
+    "Bool",
+    (rng: Rng): string => (rng() < 0.5 ? "false" : "true"),
+    inputs
+  );
+}
+export function createConstant<Inputs extends InputConfig>(
+  inputs: InputConfigJS<Inputs>
+): TerminalFactory<Inputs> {
+  return createTerminalFactory(
+    "Constant",
+    (rng: Rng): string => "" + rng(),
+    inputs
+  );
+}
+export function createIntegerConstant<Inputs extends InputConfig>(
+  inputs: InputConfigJS<Inputs>
+): TerminalFactory<Inputs> {
+  return createTerminalFactory(
+    "Integer Constant",
+    (rng: Rng): string => "" + Math.floor(rng() * 1000000),
+    inputs
+  );
+}
+export function createInput<Inputs extends InputConfig>(
+  inputs: InputConfigJS<Inputs>
+): TerminalFactory<Inputs> {
+  return createTerminalFactory(
+    "Input",
+    (rng: Rng): string =>
+      ((a): string => a[Math.floor(a.length * rng())])(Object.keys(inputs)),
+    inputs
+  );
+}
+export function createSmallIntegerConstant<Inputs extends InputConfig>(
+  inputs: InputConfigJS<Inputs>
+): TerminalFactory<Inputs> {
+  return createTerminalFactory(
+    "Small Integer Constant",
+    (rng: Rng): string => "" + Math.floor(rng() * 100),
+    inputs
+  );
+}
 
-export const terminals = Object.freeze<TerminalFactory>([
-  bipolarConstant,
-  bool,
-  constant,
-  integerConstant,
-  smallIntegerConstant,
-]);
+export function createTerminals<Inputs extends InputConfig>(
+  inputs: InputConfigJS<Inputs>
+): readonly TerminalFactory<Inputs>[] {
+  return Object.freeze<TerminalFactory<Inputs>>([
+    createBipolarConstant(inputs),
+    createBool(inputs),
+    createConstant(inputs),
+    createIntegerConstant(inputs),
+    createSmallIntegerConstant(inputs),
+  ]);
+}
 
 // }}}
 // Operators {{{
 
-export const and = createOperatorFactory("And", 2, "", "&&", "");
-export const divide = createOperatorFactory("Divide", 2, "", "/", "");
-export const equals = createOperatorFactory("Equals", 2, "", "===", "");
-export const floor = createOperatorFactory("Floor", 1, "Math.floor(", ")");
-export const ifElse = createOperatorFactory("IfElse", 3, "", "?", ":", "");
-export const lessThan = createOperatorFactory("LessThan", 2, "", "<", "");
-export const minus = createOperatorFactory("Minus", 2, "", "-", "");
-export const moreThan = createOperatorFactory("MoreThan", 2, "", ">", "");
-export const not = createOperatorFactory("Not", 1, "!", "");
-export const or = createOperatorFactory("Or", 2, "", "||", "");
-export const plus = createOperatorFactory("Plus", 2, "", "+", "");
-export const power = createOperatorFactory("Power", 2, "", "**", "");
-export const times = createOperatorFactory("Times", 2, "", "*", "");
-export const weakEquals = createOperatorFactory("WeakEquals", 2, "", "==", "");
+export function createAnd<Inputs extends InputConfig>(
+  inputs: InputConfigJS<Inputs>
+): OperatorFactory<Inputs, 2> {
+  return createOperatorFactory("And", 2, inputs, "", "&&", "");
+}
+export function createCeil<Inputs extends InputConfig>(
+  inputs: InputConfigJS<Inputs>
+): OperatorFactory<Inputs, 1> {
+  return createOperatorFactory("Ceil", 1, inputs, "Math.ceil(", ")");
+}
+export function createDivide<Inputs extends InputConfig>(
+  inputs: InputConfigJS<Inputs>
+): OperatorFactory<Inputs, 2> {
+  return createOperatorFactory("Divide", 2, inputs, "", "/", "");
+}
+export function createEquals<Inputs extends InputConfig>(
+  inputs: InputConfigJS<Inputs>
+): OperatorFactory<Inputs, 2> {
+  return createOperatorFactory("Equals", 2, inputs, "", "===", "");
+}
+export function createFloor<Inputs extends InputConfig>(
+  inputs: InputConfigJS<Inputs>
+): OperatorFactory<Inputs, 1> {
+  return createOperatorFactory("Floor", 1, inputs, "Math.floor(", ")");
+}
+export function createIfElse<Inputs extends InputConfig>(
+  inputs: InputConfigJS<Inputs>
+): OperatorFactory<Inputs, 3> {
+  return createOperatorFactory("IfElse", 3, inputs, "", "?", ":", "");
+}
+export function createLessThan<Inputs extends InputConfig>(
+  inputs: InputConfigJS<Inputs>
+): OperatorFactory<Inputs, 2> {
+  return createOperatorFactory("LessThan", 2, inputs, "", "<", "");
+}
+export function createMinus<Inputs extends InputConfig>(
+  inputs: InputConfigJS<Inputs>
+): OperatorFactory<Inputs, 2> {
+  return createOperatorFactory("Minus", 2, inputs, "", "-", "");
+}
+export function createMoreThan<Inputs extends InputConfig>(
+  inputs: InputConfigJS<Inputs>
+): OperatorFactory<Inputs, 2> {
+  return createOperatorFactory("MoreThan", 2, inputs, "", ">", "");
+}
+export function createNot<Inputs extends InputConfig>(
+  inputs: InputConfigJS<Inputs>
+): OperatorFactory<Inputs, 1> {
+  return createOperatorFactory("Not", 1, inputs, "!", "");
+}
+export function createOr<Inputs extends InputConfig>(
+  inputs: InputConfigJS<Inputs>
+): OperatorFactory<Inputs, 2> {
+  return createOperatorFactory("Or", 2, inputs, "", "||", "");
+}
+export function createPlus<Inputs extends InputConfig>(
+  inputs: InputConfigJS<Inputs>
+): OperatorFactory<Inputs, 2> {
+  return createOperatorFactory("Plus", 2, inputs, "", "+", "");
+}
+export function createPower<Inputs extends InputConfig>(
+  inputs: InputConfigJS<Inputs>
+): OperatorFactory<Inputs, 2> {
+  return createOperatorFactory("Power", 2, inputs, "", "**", "");
+}
+export function createRound<Inputs extends InputConfig>(
+  inputs: InputConfigJS<Inputs>
+): OperatorFactory<Inputs, 1> {
+  return createOperatorFactory("Round", 1, inputs, "Math.round(", ")");
+}
+export function createTimes<Inputs extends InputConfig>(
+  inputs: InputConfigJS<Inputs>
+): OperatorFactory<Inputs, 2> {
+  return createOperatorFactory("Times", 2, inputs, "", "*", "");
+}
+export function createWeakEquals<Inputs extends InputConfig>(
+  inputs: InputConfigJS<Inputs>
+): OperatorFactory<Inputs, 2> {
+  return createOperatorFactory("WeakEquals", 2, inputs, "", "==", "");
+}
 
-export const operators = Object.freeze<OperatorFactory<1 | 2 | 3>>([
-  and,
-  divide,
-  equals,
-  floor,
-  ifElse,
-  lessThan,
-  minus,
-  moreThan,
-  not,
-  or,
-  plus,
-  power,
-  times,
-  weakEquals,
-]);
+export function createOperators<Inputs extends InputConfig>(
+  inputs: InputConfigJS<Inputs>
+): readonly OperatorFactory<Inputs, 1 | 2 | 3>[] {
+  return Object.freeze<OperatorFactory<Inputs, 1 | 2 | 3>>([
+    createAnd(inputs),
+    createDivide(inputs),
+    createEquals(inputs),
+    createFloor(inputs),
+    createIfElse(inputs),
+    createLessThan(inputs),
+    createMinus(inputs),
+    createMoreThan(inputs),
+    createNot(inputs),
+    createOr(inputs),
+    createPlus(inputs),
+    createPower(inputs),
+    createTimes(inputs),
+    createWeakEquals(inputs),
+  ]);
+}
 
 // }}}
 // Other {{{
 
-export const statements = Object.freeze<StatementFactory[]>([
-  ...operators,
-  ...terminals,
-]);
+export function createStatements<Inputs extends InputConfig>(
+  inputs: InputConfigJS<Inputs>
+): readonly StatementFactory<Inputs>[] {
+  return Object.freeze<StatementFactory<Inputs>>([
+    ...createOperators(inputs),
+    ...createTerminals(inputs),
+  ]);
+}
 
 // }}}
 

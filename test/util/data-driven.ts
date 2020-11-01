@@ -23,6 +23,10 @@ export function ddIt<T extends (...args: any[]) => any>(
 
     it("Prepare", async (): Promise<void> => {
       fun = await prepare();
+      expect(fun).to.be.a(
+        "function",
+        "Prepare function has to return a function."
+      );
     });
 
     test(
