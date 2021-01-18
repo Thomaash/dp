@@ -1,0 +1,47 @@
+{
+  "name": "dunes",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "clean": "rimraf \"dist/*\" \"trash-outputs\"",
+    "lint": "prettier --write . && eslint --fix .",
+    "lint:ci": "prettier --check . && eslint .",
+    "start": "npm ci && npm run build && ./prepare/prepare.sh 19 && npm run train:gpu -- pcm19",
+    "test": "exit 1",
+    "train:cpu": "node --max-old-space-size=40000 -r source-map-support/register dist/start-cpu.js",
+    "train:cpu:brk": "node --max-old-space-size=40000 -r source-map-support/register --inspect-brk dist/start-cpu.js",
+    "train:gpu": "node --max-old-space-size=40000 -r source-map-support/register dist/start-gpu.js",
+    "train:gpu:brk": "node --max-old-space-size=40000 -r source-map-support/register --inspect-brk dist/start-gpu.js"
+  },
+  "author": "",
+  "license": "NONE",
+  "engines": {
+    "node": ">=15.0.0"
+  },
+  "dependencies": {
+    "@tensorflow/tfjs": "3.3.0",
+    "@tensorflow/tfjs-node": "3.3.0",
+    "@tensorflow/tfjs-node-gpu": "3.3.0",
+    "async-await-semaphore": "1.0.1",
+    "ccwt.js": "1.0.5",
+    "chai": "4.3.4",
+    "fs-extra": "9.1.0",
+    "globby": "11.0.3",
+    "ramda": "0.27.1",
+    "source-map-support": "0.5.19"
+  },
+  "devDependencies": {
+    "@types/chai": "4.2.16",
+    "@types/fs-extra": "9.0.10",
+    "@types/ramda": "0.27.39",
+    "@typescript-eslint/eslint-plugin": "4.20.0",
+    "eslint": "7.23.0",
+    "eslint-config-prettier": "8.1.0",
+    "eslint-plugin-prettier": "3.3.1",
+    "prettier": "2.2.1",
+    "rimraf": "3.0.2",
+    "typescript": "4.2.3"
+  }
+}

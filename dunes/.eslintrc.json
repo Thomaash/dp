@@ -1,0 +1,61 @@
+{
+  "root": true,
+  "env": {
+    "es6": true,
+    "mocha": true,
+    "node": true
+  },
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended",
+    "prettier"
+  ],
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "sourceType": "module",
+    "ecmaVersion": 2020
+  },
+  "plugins": ["prettier"],
+  "rules": {
+    "prettier/prettier": "warn",
+
+    "@typescript-eslint/explicit-function-return-type": [
+      "error",
+      {
+        "allowConciseArrowFunctionExpressionsStartingWithVoid": false,
+        "allowExpressions": false,
+        "allowHigherOrderFunctions": false,
+        "allowTypedFunctionExpressions": false
+      }
+    ],
+    "no-restricted-globals": [
+      "error",
+      {
+        "name": "event",
+        "message": "Please, use local parameter instead."
+      }
+    ],
+    "sort-imports": ["error", { "ignoreDeclarationSort": true }],
+    "no-unsafe-finally": "off"
+  },
+  "overrides": [
+    {
+      "files": ["test/**/*"],
+      "rules": {
+        "no-restricted-properties": [
+          "error",
+          {
+            "object": "describe",
+            "property": "only",
+            "message": "Please, don't commit tests with `.only`."
+          },
+          {
+            "object": "it",
+            "property": "only",
+            "message": "Please, don't commit tests with `.only`."
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -3,5 +3,11 @@
 /app/dist-app
 /app/dist/
 /app/local/
+/dunes/data
+/dunes/data-od
+/dunes/data/
+/dunes/dist/
+/dunes/outputs
+/dunes/report/built/
 /ga/dist/
 /ga/results/
