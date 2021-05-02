@@ -35,7 +35,13 @@ const y = yargs
     required: true,
     type: "string",
   })
-  .option("ot-export-infrastructure", {
+  .option("ot-export-infrastructure-otml", {
+    describe:
+      "OpenTrack -> Functions -> Exchange Infrastructure Data -> Export Infrastructure Data (OTML-Format).",
+    required: true,
+    type: "string",
+  })
+  .option("ot-export-infrastructure-trafit", {
     describe:
       "OpenTrack -> Functions -> Exchange Infrastructure Data -> Export Infrastructure Data (trafIT-Format).",
     required: true,
@@ -61,7 +67,7 @@ const y = yargs
   })
   .option("communication-log", {
     describe:
-      "The file into which the communcation with OpenTrack will be written.",
+      "The file into which the communication with OpenTrack will be written.",
     required: false,
     type: "string",
     default: null,
@@ -118,6 +124,12 @@ const y = yargs
     default: false,
     describe:
       "If enabled pauses the simulation after each run (e.g. for manual inspection).",
+    type: "boolean",
+  })
+  .option("pause-before-each-run", {
+    default: false,
+    describe:
+      "If enabled pauses the simulation before each run (e.g. for manual inspection).",
     type: "boolean",
   })
   .option("pause-with-stuck-trains", {

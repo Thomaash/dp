@@ -31,7 +31,8 @@ import { parseItineraryArgs } from "./args";
 
 export interface ParseInfrastructureXML {
   courses: string;
-  infrastructure: string;
+  infrastructureOTML: string;
+  infrastructureTrafIT: string;
   rollingStock: string;
   timetables: string;
 }
@@ -43,7 +44,13 @@ interface StationsReduceAcc {
   stationsByOCPID: Map<string, Station>;
 }
 
-export interface TempVertex {
+interface TempSignal {
+  signalID: string;
+  type: string;
+}
+
+interface TempVertex {
+  readonly hasSignal: boolean;
   readonly inflowRoutes: Set<Route>;
   readonly name: string;
   readonly neighborVertexID: string;
@@ -63,8 +70,11 @@ export async function parseInfrastructure(
   // XML Documents {{{
 
   const xmlCoursesDocument = await xmlParser.parseStringPromise(xml.courses);
-  const xmlInfrastructureDocument = await xmlParser.parseStringPromise(
-    xml.infrastructure
+  const xmlInfrastructureTrafITDocument = await xmlParser.parseStringPromise(
+    xml.infrastructureTrafIT
+  );
+  const xmlInfrastructureOTMLDocument = await xmlParser.parseStringPromise(
+    xml.infrastructureOTML
   );
   const xmlRollingStockDocument = await xmlParser.parseStringPromise(
     xml.rollingStock
@@ -141,10 +151,44 @@ export async function parseInfrastructure(
   );
 
   // }}}
+  // Signals {{{
+
+  const xmlSignals: any[] = xmlInfrastructureOTMLDocument["otml"].$$.flatMap(
+    (v: any): any[] => v.$$
+  ).filter((v: any): boolean => v["#name"] === "signal");
+
+  const xmlSignalDocumentNameIdRE = /^(.*)_(\d+)$/;
+  const tempSignals: ReadonlyMap<string, TempSignal> = new Map(
+    xmlSignals.map((xmlSignal): [string, TempSignal] => {
+      const [, documentName, id] = xmlSignalDocumentNameIdRE.exec(
+        xmlSignal.$.element
+      ) ?? [null, null];
+      const type = xmlSignal.$.type;
+
+      if (
+        typeof documentName !== "string" ||
+        typeof id !== "string" ||
+        typeof type !== "string"
+      ) {
+        throw new Error(`Invalid signal ${xmlSignal.$.element}.`);
+      }
+
+      const signalID = ck(documentName, id);
+      return [
+        signalID,
+        Object.freeze<TempSignal>({
+          signalID,
+          type,
+        }),
+      ];
+    })
+  );
+
+  // }}}
   // Vertexes {{{
 
   const xmlVertexes: any[] = filterChildren(
-    xmlInfrastructureDocument["trafIT"]["vertices"][0],
+    xmlInfrastructureTrafITDocument["trafIT"]["vertices"][0],
     "vertex",
     "stationvertex"
   );
@@ -157,10 +201,13 @@ export async function parseInfrastructure(
       );
       const name = xmlVertex.$.name;
 
+      const hasSignal = tempSignals.has(vertexID);
+
       const inflowRoutes = new Set<Route>();
       const outflowRoutes = new Set<Route>();
 
       return acc.set(vertexID, {
+        hasSignal,
         inflowRoutes,
         name,
         neighborVertexID,
@@ -176,12 +223,14 @@ export async function parseInfrastructure(
     { -readonly [Key in keyof Vertex]: Vertex[Key] }
   >();
   for (const {
+    hasSignal,
     inflowRoutes,
     name,
     outflowRoutes,
     vertexID,
   } of tempVertexes.values()) {
     vertexes.set(vertexID, {
+      hasSignal,
       inflowRoutes,
       name,
       neighborVertex: null as any,
@@ -228,7 +277,7 @@ export async function parseInfrastructure(
   // Vertex to vertex distances {{{
 
   const xmlEdges: any[] =
-    xmlInfrastructureDocument["trafIT"]["edges"][0]["edge"];
+    xmlInfrastructureTrafITDocument["trafIT"]["edges"][0]["edge"];
   const vertexToVertexDistances = xmlEdges.reduce<Map<string, number>>(
     (acc, xmlEdge): Map<string, number> => {
       const id1 = ck(xmlEdge.$.documentname, xmlEdge.$.vertex1);
@@ -371,7 +420,7 @@ export async function parseInfrastructure(
   // Routes {{{
 
   const xmlRoutes: any[] =
-    xmlInfrastructureDocument["trafIT"]["routes"][0]["route"];
+    xmlInfrastructureTrafITDocument["trafIT"]["routes"][0]["route"];
   throwIfNotUniqe(
     xmlRoutes.map((xmlRoute): string => idFromXML(xmlRoute)),
     "All route names have to be unique"
@@ -398,7 +447,50 @@ export async function parseInfrastructure(
       }
     );
 
+    const endSignalToReverseSignalDistance = ((): number | null => {
+      const lastVertex = routeVertexes[routeVertexes.length - 1];
+      if (lastVertex?.hasSignal !== true) {
+        return null;
+      }
+
+      const secondToLastVertexIndex = [...routeVertexes]
+        .reverse()
+        .findIndex((vertex, i): boolean => i > 0 && vertex.hasSignal);
+      if (secondToLastVertexIndex < 0) {
+        return null;
+      }
+
+      const distance = [...routeVertexes]
+        .reverse()
+        .slice(0, secondToLastVertexIndex)
+        .map((vertex, i, arr): number => {
+          if (i < 1) {
+            return 0;
+          }
+
+          const vertex1 = vertex;
+          const vertex2 = arr[i - 1];
+          const distance = vertexToVertexDistances.get(
+            ck(vertex2.vertexID, vertex1.neighborVertex.vertexID)
+          );
+          if (distance == null) {
+            throw new Error(
+              `Can't find distance between vertexes ${vertex2.vertexID} and ${vertex1.neighborVertex.vertexID}.`
+            );
+          }
+
+          return distance;
+        })
+        .reduce<number>(
+          (acc, singleEdgeLength): number => acc + singleEdgeLength,
+          0
+        );
+
+      return distance;
+    })();
+
     const route = Object.freeze<Route>({
+      endSignalToReverseSignalDistance,
       vertexes: routeVertexes,
       length: routeVertexes.reduce<number>((acc, vertex2, i, arr): number => {
         if (i === 0) {
@@ -512,7 +604,7 @@ export async function parseInfrastructure(
   // Paths {{{
 
   const xmlPaths: any[] =
-    xmlInfrastructureDocument["trafIT"]["paths"][0]["path"];
+    xmlInfrastructureTrafITDocument["trafIT"]["paths"][0]["path"];
   throwIfNotUniqe(
     xmlPaths.map((xmlPath): string => idFromXML(xmlPath)),
     "All path names have to be unique"
@@ -568,7 +660,7 @@ export async function parseInfrastructure(
   // Itineraries {{{
 
   const xmlItineraries: any[] =
-    xmlInfrastructureDocument["trafIT"]["itineraries"][0]["itinerary"];
+    xmlInfrastructureTrafITDocument["trafIT"]["itineraries"][0]["itinerary"];
   const itineraries = xmlItineraries.reduce<Map<string, Itinerary>>(
     (acc, xmlItinerary): Map<string, Itinerary> => {
       const itineraryID: string = xmlItinerary.$.name;

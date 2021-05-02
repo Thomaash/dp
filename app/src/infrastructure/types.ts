@@ -25,6 +25,7 @@ export interface Station {
 }
 
 export interface Vertex {
+  readonly hasSignal: boolean;
   readonly inflowRoutes: ReadonlySet<Route>;
   readonly name: string;
   readonly neighborVertex: Vertex;
@@ -33,6 +34,7 @@ export interface Vertex {
 }
 
 export interface Route {
+  readonly endSignalToReverseSignalDistance: number | null; // TODO: Better name?
   readonly length: number;
   readonly routeID: string;
   readonly stationAreas: readonly Station[];

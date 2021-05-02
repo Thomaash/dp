@@ -128,6 +128,14 @@ function getOvertakingAreas(infrastructure: Infrastructure): OvertakingArea[] {
         ),
       ]);
 
+      const waitingRoutes = new Set<Route>(
+        [...routes.values()].filter(
+          (route): boolean =>
+            route.stations.includes(outflowStation) &&
+            route.vertexes[route.vertexes.length - 1] !== exitVertex
+        )
+      );
+
       return Object.freeze<OvertakingArea>({
         areaID,
         entryRoutes,
@@ -143,6 +151,7 @@ function getOvertakingAreas(infrastructure: Infrastructure): OvertakingArea[] {
         routes,
         stationAreas,
         stations,
+        waitingRoutes,
       });
     }
   );

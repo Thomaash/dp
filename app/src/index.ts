@@ -60,6 +60,20 @@ interface OvertakingModule {
   module: DecisionModule;
 }
 
+async function startUnless(otapi: OTAPI): Promise<void> {
+  // Continue only if:
+  if (
+    // The user doesn't want to pause before each run.
+    args["pause-before-each-run"] === false
+  ) {
+    await otapi.startSimulation();
+  } else {
+    // Otherwise wait for the user to click the resume button in
+    // OpenTrack on their own.
+    log.info("Resume in OpenTrack to continue...");
+  }
+}
+
 async function continueUnless(
   otapi: OTAPI,
   trainCounter: TrainCounter
@@ -78,9 +92,7 @@ async function continueUnless(
       // The user doesn't want to pause and inspect the situation.
       args["pause-with-stuck-trains"] === false)
   ) {
-    otapi.startSimulation().catch((error): void => {
-      log.error(error, "Failed to resume simulation.");
-    });
+    await otapi.startSimulation();
   } else {
     // Otherwise wait for the user to click the resume button in
     // OpenTrack on their own.
@@ -458,7 +470,7 @@ async function doOneRun(
         log.info("Starting simulation...");
         const simulationEnd = otapi.once("simStopped");
         const simulationContinued = otapi.once("simContinued");
-        await otapi.startSimulation();
+        await startUnless(otapi);
         await simulationContinued;
         log.info("Simulating...");
 
@@ -501,7 +513,8 @@ const log = curryLog(
     log("infrastructure"),
     {
       courses: args["ot-export-courses"],
-      infrastructure: args["ot-export-infrastructure"],
+      infrastructureOTML: args["ot-export-infrastructure-otml"],
+      infrastructureTrafIT: args["ot-export-infrastructure-trafit"],
       rollingStock: args["ot-export-rolling-stock"],
       timetables: args["ot-export-timetable"],
     }

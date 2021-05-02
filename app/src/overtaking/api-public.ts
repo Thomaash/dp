@@ -58,6 +58,7 @@ export interface OvertakingArea extends Area {
   readonly routes: ReadonlySet<Route>;
   readonly stationAreas: ReadonlySet<Station>;
   readonly stations: ReadonlySet<Station>;
+  readonly waitingRoutes: ReadonlySet<Route>;
 }
 
 export interface OvertakingDecision {

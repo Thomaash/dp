@@ -100,7 +100,12 @@ export class TrainOvertaking {
     overtaking: Train,
     waiting: Train
   ): Promise<void> {
-    const { exitRoutes, outflowStation: station, maxWaiting } = overtakingArea;
+    const {
+      exitRoutes,
+      maxWaiting,
+      outflowStation: station,
+      waitingRoutes,
+    } = overtakingArea;
 
     if (
       this._blocking.isBlocked(
@@ -139,27 +144,55 @@ export class TrainOvertaking {
     }
 
     if (
-      // We can safely continue if the waiting train is already blocket at the
+      // We can safely continue if the waiting train is already blocked at the
       // station.
       !this._blocking.isBlockedQuery({
         place: station.stationID,
         blocked: waiting.trainID,
-      }) &&
-      // We can safely continue only if max waiting wasn't reached yet.
-      this._blocking.countBlockedAtPlace(station.stationID) >= maxWaiting
+      })
     ) {
-      // Too many trains waiting at the station and the train that should be
-      // overtaken here is not one of them.
-      this._log.info(
-        "Can't plan overtaking of " +
-          waiting.trainID +
-          " by " +
-          overtaking.trainID +
-          " as too many trains would be waiting at " +
-          station.stationID +
-          "."
-      );
-      return;
+      if (
+        // We can safely continue only if max waiting wasn't reached yet.
+        this._blocking.countBlockedAtPlace(station.stationID) >= maxWaiting
+      ) {
+        // Too many trains waiting at the station and the train that should be
+        // overtaken here is not one of them.
+        this._log.info(
+          "Can't plan overtaking of " +
+            waiting.trainID +
+            " by " +
+            overtaking.trainID +
+            " as too many trains would be waiting at " +
+            station.stationID +
+            "."
+        );
+        return;
+      }
+      if (
+        // We can only make the train wait on a track that is short enough.
+        Math.min(
+          ...[...waitingRoutes.values()]
+            .filter((route): boolean => waiting.routes.has(route))
+            .map(
+              (route): number =>
+                route.endSignalToReverseSignalDistance ??
+                Number.POSITIVE_INFINITY
+            )
+        ) > waiting.length
+      ) {
+        // Too many trains waiting at the station and the train that should be
+        // overtaken here is not one of them.
+        this._log.info(
+          "Can't plan overtaking of " +
+            waiting.trainID +
+            " by " +
+            overtaking.trainID +
+            " as the train is to long to wait at " +
+            station.stationID +
+            "."
+        );
+        return;
+      }
     }
 
     this._blocking.block(

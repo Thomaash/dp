@@ -30,26 +30,30 @@ export const infrastructureFactory = {
     log: CurryLog,
     paths: {
       courses: string;
-      infrastructure: string;
+      infrastructureOTML: string;
+      infrastructureTrafIT: string;
       rollingStock: string;
       timetables: string;
     }
   ): Promise<Infrastructure> {
     const [
       courses,
-      infrastructure,
+      infrastructureOTML,
+      infrastructureTrafIT,
       rollingStock,
       timetables,
     ] = await Promise.all([
       readFile(paths.courses, "utf-8"),
-      readFile(paths.infrastructure, "utf-8"),
+      readFile(paths.infrastructureOTML, "utf-8"),
+      readFile(paths.infrastructureTrafIT, "utf-8"),
       readFile(paths.rollingStock, "utf-8"),
       readFile(paths.timetables, "utf-8"),
     ]);
 
     return infrastructureFactory.buildFromText(log, {
       courses,
-      infrastructure,
+      infrastructureOTML,
+      infrastructureTrafIT,
       rollingStock,
       timetables,
     });
