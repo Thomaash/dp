@@ -8,13 +8,13 @@
   "extends": [
     "eslint:recommended",
     "plugin:@typescript-eslint/recommended",
-    "prettier",
-    "prettier/@typescript-eslint"
+    "prettier"
   ],
   "parser": "@typescript-eslint/parser",
   "parserOptions": {
-    "sourceType": "module",
-    "ecmaVersion": 2020
+    "ecmaVersion": 2020,
+    "project": "./tsconfig.lint.json",
+    "sourceType": "module"
   },
   "plugins": ["prettier"],
   "rules": {
@@ -50,6 +50,17 @@
       }
     ],
     "sort-imports": ["error", { "ignoreDeclarationSort": true }],
+    "@typescript-eslint/consistent-type-assertions": [
+      "error",
+      {
+        "assertionStyle": "as",
+        "objectLiteralTypeAssertions": "allow"
+      }
+    ],
+    "@typescript-eslint/consistent-type-definitions": ["error", "interface"],
+
+    "require-await": "off",
+    "@typescript-eslint/require-await": "error",
 
     "@typescript-eslint/ban-types": "off",
     "@typescript-eslint/explicit-module-boundary-types": "off",

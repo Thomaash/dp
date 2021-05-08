@@ -113,7 +113,9 @@ export class OTAPIKilledError extends Error {
 export class OTAPI {
   private readonly _responseManager: ResponseManager;
   private readonly _limiter: RateLimiter;
-  private readonly _callOnKill = new Set<() => void>();
+  private readonly _callOnKill = new Set<
+    (() => Promise<void>) | (() => void)
+  >();
 
   private readonly _failureCallbacks = new Map<symbol, () => void>();
 
@@ -168,13 +170,18 @@ export class OTAPI {
 
     return this._responseManager.stop();
   }
-  public kill(
+  public async kill(
     error = new OTAPIKilledError("This OTAPI session has been killed.")
   ): Promise<void> {
     this._killed = error;
 
     for (const func of this._callOnKill) {
-      func();
+      try {
+        await func();
+      } catch (error) {
+        console.error("An error occured during OTAPI session killing:");
+        console.error(error);
+      }
     }
     return this._responseManager.kill(error);
   }
@@ -206,7 +213,7 @@ export class OTAPI {
           retryFailed
         );
 
-        this._callOnKill.add(cancel);
+        this._callOnKill.add(cancel.bind(null));
         try {
           await result;
         } catch (error) {
@@ -217,7 +224,7 @@ export class OTAPI {
           }
           throw error;
         } finally {
-          this._callOnKill.delete(cancel);
+          this._callOnKill.delete(cancel.bind(null));
         }
 
         return result;

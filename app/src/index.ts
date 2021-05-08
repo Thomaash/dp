@@ -13,12 +13,12 @@ import {
 import { CallbackQueue, Deferred } from "./util";
 import { args } from "./cli";
 import { buildChunkLogger } from "./util";
-import { infrastructureFactory } from "./infrastructure";
+import { Infrastructure, infrastructureFactory } from "./infrastructure";
 import { TrainCounter } from "./train-counter";
 import { testConnection } from "./connection-test";
 import {
   CurryLog,
-  createCurryLogFileConsumer,
+  createCurryLogStreamFileConsumer,
   curryLog,
   curryLogCleanConsoleConsumer,
 } from "./curry-log";
@@ -30,29 +30,17 @@ import {
   overtaking,
 } from "./overtaking";
 import { retry } from "./otapi/util";
+import { pathExists, remove } from "fs-extra";
+
+process.on("unhandledRejection", (error: any): void => {
+  debugger;
+  console.error("==== unhandledRejection ====", "\n", error.stack, "\n");
+});
 
 const mkdir = promisify(mkdirCallback);
 const writeFile = promisify(writeFileCallback);
 
-const cooldownMs = 100;
-
-const fsConversionTable: Record<string, undefined | string> = {
-  "*": "-",
-  "/": "=",
-  ":": "=",
-  "<": "(",
-  ">": ")",
-  "?": " ",
-  "\\": "=",
-  "|": "=",
-  '"': "'",
-};
-function toFSSafe(input: string): string {
-  return input
-    .split("")
-    .map((char): string => fsConversionTable[char] ?? char)
-    .join("");
-}
+const cooldownMs = 2000;
 
 interface OvertakingModule {
   confString: string;
@@ -185,13 +173,6 @@ async function startOpenTrackAndOTAPI(
       const simStarted = otapi.once("simStarted");
       const simPaused = otapi.once("simPaused");
 
-      const failed = new Deferred();
-      setTimeout((): void => {
-        if (failed.pending) {
-          failed.reject(new Error("Timed out."));
-        }
-      }, 120 * 1000);
-
       log.info(
         attempt === 1
           ? "Starting OpenTrack..."
@@ -211,7 +192,7 @@ async function startOpenTrackAndOTAPI(
               line
             )
           ) {
-            failed.reject(new Error(line));
+            // noop
           }
         }
       );
@@ -235,13 +216,14 @@ async function startOpenTrackAndOTAPI(
         }
       );
 
-      await Promise.race([
-        Promise.all([
-          simStarted,
-          simPaused,
-          waitPort({ port: otapi.config.portOT, output: "silent" }),
-        ]),
-        failed.promise,
+      await Promise.all([
+        simStarted,
+        simPaused,
+        waitPort({
+          port: otapi.config.portOT,
+          output: "silent",
+          timeout: 120 * 1000,
+        }),
       ]);
       log.info("OpenTrack is ready for simulation.");
       await otapi.openSimulationPanel({ mode: "Simulation" });
@@ -252,7 +234,14 @@ async function startOpenTrackAndOTAPI(
       log.error(error, "Startup failed.");
 
       for (const callback of cleanupCallbacks.splice(0).reverse()) {
-        await callback();
+        try {
+          await callback();
+        } catch (error) {
+          log.error(
+            error,
+            "An error occured during failed OpenTrack startup cleanup."
+          );
+        }
       }
 
       await new Promise(
@@ -377,10 +366,7 @@ async function prepareForRun(
       });
 
       if (args["log-ot-responses"]) {
-        const debugCallback: AnyEventCallback = async function (
-          name,
-          payload
-        ): Promise<void> {
+        const debugCallback: AnyEventCallback = function (name, payload): void {
           process.stdout.write(
             `\n\n===> OT: ${name}\n${JSON.stringify(payload, null, 4)}\n\n`
           );
@@ -425,182 +411,218 @@ async function doOneRun(
     runfiles: TmpRunfilePair;
   }
 ): Promise<void> {
-  return retry(
-    log,
-    async ({ attempt }): Promise<void> => {
-      if (attempt > 1) {
-        log.warn(`Starting rerun (attempt ${attempt})...`);
-      } else {
-        log.info("Starting run...");
-      }
+  try {
+    console.time("Single run");
+    return retry(
+      log,
+      async ({ attempt }): Promise<void> => {
+        try {
+          console.time("Single run attempt");
 
-      const {
-        command,
-        otapi,
-        simulationRunning,
-        trainCounter,
-      } = await startOpenTrackAndOTAPI(log("startup"), {
-        runNumber,
-        runSuffix,
-        runfiles,
-      });
-      command.returnCode.catch().then(
-        async (): Promise<void> => {
-          log.info(
-            `OpenTrack exited with exit code ${await command.returnCode}.`
+          if (attempt > 1) {
+            log.warn(`Starting rerun (attempt ${attempt})...`);
+          } else {
+            log.info("Starting run...");
+          }
+
+          const {
+            command,
+            otapi,
+            simulationRunning,
+            trainCounter,
+          } = await startOpenTrackAndOTAPI(log("startup"), {
+            runNumber,
+            runSuffix,
+            runfiles,
+          });
+          command.returnCode.catch().then(
+            async (): Promise<void> => {
+              log.info(
+                `OpenTrack exited with exit code ${await command.returnCode}.`
+              );
+              log.info("Stopping the app...");
+              otapi.kill();
+            }
           );
-          log.info("Stopping the app...");
-          otapi.kill();
+
+          const { cleanup, setup } = overtaking({
+            ...overtakingParamsBase,
+            otapi,
+          });
+          try {
+            await setup();
+
+            // The simulation has to be stopped right before it ends to detect and
+            // react to stuck trains situation.
+            await otapi.setSimulationPauseTime({
+              time: await runfiles.tmp.readDayTimeValue("stop"),
+            });
+
+            log.info("Starting simulation...");
+            const simulationEnd = otapi.once("simStopped");
+            const simulationContinued = otapi.once("simContinued");
+            await startUnless(otapi);
+            await simulationContinued;
+            log.info("Simulating...");
+
+            await simulationRunning;
+            log.info("Simulation ended.");
+            await cleanup();
+            await continueUnless(otapi, trainCounter);
+            await simulationEnd;
+
+            // Wait for the process to finish. OpenTrack doesn't handle well when
+            // the app stops responding when it's running.
+            log.info("Waiting for OpenTrack to terminate...");
+            await command.returnCode;
+            log.info("OpenTrack closed.");
+          } finally {
+            await cleanup();
+            await otapi.kill();
+            log.info("OTAPI stopped.");
+            log.info();
+          }
+        } finally {
+          console.timeEnd("Single run attempt");
         }
-      );
-
-      const { cleanup, setup } = overtaking({
-        ...overtakingParamsBase,
-        otapi,
-      });
-      try {
-        await setup();
-
-        // The simulation has to be stopped right before it ends to detect and
-        // react to stuck trains situation.
-        await otapi.setSimulationPauseTime({
-          time: await runfiles.tmp.readDayTimeValue("stop"),
-        });
-
-        log.info("Starting simulation...");
-        const simulationEnd = otapi.once("simStopped");
-        const simulationContinued = otapi.once("simContinued");
-        await startUnless(otapi);
-        await simulationContinued;
-        log.info("Simulating...");
-
-        await simulationRunning;
-        log.info("Simulation ended.");
-        await cleanup();
-        await continueUnless(otapi, trainCounter);
-        await simulationEnd;
-
-        // Wait for the process to finish. OpenTrack doesn't handle well when
-        // the app stops responding when it's running.
-        log.info("Waiting for OpenTrack to terminate...");
-        await command.returnCode;
-        log.info("OpenTrack closed.");
-      } finally {
-        await cleanup();
-        await otapi.kill();
-        log.info("OTAPI stopped.");
-        log.info();
       }
-    }
-  ).result;
+    ).result;
+  } finally {
+    console.timeEnd("Single run");
+  }
 }
 
 const logFilePath = args["log-file"];
 const log = curryLog(
   curryLogCleanConsoleConsumer,
-  ...(logFilePath != null ? [createCurryLogFileConsumer(logFilePath)] : [])
+  ...(logFilePath != null
+    ? [createCurryLogStreamFileConsumer(logFilePath)]
+    : [])
 ).get("index");
 
 (async (): Promise<void> => {
-  const runfiles = await createTmpRunfilePair(
-    args["ot-runfile"],
-    args["ot-runfile"].endsWith(".txt")
-      ? args["ot-runfile"].slice(0, -4) + ".tmp.txt"
-      : args["ot-runfile"] + ".tmp.txt"
-  );
-
-  const infrastructure = await infrastructureFactory.buildFromFiles(
-    log("infrastructure"),
-    {
-      courses: args["ot-export-courses"],
-      infrastructureOTML: args["ot-export-infrastructure-otml"],
-      infrastructureTrafIT: args["ot-export-infrastructure-trafit"],
-      rollingStock: args["ot-export-rolling-stock"],
-      timetables: args["ot-export-timetable"],
-    }
-  );
-
-  log.info(
-    [
-      "Infrastructure:",
-
-      `  ${infrastructure.trains.size} trains ` +
-        `(${Math.min(
-          ...[...infrastructure.trains.values()].map(
-            (train): number => train.length
-          )
-        )} m shortest, ` +
-        `${Math.max(
-          ...[...infrastructure.trains.values()].map(
-            (train): number => train.length
-          )
-        )} m longest, ` +
-        `${Math.min(
-          ...[...infrastructure.trains.values()].map(
-            (train): number => train.maxSpeed
-          )
-        )} km/h slowest, ` +
-        `${Math.max(
-          ...[...infrastructure.trains.values()].map(
-            (train): number => train.maxSpeed
-          )
-        )} km/h fastest),`,
-
-      `  ${infrastructure.itineraries.size} itineraries ` +
-        `(${infrastructure.itinerariesLength / 1000} km, ` +
-        `${infrastructure.mainItineraries.size} used as main itineraries),`,
-
-      `  ${infrastructure.paths.size} paths ` +
-        `(${infrastructure.pathsLength / 1000} km),`,
-
-      `  ${infrastructure.routes.size} routes ` +
-        `(${infrastructure.routesLength / 1000} km).`,
-
-      `  ${infrastructure.vertexes.size} vertexes,`,
-
-      `  ${infrastructure.stations.size} stations,`,
-
-      `  ${infrastructure.timetables.size} timetables.`,
-    ].join("\n")
-  );
-
-  const overtakingModules: OvertakingModule[] = await Promise.all(
-    args["overtaking-module"].map(
-      async (confString): Promise<OvertakingModule> => {
-        const [nameOrPath, paramsString] = confString.split("?", 2);
-
-        const params =
-          typeof paramsString === "string" && paramsString.length > 0
-            ? JSON.parse(paramsString)
-            : null;
-
-        if (nameOrPath.includes("/") || nameOrPath.includes("\\")) {
-          const path = nameOrPath;
-          return {
-            confString: confString,
-            fsConfString: toFSSafe(confString),
-            module: (
-              await import(resolve(process.cwd(), path))
-            ).decisionModuleFactory.create(params),
-          };
-        } else if (
-          Object.prototype.hasOwnProperty.call(
-            decisionModuleFactories,
-            nameOrPath
-          )
-        ) {
-          const name = nameOrPath;
-          return {
-            confString: confString,
-            fsConfString: toFSSafe(confString),
-            module: decisionModuleFactories[name].create(params),
-          };
-        } else {
-          throw new Error(`Unknown module "${nameOrPath}".`);
-        }
+  const [
+    stopFilePath,
+    runfiles,
+    infrastructure,
+    overtakingModules,
+  ] = await Promise.all([
+    (async (): Promise<string | null> => {
+      const stopFilePath = args["stop-file"];
+      if (stopFilePath != null) {
+        await remove(stopFilePath);
       }
-    )
-  );
+      return stopFilePath;
+    })(),
+    ((): Promise<TmpRunfilePair> => {
+      return createTmpRunfilePair(
+        args["ot-runfile"],
+        args["ot-runfile"].endsWith(".txt")
+          ? args["ot-runfile"].slice(0, -4) + ".tmp.txt"
+          : args["ot-runfile"] + ".tmp.txt"
+      );
+    })(),
+    (async (): Promise<Infrastructure> => {
+      const infrastructure = await infrastructureFactory.buildFromFiles(
+        log("infrastructure"),
+        {
+          courses: args["ot-export-courses"],
+          infrastructureOTML: args["ot-export-infrastructure-otml"],
+          infrastructureTrafIT: args["ot-export-infrastructure-trafit"],
+          rollingStock: args["ot-export-rolling-stock"],
+          timetables: args["ot-export-timetable"],
+        }
+      );
+
+      log.info(
+        [
+          "Infrastructure:",
+
+          `  ${infrastructure.trains.size} trains ` +
+            `(${Math.min(
+              ...[...infrastructure.trains.values()].map(
+                (train): number => train.length
+              )
+            )} m shortest, ` +
+            `${Math.max(
+              ...[...infrastructure.trains.values()].map(
+                (train): number => train.length
+              )
+            )} m longest, ` +
+            `${Math.min(
+              ...[...infrastructure.trains.values()].map(
+                (train): number => train.maxSpeed
+              )
+            )} km/h slowest, ` +
+            `${Math.max(
+              ...[...infrastructure.trains.values()].map(
+                (train): number => train.maxSpeed
+              )
+            )} km/h fastest),`,
+
+          `  ${infrastructure.itineraries.size} itineraries ` +
+            `(${infrastructure.itinerariesLength / 1000} km, ` +
+            `${infrastructure.mainItineraries.size} used as main itineraries),`,
+
+          `  ${infrastructure.paths.size} paths ` +
+            `(${infrastructure.pathsLength / 1000} km),`,
+
+          `  ${infrastructure.routes.size} routes ` +
+            `(${infrastructure.routesLength / 1000} km).`,
+
+          `  ${infrastructure.vertexes.size} vertexes,`,
+
+          `  ${infrastructure.stations.size} stations,`,
+
+          `  ${infrastructure.timetables.size} timetables.`,
+        ].join("\n")
+      );
+
+      return infrastructure;
+    })(),
+    ((): Promise<readonly OvertakingModule[]> => {
+      return Promise.all(
+        args["overtaking-module"].map(
+          async (confString): Promise<OvertakingModule> => {
+            const [nameOrPath, outputDirName, paramsString] = confString.split(
+              "?",
+              3
+            );
+
+            const params =
+              typeof paramsString === "string" && paramsString.length > 0
+                ? (JSON.parse(paramsString) as Record<string, any>)
+                : {};
+
+            if (nameOrPath.includes("/") || nameOrPath.includes("\\")) {
+              const path = nameOrPath;
+              return {
+                confString: confString,
+                fsConfString: outputDirName,
+                module: (
+                  await import(resolve(process.cwd(), path))
+                ).decisionModuleFactory.create(params),
+              };
+            } else if (
+              Object.prototype.hasOwnProperty.call(
+                decisionModuleFactories,
+                nameOrPath
+              )
+            ) {
+              const name = nameOrPath;
+              return {
+                confString,
+                fsConfString: outputDirName,
+                module: decisionModuleFactories[name].create(params),
+              };
+            } else {
+              throw new Error(`Unknown module "${nameOrPath}".`);
+            }
+          }
+        )
+      );
+    })(),
+  ]);
 
   const overtakingParamsBase = {
     infrastructure,
@@ -667,14 +689,14 @@ const log = curryLog(
     } else if (
       Number.isInteger(firstRunDelayScenario) &&
       Number.isInteger(lastRunDelayScenario) &&
-      1 <= firstRunDelayScenario &&
-      firstRunDelayScenario <= lastRunDelayScenario &&
-      lastRunDelayScenario <= 200
+      1 <= Math.min(firstRunDelayScenario, lastRunDelayScenario) &&
+      Math.max(firstRunDelayScenario, lastRunDelayScenario) <= 200
     ) {
       for (
         let runNumber = firstRunDelayScenario;
-        runNumber <= lastRunDelayScenario;
-        ++runNumber
+        Math.min(firstRunDelayScenario, lastRunDelayScenario) <= runNumber &&
+        runNumber <= Math.max(firstRunDelayScenario, lastRunDelayScenario);
+        runNumber += firstRunDelayScenario < lastRunDelayScenario ? 1 : -1
       ) {
         for (const { fsConfString, module } of overtakingModules) {
           await doOneRun(log("run", "" + runNumber), {
@@ -684,10 +706,14 @@ const log = curryLog(
             runfiles,
           });
         }
+        if (stopFilePath != null && (await pathExists(stopFilePath))) {
+          await remove(stopFilePath);
+          break;
+        }
       }
     } else {
       throw new TypeError(
-        "First and last run options have to be in <1, 200> integer range and first run has to be smaller."
+        "First and last run options have to be in <1, 200> integer range."
       );
     }
   } else {
@@ -731,6 +757,6 @@ const log = curryLog(
     process.exit(0);
   })
   .catch((error): void => {
-    log.error(error);
+    log.error(error, "An error bubbled all the way up, no idea what to do.");
     process.exit(1);
   });

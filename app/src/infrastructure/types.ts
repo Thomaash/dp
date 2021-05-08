@@ -67,12 +67,14 @@ export interface Vehicle {
 }
 
 export interface Formation {
+  readonly category: string;
   readonly formationID: string;
   readonly length: number;
   readonly maxSpeed: number;
 }
 
 export interface Train {
+  readonly category: string;
   readonly itineraries: readonly Itinerary[];
   readonly length: number;
   readonly mainItinerary: Itinerary;

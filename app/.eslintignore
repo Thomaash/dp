@@ -1,2 +1,4 @@
+/__snapshots__/
 /dist/
+/local/dist-*
 /node_modules/

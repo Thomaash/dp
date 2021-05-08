@@ -18,11 +18,15 @@ export interface DecisionModuleAPI {
 
   formatSimulationTime(simulationTime: number, ms?: boolean): string;
 
-  cancelOvertaking(overtaking: Train, waiting: Train): Promise<void>;
-  planOvertaking(overtaking: Train, waiting: Train): Promise<void>;
+  cancelOvertaking(overtaking: Train, waiting: Train): void;
+  planOvertaking(overtaking: Train, waiting: Train): void;
 
   getTrain(trainID: string): Train;
-  getTrainsDelayedArrivalAtStation(train: Train, station: Station): number;
+  getTrainsDelayedArrivalAtStation(
+    train: Train,
+    station: Station,
+    stopTimeAdjustment?: boolean
+  ): number;
   getTrainsLastStation(train: Train): Station | undefined;
   getTrainsInArea(area: Area): { train: Train; position: number }[];
   getTrainsTimetableReserve(
@@ -78,7 +82,7 @@ export interface NewTrainEntedOvertakingAreaParams extends Time {
 
 export interface DecisionModuleFactory {
   name: string;
-  create(params: any): DecisionModule;
+  create(params: Record<string, any>): DecisionModule;
 }
 
 export interface DecisionModule {

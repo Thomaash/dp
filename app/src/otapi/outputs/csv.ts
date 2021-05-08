@@ -77,14 +77,15 @@ export class CSV<CSVRecord extends Record<HK, any>, HK extends string> {
         // Convert arrays of fields into records.
         .map(
           (fields): RawCSVRecord<HK> =>
-            fields.reduce<RawCSVRecord<HK>>((acc, field, i): RawCSVRecord<
-              HK
-            > => {
-              if (keys[i] != null) {
-                acc[keys[i]] = field;
-              }
-              return acc;
-            }, Object.create(null) as RawCSVRecord<HK>)
+            fields.reduce<RawCSVRecord<HK>>(
+              (acc, field, i): RawCSVRecord<HK> => {
+                if (keys[i] != null) {
+                  acc[keys[i]] = field;
+                }
+                return acc;
+              },
+              Object.create(null) as RawCSVRecord<HK>
+            )
         )
         // Convert using user converters.
         .map(

@@ -111,6 +111,10 @@ export async function parseInfrastructure(
     xmlRollingStockDocument["railml"]["rollingstock"][0]["formations"][0][
       "formation"
     ];
+  const xmlCategories: any[] =
+    xmlRollingStockDocument["railml"]["timetable"][0]["categories"][0][
+      "category"
+    ];
   const formations = xmlFormations.reduce<Map<string, Formation>>(
     (acc, xmlFormation): Map<string, Formation> => {
       const formationID = xmlFormation.$.name;
@@ -138,9 +142,18 @@ export async function parseInfrastructure(
         return Math.min(acc, vehicleMaxSpeed);
       }, Number.POSITIVE_INFINITY);
 
+      const category: string | null = xmlCategories.find(
+        (xmlCategory): boolean =>
+          xmlCategory.$.id === xmlFormation["categoryRef"][0].$.ref
+      )?.$.name;
+      if (category == null) {
+        throw new Error(`Can't find category for formation ${formationID}.`);
+      }
+
       return acc.set(
         formationID,
         Object.freeze<Formation>({
+          category,
           formationID,
           length,
           maxSpeed,
@@ -448,30 +461,30 @@ export async function parseInfrastructure(
     );
 
     const endSignalToReverseSignalDistance = ((): number | null => {
-      const lastVertex = routeVertexes[routeVertexes.length - 1];
+      const routeVertexesReverse = [...routeVertexes].reverse();
+
+      const lastVertex = routeVertexesReverse[0];
       if (lastVertex?.hasSignal !== true) {
         return null;
       }
 
-      const secondToLastVertexIndex = [...routeVertexes]
-        .reverse()
-        .findIndex((vertex, i): boolean => i > 0 && vertex.hasSignal);
-      if (secondToLastVertexIndex < 0) {
+      const signalInOppositeDirectionVertexIndex = routeVertexesReverse.findIndex(
+        (vertex, i): boolean => i > 0 && vertex.neighborVertex.hasSignal
+      );
+      if (signalInOppositeDirectionVertexIndex < 0) {
         return null;
       }
 
-      const distance = [...routeVertexes]
-        .reverse()
-        .slice(0, secondToLastVertexIndex)
-        .map((vertex, i, arr): number => {
+      const distance = routeVertexesReverse
+        .slice(0, signalInOppositeDirectionVertexIndex + 1)
+        .map((vertex1, i, arr): number => {
           if (i < 1) {
             return 0;
           }
 
-          const vertex1 = vertex;
           const vertex2 = arr[i - 1];
           const distance = vertexToVertexDistances.get(
-            ck(vertex2.vertexID, vertex1.neighborVertex.vertexID)
+            ck(vertex1.neighborVertex.vertexID, vertex2.vertexID)
           );
           if (distance == null) {
             throw new Error(
@@ -780,6 +793,11 @@ export async function parseInfrastructure(
       throw new Error(`Can't find max speed for train ${trainID}.`);
     }
 
+    const category = formations.get(xmlCourse.$.train)?.category;
+    if (category == null) {
+      throw new Error(`Can't find category for train ${trainID}.`);
+    }
+
     if (!timetables.has(trainID)) {
       log.warn(
         `Can't find any timetable for train ${trainID}. Empty one was created.`
@@ -794,6 +812,7 @@ export async function parseInfrastructure(
     return acc.set(
       trainID,
       Object.freeze<Train>({
+        category,
         itineraries: trainItineraries,
         length,
         mainItinerary: trainItineraries[0],

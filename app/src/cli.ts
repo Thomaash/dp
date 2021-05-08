@@ -120,6 +120,12 @@ const y = yargs
     describe: "The delay scenario to end with (inclusive).",
     type: "number",
   })
+  .option("stop-file", {
+    default: null,
+    describe:
+      "If this file exists the simulation will gracefully stop after finishing all runs with the already started delay scenario. Note that the file will be deleted if it exists before the simulation is started.",
+    type: "string",
+  })
   .option("pause-after-each-run", {
     default: false,
     describe:

@@ -35,7 +35,8 @@ export class DecisionModuleAPIFactory {
       },
       getTrainsDelayedArrivalAtStation: (
         train,
-        station
+        station,
+        stopTimeAdjustment = false
       ): ReturnType<DecisionModuleAPI["getTrainsDelayedArrivalAtStation"]> => {
         const entry = train.timetable.entries.find(
           (entry): boolean => entry.station === station
@@ -68,8 +69,11 @@ export class DecisionModuleAPIFactory {
           : // No stations no reserve.
             0;
 
-        const delay = this._tracker.getDelay(train.trainID);
-
+        const delay =
+          this._tracker.getDelay(train.trainID) +
+          (stopTimeAdjustment
+            ? this._tracker.getCurrentStopDuration(train.trainID)
+            : 0);
         const delayedArrival = plannedArrival + Math.max(0, delay - reserve);
 
         return delayedArrival;
@@ -142,7 +146,7 @@ export class DecisionModuleAPIFactory {
     return {
       api: Object.freeze<DecisionModuleAPI>({
         ...this._apiBase,
-        planOvertaking: async (overtaking, waiting): Promise<void> => {
+        planOvertaking: (overtaking, waiting): void => {
           plannedOvertakings.plan(
             (): Promise<void> =>
               this._trainOvertaking.planOvertaking(
@@ -152,7 +156,7 @@ export class DecisionModuleAPIFactory {
               )
           );
         },
-        cancelOvertaking: async (overtaking, waiting): Promise<void> => {
+        cancelOvertaking: (overtaking, waiting): void => {
           canceledOvertakings.plan(
             (): Promise<void> =>
               this._trainOvertaking.cancelOvertaking(

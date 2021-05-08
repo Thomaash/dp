@@ -69,6 +69,7 @@ export class TrainTracker {
   private readonly _areas = new Set<Area>();
   private readonly _distancesToEnd = new MapMap<Area, Route, number>();
 
+  private readonly _firstStopReports = new Map<Train, Report>();
   private readonly _lastRoutes = new Map<Train, Route>();
   private readonly _lastStations = new Map<Train, Station>();
   private readonly _reports = new Map<Train, Report>();
@@ -163,6 +164,14 @@ export class TrainTracker {
     );
   }
 
+  public getFirstStopReport(train: Train | string): Report | undefined {
+    return this._firstStopReports.get(
+      typeof train === "string"
+        ? this._infrastructure.getOrThrow("train", train)
+        : train
+    );
+  }
+
   public getTrainsLastStation(train: Train | string): Station | undefined {
     return this._lastStations.get(
       typeof train === "string"
@@ -197,6 +206,17 @@ export class TrainTracker {
 
   public getDelay(train: Train | string): number {
     return this.getReport(train)?.delay ?? 0;
+  }
+
+  public getCurrentStopDuration(train: Train | string): number {
+    const report = this.getReport(train);
+    const firstStopReport = this.getFirstStopReport(train);
+
+    if (report != null && firstStopReport != null) {
+      return report.time - firstStopReport.time;
+    } else {
+      return 0;
+    }
   }
 
   public isReservedBy(train: Train | string, route: Route | string): boolean {
@@ -470,6 +490,13 @@ export class TrainTracker {
   ): void {
     const train = this._infrastructure.getOrThrow("train", newReport.trainID);
     this._reports.set(train, newReport);
+    if (newReport.speed === 0 && newReport.acceleration === 0) {
+      if (!this._firstStopReports.has(train)) {
+        this._firstStopReports.set(train, newReport);
+      }
+    } else {
+      this._firstStopReports.delete(train);
+    }
   }
 
   private _handleRouteEntry(
@@ -552,6 +579,7 @@ export class TrainTracker {
   ): void {
     const train = this._infrastructure.getOrThrow("train", trainID);
 
+    this._firstStopReports.delete(train);
     this._lastRoutes.delete(train);
     this._lastStations.delete(train);
     this._reports.delete(train);

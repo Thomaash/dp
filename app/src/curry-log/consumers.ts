@@ -1,4 +1,4 @@
-import { createWriteStream } from "fs";
+import { appendFile as appendFileCallback, createWriteStream } from "fs";
 import { inspect } from "util";
 
 import { formatISO9075 } from "date-fns";
@@ -71,15 +71,17 @@ export function curryLogCleanConsoleConsumer({
 }
 
 const levelLetters = Object.freeze<Record<CurryLogLevel, string>>({
-  debug: "d",
-  error: "e",
-  info: "i",
+  debug: "D",
+  error: "E",
+  info: "I",
   log: "L",
-  trace: "t",
-  warn: "w",
+  trace: "T",
+  warn: "W",
 });
-export function createCurryLogFileConsumer(path: string): CurryLogConsumer {
-  const writeStream = createWriteStream(path);
+export function createCurryLogStreamFileConsumer(
+  logFilePath: string
+): CurryLogConsumer {
+  const writeStream = createWriteStream(logFilePath);
 
   return function curryLogFileConsumer({
     error,
@@ -88,7 +90,7 @@ export function createCurryLogFileConsumer(path: string): CurryLogConsumer {
     path,
     time,
   }: CurryLogConsumerParams): void {
-    // Don't use os.EOL here as util.inspect is allways POSIX.
+    // Don't use os.EOL here as util.inspect is always POSIX.
     writeStream.write(
       [
         `➤ ${levelLetters[level]} /${path} - ${formatISO9075(time)}`,
@@ -102,6 +104,42 @@ export function createCurryLogFileConsumer(path: string): CurryLogConsumer {
         "",
       ].join("\n"),
       "utf-8"
+    );
+  };
+}
+export function createCurryLogAppendFileConsumer(
+  logFilePath: string
+): CurryLogConsumer {
+  return function curryLogFileConsumer({
+    error,
+    level,
+    messages,
+    path,
+    time,
+  }: CurryLogConsumerParams): void {
+    // Don't use os.EOL here as util.inspect is always POSIX.
+    appendFileCallback(
+      logFilePath,
+      [
+        `➤ ${levelLetters[level]} /${path} - ${formatISO9075(time)}`,
+        ...(error != null ? [error.stack ?? inspect(error)] : []),
+        ...messages.map((message): string =>
+          typeof message === "string"
+            ? message
+            : inspect(message, { depth: Number.POSITIVE_INFINITY })
+        ),
+        "",
+        "",
+      ].join("\n"),
+      "utf-8",
+      (error): void => {
+        if (error != null) {
+          /* eslint-disable-next-line no-console */
+          console.error("Error occurred while appending to the log.");
+          /* eslint-disable-next-line no-console */
+          console.error(error);
+        }
+      }
     );
   };
 }

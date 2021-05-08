@@ -2,11 +2,17 @@ import { DecisionModule, DecisionModuleFactory } from "../";
 
 export const decisionModuleFactory: DecisionModuleFactory = {
   name: "max-speed",
-  create(): DecisionModule {
+  create(params: {}): DecisionModule {
+    if (Object.keys(params).length !== 0) {
+      throw new Error(
+        `Superfluous parameters: ${Object.keys(params).join(", ")}.`
+      );
+    }
+
     return {
       name: "max-speed",
       newTrainEnteredOvertakingArea(
-        { getTrainsInArea, log, planOvertaking },
+        { getTrainsInArea, planOvertaking },
         { overtakingArea }
       ): void {
         const trainsOnItinerary = getTrainsInArea(overtakingArea);
@@ -22,9 +28,7 @@ export const decisionModuleFactory: DecisionModuleFactory = {
           planOvertaking(
             trainsOnItinerary[1].train,
             trainsOnItinerary[0].train
-          ).catch((error): void => {
-            log.error(error, "Can't plan overtaking.");
-          });
+          );
         }
       },
     };

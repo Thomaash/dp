@@ -9,7 +9,12 @@ import {
 export const decisionModuleFactory: DecisionModuleFactory = {
   name: "timetable-guess",
   create(params: { threshold: number }): DecisionModule {
-    const { threshold = 60 } = params;
+    const { threshold = 60, ...paramsRest } = params;
+    if (Object.keys(paramsRest).length !== 0) {
+      throw new Error(
+        `Superfluous parameters: ${Object.keys(paramsRest).join(", ")}.`
+      );
+    }
 
     return {
       name: "timetable-guess",
@@ -90,9 +95,7 @@ export const decisionModuleFactory: DecisionModuleFactory = {
               }).`
             );
 
-            planOvertaking(train2, train1).catch((error): void => {
-              log.error(error, "Can't plan overtaking.");
-            });
+            planOvertaking(train2, train1);
           } else {
             log.info(
               `Don't overtake ${train1.trainID} by ${train2.trainID} at ${
@@ -104,9 +107,7 @@ export const decisionModuleFactory: DecisionModuleFactory = {
               }.`
             );
 
-            cancelOvertaking(train2, train1).catch((error): void => {
-              log.error(error, "Can't plan overtaking:");
-            });
+            cancelOvertaking(train2, train1);
           }
         }
       },

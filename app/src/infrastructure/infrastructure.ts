@@ -288,11 +288,11 @@ export class Infrastructure implements InfrastructureData {
       distanceMap.set(route, route.length);
     }
 
-    type Item = {
+    interface Item {
       firstRoute: Route;
       length: number;
       routes: ReadonlySet<Route>;
-    };
+    }
     const queue = new PriorityQueue<Item>(
       (a, b): number => a.length - b.length
     );

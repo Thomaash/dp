@@ -151,9 +151,12 @@ export class TrainOvertaking {
         blocked: waiting.trainID,
       })
     ) {
+      const numberOfBlockedTrains = this._blocking.countBlockedAtPlace(
+        station.stationID
+      );
       if (
         // We can safely continue only if max waiting wasn't reached yet.
-        this._blocking.countBlockedAtPlace(station.stationID) >= maxWaiting
+        numberOfBlockedTrains >= maxWaiting
       ) {
         // Too many trains waiting at the station and the train that should be
         // overtaken here is not one of them.
@@ -164,24 +167,29 @@ export class TrainOvertaking {
             overtaking.trainID +
             " as too many trains would be waiting at " +
             station.stationID +
-            "."
+            " (" +
+            (numberOfBlockedTrains + 1) +
+            " when the max is " +
+            maxWaiting +
+            ")."
         );
         return;
       }
+
+      const shortestWaitingTrack = Math.min(
+        ...[...waitingRoutes.values()]
+          .filter((route): boolean => waiting.routes.has(route))
+          .map(
+            (route): number =>
+              route.endSignalToReverseSignalDistance ?? Number.POSITIVE_INFINITY
+          )
+      );
       if (
         // We can only make the train wait on a track that is short enough.
-        Math.min(
-          ...[...waitingRoutes.values()]
-            .filter((route): boolean => waiting.routes.has(route))
-            .map(
-              (route): number =>
-                route.endSignalToReverseSignalDistance ??
-                Number.POSITIVE_INFINITY
-            )
-        ) > waiting.length
+        shortestWaitingTrack < waiting.length
       ) {
-        // Too many trains waiting at the station and the train that should be
-        // overtaken here is not one of them.
+        // The train is too long and may cause a deadlock by blocking the
+        // overtaking train from passing by.
         this._log.info(
           "Can't plan overtaking of " +
             waiting.trainID +
@@ -189,7 +197,11 @@ export class TrainOvertaking {
             overtaking.trainID +
             " as the train is to long to wait at " +
             station.stationID +
-            "."
+            " (the train has " +
+            waiting.length +
+            "m when shortest track has " +
+            shortestWaitingTrack +
+            "m)."
         );
         return;
       }

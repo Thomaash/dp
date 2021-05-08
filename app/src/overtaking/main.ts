@@ -28,7 +28,7 @@ export function overtaking({
   const overtakingData = getOvertakingData(infrastructure);
   const { overtakingAreas } = overtakingData;
 
-  async function setup(): Promise<void> {
+  function setup(): Promise<void> {
     const tracker = new TrainTracker(
       log("train-tracker"),
       otapi,
@@ -58,7 +58,7 @@ export function overtaking({
           tracker.onArea(
             "train-entered-area",
             overtakingArea,
-            async ({ train, route, time }): Promise<void> => {
+            ({ train, route, time }): void => {
               otapi.pauseFor(
                 async (): Promise<void> => {
                   try {
@@ -95,7 +95,7 @@ export function overtaking({
           tracker.onArea(
             "train-left-area",
             overtakingArea,
-            async ({ train }): Promise<void> => {
+            ({ train }): void => {
               otapi.pauseFor(
                 async (): Promise<void> => {
                   try {
@@ -140,46 +140,46 @@ export function overtaking({
             log.error(error, `Can't allow routes for train ${trainID}.`, error);
           });
       }),
-      otapi.on(
-        "trainDeleted",
-        async (_, { trainID }): Promise<void> => {
-          otapi.pauseFor(
-            async (): Promise<void> => {
-              const train = infrastructure.getOrThrow("train", trainID);
+      otapi.on("trainDeleted", (_, { trainID }): void => {
+        otapi.pauseFor(
+          async (): Promise<void> => {
+            const train = infrastructure.getOrThrow("train", trainID);
 
-              log.info(`Train ${trainID} was deleted, release blocked trains.`);
+            log.info(`Train ${trainID} was deleted, release blocked trains.`);
 
-              await Promise.all(
-                overtakingAreas.map(
-                  (overtakingArea): Promise<void> =>
-                    trainOvertaking
-                      .releaseTrains(overtakingArea, train)
-                      .catch((error): void => {
-                        log.error(
-                          error,
-                          "Failed to release trains blocked by " +
-                            train.trainID +
-                            " after overtaking in " +
-                            overtakingArea.overtakingAreaID +
-                            ".",
-                          error
-                        );
-                      })
-                )
-              );
-            }
-          );
-        }
-      ),
+            await Promise.all(
+              overtakingAreas.map(
+                (overtakingArea): Promise<void> =>
+                  trainOvertaking
+                    .releaseTrains(overtakingArea, train)
+                    .catch((error): void => {
+                      log.error(
+                        error,
+                        "Failed to release trains blocked by " +
+                          train.trainID +
+                          " after overtaking in " +
+                          overtakingArea.overtakingAreaID +
+                          ".",
+                        error
+                      );
+                    })
+              )
+            );
+          }
+        );
+      }),
     ];
     cleanupCallbacks.push(...removeListeners);
+
+    return Promise.resolve();
   }
 
-  async function cleanup(): Promise<void> {
+  function cleanup(): Promise<void> {
     cleanupCallbacks
       .splice(0)
       .reverse()
       .forEach((callback): void => void callback());
+    return Promise.resolve();
   }
 
   return { setup, cleanup };

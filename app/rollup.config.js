@@ -67,17 +67,20 @@ const plugins = (declarations) => [
 ];
 
 const DIST_APP = process.env.DIST_APP || join("dist", "app");
+const DIST_APP_OTAPI = process.env.DIST_APP || join("dist", "app", "otapi");
 const DIST_OTAPI = process.env.DIST_OTAPI || join("dist", "otapi");
+
+const external = [
+  ...builtins,
+  ...Object.keys(packageJSON.dependencies || {}),
+  ...Object.keys(packageJSON.peerDependencies || {}),
+  ...Object.keys(packageJSON.devDependencies || {}),
+];
 
 export default [
   {
     input: "src/otapi/index.ts",
-    external: [
-      ...builtins,
-      ...Object.keys(packageJSON.dependencies || {}),
-      ...Object.keys(packageJSON.peerDependencies || {}),
-      ...Object.keys(packageJSON.devDependencies || {}),
-    ],
+    external,
     output: {
       file: join(DIST_OTAPI, "index.js"),
       format: "cjs",
@@ -87,12 +90,7 @@ export default [
   },
   {
     input: "src/index.ts",
-    external: [
-      ...builtins,
-      ...Object.keys(packageJSON.dependencies || {}),
-      ...Object.keys(packageJSON.peerDependencies || {}),
-      ...Object.keys(packageJSON.devDependencies || {}),
-    ],
+    external,
     output: {
       file: join(DIST_APP, "index.js"),
       format: "cjs",
@@ -102,6 +100,7 @@ export default [
       ...plugins(false),
       copy({
         targets: [
+          { src: join(DIST_OTAPI, "index.js*"), dest: DIST_APP_OTAPI },
           { src: "static-app-assets/*", dest: DIST_APP },
           {
             src: "package.json",
