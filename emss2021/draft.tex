@@ -1,0 +1,111 @@
+%!TEX TS-program = xelatex
+%!TEX encoding = UTF-8 Unicode
+
+% Document info {{{
+
+\def\documenttitle{TODO}
+\def\documentdate{\today}
+\def\documentauthor{TODO}
+\def\documentkeywords{TODO}
+\def\languages{american,czech}
+
+% }}}
+% Shared configuration {{{
+
+\documentclass[\languages,a4paper,12pt]{article}
+
+% Design
+\raggedright{}
+\usepackage{parskip}
+
+% Fonts
+\usepackage[no-math]{fontspec} % no-math required by mathastext
+\usepackage[light,semibold,default]{sourceserifpro}
+\usepackage[light,semibold]{sourcesanspro}
+\usepackage[light,semibold]{sourcecodepro}
+
+% Other
+\usepackage{babel}
+\usepackage[autostyle]{csquotes}
+\usepackage{titlesec}
+\usepackage{siunitx}
+\usepackage{blindtext}
+
+% Math
+\usepackage{mathtools}
+\usepackage[italic]{mathastext}
+
+% Spacing
+\usepackage[onehalfspacing]{setspace}
+\usepackage{enumitem}
+\setlist{nosep}
+\frenchspacing
+
+% Unumbered but included in TOC
+\newcommand{\unnumberedsection}[1]{%
+	\section*{#1}
+	\phantomsection\addcontentsline{toc}{section}{#1}
+}
+
+% Links in PDF
+\usepackage{hyperref}
+\hypersetup{
+	allcolors=[RGB]{0,150,136},
+	bookmarksnumbered=true,
+	bookmarksopen=true,
+	bookmarksopenlevel=2,
+	colorlinks=true,
+	unicode,
+}
+% has to be imported last to work properly
+
+% Metadata
+\title{\documenttitle}
+\date{\documentdate}
+\author{\documentauthor}
+\pdfstringdefDisableCommands{\def\and{and }}
+\hypersetup{
+	pdftitle={\documenttitle},
+	pdfauthor={\documentauthor},
+	pdfkeywords={\documentkeywords},
+}
+
+% }}}
+
+\begin{document}
+
+\maketitle
+
+\unnumberedsection{Abstract}
+
+In the original article\footnote{TODO original article} an algorithm for more natural train overtaking has been described.
+The goal of this paper is to improve upon it's performance by waving it's single parameter configuration in favor of a more flexible multi parameter configuration while still keeping it simple and intuitive.
+These new parameters allow to overtake stopped trains more aggressively and also to tweak how aggressively/conservative is based on the kind of considered trains (e.g. all other things being equal a passanger train can be more likely to overtake a freight train than the other way around).
+In included case study using over \SI{50}{\km} of tracks trough Pardubice it shows that this approach, if well configured, allows for lower delays overall compared to the original algorithm.
+Especially better results have been achieved for prioritized traffic (in this case passanger over freight).
+
+\section{Algorithm}
+
+The algorithm presented in this paper is based directly on the algorithm presented in TODO\footnote{TODO original article}.
+It's general way of operation is the same, only the parameters and final decision process has been extended.
+
+\subsection{Parameters}
+
+The threshold from the original algorithm has been retained as the basis for decision making and all the new parameters has been added as bonuses or penalties that tweak this threshold for each individual train and it's situation.
+A bonus is expressed as the number of seconds that will be subtracted from given train's expected arrival to given overtaking opportunity, giving the train a more optimistic ETA than it would get otherwise.
+Penalties then work the same way but add time instead (i.e. bonus = -penalty), giving a more pessimistic ETA.
+
+The first and simplest extension allows to penalize a train that stops in given overtaking opportunity.
+The rationale behind this is that since the train will stop anyway, we may as well use this as an opportunity to overtake given train.
+Of course if both considered trains would stop there, they would both get the penalty and its effect would be negated.
+
+The second and more elaborate extension adds a penalty or a bonus to trains based on their categories.
+For example express trains may get a bonus of \SI{60}{\s} and commuter trains may get a penalty of \SI{60}{\s}.
+This will lead to more optimistic ETAs for express trains and more pessimistic ones for commuter trains.
+Since express trains stop in way fewer stations than commuter trains, it is quite a safe assumption that even if an express train doesn't catch up with a commuter train prior to one overtaking opportunity, it's quite likely that the express train will catch up with the commuter train eventually.
+Under this assumption it makes sense to plan overtaking more aggressively when an overtaking of a commuter train by an express train is considered and more conservatively when an overtaking of an express train by a commuter train is considered.
+Of course this can be configured based on completely different reasoning, the example above is just what has been used in the case study in this paper.
+
+\end{document}
+
+% vim:sw=8:ts=8:fdm=marker
