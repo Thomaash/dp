@@ -207,6 +207,9 @@ export class OTTimetable extends CSV<OTTimetableRecord, HeaderKey> {
           string,
           number
         > => {
+          if (acc.has(course)) {
+            throw new Error(`There already is an entry for ${course}.`);
+          }
           acc.set(course, diff);
           return acc;
         }, new Map())
@@ -228,6 +231,9 @@ export class OTTimetable extends CSV<OTTimetableRecord, HeaderKey> {
 
     return [...perGroupDiffs].reduce<Map<GroupName, number>>(
       (acc, [group, diffs]): Map<GroupName, number> => {
+        if (acc.has(group)) {
+          throw new Error(`There already is an entry for ${group}.`);
+        }
         acc.set(
           group,
           [...diffs].reduce<number>((acc, diff): number => acc + diff, 0) /

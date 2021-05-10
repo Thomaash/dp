@@ -1,6 +1,6 @@
 #!/usr/bin/env zsh
 
-cd '/Volumes/Sync/OneDrive - Univerzita Pardubice/DP/model-1'
+cd '/Volumes/Sync/OneDrive - Univerzita Pardubice/DP/model-1' || exit 1
 
 trash otsimcor.run.*.ps1(N)
 trash otsimcor.runfile.*.txt(N)
